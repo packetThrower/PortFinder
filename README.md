@@ -39,3 +39,9 @@ Be sure to run with Wifi desabled on the device. tcpdump will get confused.
 
 `get_ports.sh` - Shell script for doing the samething as the python script. (Only works on Linux and tested against Ubuntu)
 
+## To Contribute
+
+- Be sure to install TK for the GUI dependencies:
+
+        sudo apt install python3-tk
+
