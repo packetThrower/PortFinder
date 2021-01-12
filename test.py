@@ -1,3 +1,4 @@
+import netifaces
 from scapy.all import *
 
 
@@ -17,5 +18,7 @@ def process_packets(pkt):
 if __name__ == "__main__":
     load_contrib("cdp")
 
-    sniff(iface="enxe4b97a866934", prn=process_packets,
-          store=0, filter="ether dst 01:00:0c:cc:cc:cc", count=1)
+    # sniff(iface="enxe4b97a866934", prn=process_packets,
+    #       store=0, filter="ether dst 01:00:0c:cc:cc:cc", count=1)
+
+    print(netifaces.interfaces())
