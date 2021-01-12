@@ -9,6 +9,12 @@ Run these scripts to get lldp or cdp info from a switch that your computer is pl
 * Create Script for LLDP (Aruba will use LLDP)
 * Make multi-platform (Win Version)
 
+## Requirements
+
+- Windows
+
+        [Microsoft Visual C++ 14.0](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+
 ## How to
 
 Be sure to run with Wifi desabled on the device. tcpdump will get confused.

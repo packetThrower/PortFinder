@@ -3,6 +3,7 @@ import tkinter.ttk
 import netifaces
 
 from scapy.all import *
+from tkinter import messagebox
 
 
 #######################################################################################################################
@@ -21,16 +22,21 @@ def run_scan():
     progressb.start()
     
     load_contrib("cdp")
-    
-    # sniff for the CDP packet
-    if nic_selector.get() != '':
-        A_S = AsyncSniffer(iface=nic_selector.get(), prn=process_packets,
-                           store=0, filter="ether dst 01:00:0c:cc:cc:cc", count=1)
-        A_S.start()
-    else:
-        A_S = AsyncSniffer(prn=process_packets,
-                           store=0, filter="ether dst 01:00:0c:cc:cc:cc", count=1)
-        A_S.start()
+
+    try:    
+        # sniff for the CDP packet
+        if nic_selector.get() != '':
+            A_S = AsyncSniffer(iface=nic_selector.get(), prn=process_packets,
+                            store=0, filter="ether dst 01:00:0c:cc:cc:cc", count=1)
+            A_S.start()
+        else:
+            A_S = AsyncSniffer(prn=process_packets,
+                            store=0, filter="ether dst 01:00:0c:cc:cc:cc", count=1)
+            A_S.start()
+    except Exception as e:
+        w_error = messagebox.showerror(title="Error", message=e)
+        print("something went wrong :(")
+        print(e)
 
 #######################################################################################################################
 
@@ -60,6 +66,7 @@ def process_packets(pkt):
 
 
 #######################################################################################################################
+
 root = tkinter.Tk()
 root.title("  Get Port Info")
 root.tk.call('wm', 'iconphoto', root._w, tkinter.PhotoImage(file='otecc.png'))
