@@ -1,9 +1,19 @@
 import tkinter
 import tkinter.ttk
 import netifaces
+import sys
 
-from scapy.all import *
 from tkinter import messagebox
+
+from scapy import sendrecv
+from scapy.arch.windows import get_windows_if_list
+from scapy.main import load_contrib
+
+# Needs to be imported for pyinstaller
+from scapy.contrib import cdp
+
+from platform import system
+from pathlib import Path
 
 
 #######################################################################################################################
@@ -21,23 +31,16 @@ def run_scan():
     progressb.grid()
     progressb.start()
     
-    load_contrib("cdp")
-
-    try:    
-        # sniff for the CDP packet
-        if nic_selector.get() != '':
-            A_S = AsyncSniffer(iface=nic_selector.get(), prn=process_packets,
-                            store=0, filter="ether dst 01:00:0c:cc:cc:cc", count=1)
+    # sniff for the CDP packet
+    if nic_selector.get() != '':
+            A_S = sendrecv.AsyncSniffer(iface=nic_selector.get(), prn=process_packets,
+                            store=0, filter="ether[12:2] <= 1500 && ether[14:2] == 0xAAAA && ether[16:1] == 0x03 && ether[17:2] == 0x0000 && ether[19:1] == 0x0C && ether[20:2] == 0x2000", count=1)
             A_S.start()
-        else:
-            A_S = AsyncSniffer(prn=process_packets,
-                            store=0, filter="ether dst 01:00:0c:cc:cc:cc", count=1)
-            A_S.start()
-    except Exception as e:
-        w_error = messagebox.showerror(title="Error", message=e)
-        print("something went wrong :(")
-        print(e)
-
+    else:
+        A_S = sendrecv.AsyncSniffer(prn=process_packets,
+                        store=0, filter="ether[12:2] <= 1500 && ether[14:2] == 0xAAAA && ether[16:1] == 0x03 && ether[17:2] == 0x0000 && ether[19:1] == 0x0C && ether[20:2] == 0x2000", count=1)
+        A_S.start()
+    
 #######################################################################################################################
 
 
@@ -53,23 +56,38 @@ def process_packets(pkt):
     ent_voicevlan.delete(0, tkinter.END)
     ent_model.delete(0, tkinter.END)
 
-    lbl_sniff_interface.config(text=pkt.sniffed_on)
+    pkt.show()
 
-    ent_switchport.insert(0, pkt['CDPMsgPortID'].iface.decode())
-    ent_switch.insert(0, pkt['CDPMsgDeviceID'].val.decode())
-    ent_ip.insert(0, pkt['CDPMsgMgmtAddr'].addr[0].addr)
-    ent_vlan.insert(0, str(pkt['CDPMsgNativeVLAN'].vlan))
-    ent_voicevlan.insert(0, str(pkt['CDPMsgVoIPVLANReply'].vlan))
-    ent_model.insert(0, pkt['CDPMsgPlatform'].val.decode())
+    try:
+        ent_switchport.insert(0, pkt['CDPMsgPortID'].iface.decode())
+        ent_switch.insert(0, pkt['CDPMsgDeviceID'].val.decode())
+        ent_ip.insert(0, pkt['CDPMsgMgmtAddr'].addr[0].addr)
+        ent_vlan.insert(0, str(pkt['CDPMsgNativeVLAN'].vlan))
+        ent_voicevlan.insert(0, str(pkt['CDPMsgVoIPVLANReply'].vlan))
+        ent_model.insert(0, pkt['CDPMsgPlatform'].val.decode())
+    except Exception as e1:
+        what_to_say = e1.args[0] + "\n\nTry rerunning the scan."
+        messagebox.showerror(title="Bad Packet", message=what_to_say)
 
     progressb.grid_remove()
 
 
 #######################################################################################################################
 
+load_contrib("cdp")
+
+# find the pictures after 
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    bundle_dir = Path(sys._MEIPASS)
+else:
+    bundle_dir = Path(__file__).parent
+
+otecc_png = Path.cwd() / bundle_dir / "otecc.png"
+otecC_small_png = Path.cwd() / bundle_dir / "otecc_small.png"
+
 root = tkinter.Tk()
 root.title("  Get Port Info")
-root.tk.call('wm', 'iconphoto', root._w, tkinter.PhotoImage(file='otecc.png'))
+root.tk.call('wm', 'iconphoto', root._w, tkinter.PhotoImage(file=otecc_png))
 
 content = tkinter.Frame(root, padx=10, pady=10)
 btn_frame = tkinter.Frame(content)
@@ -82,8 +100,6 @@ lbl_vlan = tkinter.Label(content, text="VLAN: ", fg="blue", pady=3)
 lbl_voicevlan = tkinter.Label(content, text="Voice VLAN: ", fg="blue", pady=3)
 lbl_model = tkinter.Label(content, text="Switch Model: ", fg="blue", pady=3)
 lbl_spacer = tkinter.Label(content, text="", pady=3)
-lbl_sniff_interface = tkinter.Label(content, text="", fg="red", pady=3)
-
 
 ent_switch = tkinter.Entry(content, width="30")
 ent_ip = tkinter.Entry(content, width="30")
@@ -101,7 +117,7 @@ progressb = tkinter.ttk.Progressbar(
 progressb.start(10)
 progressb.step(100)
 
-otec_photo = tkinter.PhotoImage(file="otecc_small.png")
+otec_photo = tkinter.PhotoImage(file=otecC_small_png)
 lbl_photo = tkinter.Label(content, image=otec_photo,
                           anchor="e", justify=tkinter.LEFT, width="200")
 
@@ -112,7 +128,15 @@ stop_button = tkinter.Button(
     btn_frame, text="Stop", state="active", padx=60, pady=5, command=stop_thread)
 
 # Get all the NICs and put then into a list.
-nics = netifaces.interfaces()
+nics=[]
+if system() == "Windows":
+    windows_nics = get_windows_if_list()
+    for interface in windows_nics:
+        if "bluetooth" not in interface['name']:
+            nics.append(interface['name'])
+else:
+    nics = netifaces.interfaces()
+
 nic_selector['values'] = nics
 
 # put widgets into the window
@@ -143,8 +167,6 @@ lbl_spacer.grid(row=7, column=0)
 progressb.grid(row=7, column=0, columnspan=2)
 progressb.grid_remove()
 
-lbl_sniff_interface.grid(row=9, column=0, pady=3)
-
 btn_frame.grid(row=8, column=0, columnspan=2)
 start_button.grid(row=0, column=0)
 stop_button.grid(row=0, column=1)
@@ -152,3 +174,5 @@ stop_button.grid(row=0, column=1)
 lbl_photo.grid(row=9, column=1, pady=3)
 
 root.mainloop()
+
+
