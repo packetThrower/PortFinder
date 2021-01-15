@@ -10,7 +10,9 @@ from pathlib import Path
 
 from scapy import sendrecv
 if system() == "Windows":
+    import ctypes
     from scapy.arch.windows import get_windows_if_list
+    
 from scapy.main import load_contrib
 
 # Needs to be imported for pyinstaller
@@ -131,6 +133,10 @@ def process_packets(pkt):
 
 
 def main():
+    if system() == "Windows":
+        myappid = 'PortFinder.0.2.0'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+
     load_contrib("cdp")
     load_contrib("lldp")
 
@@ -154,13 +160,13 @@ class Port_Finder_Window:
             bundle_dir = Path(sys._MEIPASS)
         else:
             bundle_dir = Path(__file__).parent
-        self.otecc_png = Path.cwd() / bundle_dir / "otecc.png"
-        self.otecc_small_png = Path.cwd() / bundle_dir / "otecc_small.png"
+        self.icon_png = Path.cwd() / bundle_dir / "ic_launcher_h.png"
+        self.image_png = Path.cwd() / bundle_dir / "ic_launcher_m_half.png"
 
         # setup root window
         self.root = tkinter.Tk()
         self.root.title("  Get Port Info")
-        self.root.tk.call('wm', 'iconphoto', self.root._w, tkinter.PhotoImage(file=self.otecc_png))
+        self.root.tk.call('wm', 'iconphoto', self.root._w, tkinter.PhotoImage(file=self.icon_png))
 
         # create some containers to hold widgets
         self.content = tkinter.Frame(self.root, padx=10, pady=10, bg="#505050")
@@ -225,7 +231,7 @@ class Port_Finder_Window:
             self.btn_frame, text="Stop", state="active", padx=60, pady=5, command=stop_thread)
 
         # add watermark
-        self.otec_photo = tkinter.PhotoImage(file=self.otecc_small_png)
+        self.otec_photo = tkinter.PhotoImage(file=self.image_png)
         self.lbl_photo = tkinter.Label(self.content, image=self.otec_photo, anchor="e", justify=tkinter.LEFT, width="200", bg="#505050")
 
         # setup the radio buttons
