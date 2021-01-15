@@ -9,11 +9,15 @@ Run these scripts to get lldp or cdp info from a switch that your computer is pl
 * Create Script for LLDP (Aruba will use LLDP)
 * Make multi-platform (Win Version)
 
-## Requirements
+## Requirements for building
 
 - Windows
 
-        [Microsoft Visual C++ 14.0](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+        [Microsoft Visual C++ 14.0](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Warning: Large download) - Required for netifaces.
+
+- Linux
+
+        sudo apt install python3-tk  - Required for the GUI (tkinter)
 
 ## How to
 
