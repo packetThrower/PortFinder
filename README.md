@@ -4,7 +4,7 @@ Run these scripts to get lldp or cdp info from a switch that your computer is pl
 
 * Written for linux environment.
 
-# Files
+## Files
 
 `PortFinder.py` - Main script with GUI. This can be compiled with pyinstaller for binaries, or ran as a script with python PortFiner. On Linux this script requires sudo privilages. It may require admin rights on Windows (untested).
 
@@ -75,7 +75,7 @@ Now you can edit and modify.
 
 - Windows
 
-        [Microsoft Visual C++ 14.0](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Warning: Large download) - Required for netifaces.
+        (Microsoft Visual C++ 14.0)[https://visualstudio.microsoft.com/visual-cpp-build-tools/] (Warning: Large download) - Required for netifaces.
 
 - Linux
 
