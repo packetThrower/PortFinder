@@ -55,3 +55,12 @@ Be sure to run with Wifi desabled on the device. tcpdump will get confused.
 
         sudo apt install python3-tk
 
+## Build
+
+- linux
+
+        pyinstaller --onefile --add-data="*.png:." PortFinder.py
+
+- Windows
+
+        pyinstaller.exe --onefile --noconsole --noupx --add-data="*.png;." .\PortFinder.py
