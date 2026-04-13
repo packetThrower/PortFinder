@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
@@ -14,6 +15,10 @@ const (
 	cdpFilter  = "ether[12:2] <= 1500 && ether[14:2] == 0xAAAA && ether[16:1] == 0x03 && ether[17:2] == 0x0000 && ether[19:1] == 0x0C && ether[20:2] == 0x2000"
 	lldpFilter = "ether proto 0x88cc"
 	snapLen    = 65535
+	// Short pcap timeout so reads don't block forever.
+	// On Linux, BlockForever causes handle.Close() to hang
+	// when a read is blocked in another goroutine.
+	pcapTimeout = 500 * time.Millisecond
 )
 
 func Run(ctx context.Context, req CaptureRequest) (*CaptureResult, error) {
@@ -55,7 +60,7 @@ func bpfFilter(protocol string) (string, error) {
 }
 
 func captureInterface(ctx context.Context, ifaceName, filter string) (gopacket.Packet, error) {
-	handle, err := pcap.OpenLive(ifaceName, snapLen, true, pcap.BlockForever)
+	handle, err := pcap.OpenLive(ifaceName, snapLen, true, pcapTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open interface %s: %w", ifaceName, err)
 	}
@@ -65,17 +70,28 @@ func captureInterface(ctx context.Context, ifaceName, filter string) (gopacket.P
 		return nil, fmt.Errorf("failed to set BPF filter: %w", err)
 	}
 
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-	packets := packetSource.Packets()
-
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("capture cancelled")
-	case pkt, ok := <-packets:
-		if !ok {
-			return nil, fmt.Errorf("packet source closed")
+	// Read packets directly with timeout instead of using Packets() channel.
+	// The short pcapTimeout ensures ReadPacketData returns periodically
+	// so we can check for context cancellation.
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("capture cancelled")
+		default:
 		}
-		return pkt, nil
+
+		data, ci, err := handle.ReadPacketData()
+		if err != nil {
+			// Timeout — no packet yet, loop and check context
+			if err == pcap.NextErrorTimeoutExpired {
+				continue
+			}
+			return nil, fmt.Errorf("read error: %w", err)
+		}
+
+		packet := gopacket.NewPacket(data, handle.LinkType(), gopacket.Default)
+		packet.Metadata().CaptureInfo = ci
+		return packet, nil
 	}
 }
 
