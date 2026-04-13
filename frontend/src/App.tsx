@@ -54,8 +54,8 @@ function App() {
                 setResult(res);
                 setStatus('Capture complete');
             }
-        } catch (err: any) {
-            const msg = typeof err === 'string' ? err : err?.message || 'Capture failed';
+        } catch (err: unknown) {
+            const msg = typeof err === 'string' ? err : (err instanceof Error ? err.message : 'Capture failed');
             if (msg.includes('cancelled')) {
                 setStatus('Capture stopped');
             } else {
@@ -88,8 +88,8 @@ function App() {
                     onChange={(e) => setSelectedInterface(e.target.value)}
                     disabled={isCapturing}
                 >
-                    {interfaces.map((iface, idx) => (
-                        <option key={idx} value={iface.name}>
+                    {interfaces.map((iface) => (
+                        <option key={iface.name || '__all__'} value={iface.name}>
                             {iface.description || iface.name || 'Sniff all Interfaces'}
                             {iface.addresses ? ` (${iface.addresses})` : ''}
                         </option>
