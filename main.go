@@ -2,6 +2,8 @@ package main
 
 import (
 	"embed"
+	"os"
+	"runtime"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -15,6 +17,10 @@ var assets embed.FS
 var Version = "dev"
 
 func main() {
+	// Suppress WebKitGTK signal handler warning on Linux
+	if runtime.GOOS == "linux" {
+		os.Setenv("JSC_SIGNAL_FOR_GC", "20")
+	}
 	app := NewApp()
 
 	err := wails.Run(&options.App{
