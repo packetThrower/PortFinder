@@ -42,7 +42,7 @@ jobs:
         run: |
           cd frontend && pnpm install && cd ..
           VERSION=${GITHUB_REF_NAME#v}
-          wails build -platform linux/amd64 -ldflags "-X main.Version=$VERSION"
+          wails build -platform linux/amd64 -tags webkit2_41 -ldflags "-X main.Version=$VERSION"
 
       - name: Package
         run: |
