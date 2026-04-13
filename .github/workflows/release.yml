@@ -129,9 +129,12 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
+      - name: Install frontend deps
+        run: pnpm install
+        working-directory: frontend
+
       - name: Build
         run: |
-          cd frontend && pnpm install && cd ..
           $version = "${{ github.ref_name }}".TrimStart("v")
           wails build -ldflags "-X main.Version=$version"
         shell: powershell
