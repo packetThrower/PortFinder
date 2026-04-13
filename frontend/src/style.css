@@ -1,6 +1,52 @@
+/* OTEC Dark Theme (default) */
+:root {
+    --bg-page: #001825;
+    --bg-card: #002535;
+    --bg-input: #001520;
+    --text-primary: #FFFFFF;
+    --text-secondary: #bbb;
+    --text-muted: #888;
+    --accent: #EDB426;
+    --accent-dark: #d9a422;
+    --ansel: #006A84;
+    --aqua: #76b7bd;
+    --courtyard: #718083;
+    --error: #ef5350;
+    --success: #4caf50;
+    --input-text: #FFFFFF;
+    --input-border: #718083;
+    --btn-bg: #002535;
+    --btn-text: #EDB426;
+    --btn-border: #EDB426;
+}
+
+/* OTEC Light Theme */
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg-page: #EDF2E5;
+        --bg-card: #FFFFFF;
+        --bg-input: #f0f0f0;
+        --text-primary: #1a1a1a;
+        --text-secondary: #555555;
+        --text-muted: #888888;
+        --accent: #EDB426;
+        --accent-dark: #d9a422;
+        --ansel: #006A84;
+        --aqua: #00838f;
+        --courtyard: #9aacaf;
+        --error: #d32f2f;
+        --success: #2e7d32;
+        --input-text: #1a1a1a;
+        --input-border: #9aacaf;
+        --btn-bg: #FFFFFF;
+        --btn-text: #001825;
+        --btn-border: #EDB426;
+    }
+}
+
 html {
-    background-color: #505050;
-    color: white;
+    background-color: var(--bg-page);
+    color: var(--text-primary);
 }
 
 body {

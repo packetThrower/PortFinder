@@ -28,5 +28,15 @@ frontend/dist/
 .DS_Store
 Thumbs.db
 
+# Python leftovers
+__pycache__/
+venv/
+*.spec
+*.log
+
+# Wails dev artifacts
+frontend/package.json.md5
+build/PortFinder/
+
 # Claude
 .claude/

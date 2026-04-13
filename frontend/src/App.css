@@ -1,11 +1,11 @@
 .app {
-    padding: 20px;
+    padding: 24px;
     max-width: 460px;
     margin: 0 auto;
 }
 
 .privilege-warning {
-    background-color: #c0392b;
+    background-color: var(--error);
     color: white;
     padding: 8px 12px;
     border-radius: 4px;
@@ -26,22 +26,28 @@
     text-align: right;
     padding-right: 8px;
     font-size: 14px;
-    color: white;
+    color: var(--text-primary);
 }
 
 .form-group select,
 .form-group input[type="text"] {
     width: 100%;
     padding: 4px 8px;
-    border: 1px solid #999;
+    border: 1px solid var(--input-border);
     border-radius: 3px;
     font-size: 14px;
-    background-color: white;
-    color: #333;
+    background-color: var(--bg-input);
+    color: var(--input-text);
+}
+
+.form-group select:focus,
+.form-group input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
 }
 
 .form-group input[readonly] {
-    background-color: #f0f0f0;
+    background-color: var(--bg-card);
     cursor: default;
 }
 
@@ -57,11 +63,12 @@
     gap: 4px;
     cursor: pointer;
     font-size: 14px;
-    color: white;
+    color: var(--text-primary);
 }
 
 .protocol-selector input[type="radio"] {
     cursor: pointer;
+    accent-color: var(--accent);
 }
 
 .button-row {
@@ -74,37 +81,39 @@
 .button-row button {
     padding: 6px 48px;
     font-size: 14px;
-    border: 1px solid #999;
+    border: 1px solid var(--btn-border);
     border-radius: 3px;
     cursor: pointer;
-    background-color: #e0e0e0;
-    color: #333;
+    background-color: var(--btn-bg);
+    color: var(--btn-text);
+    transition: background-color 0.15s;
 }
 
 .button-row button:hover:not(:disabled) {
-    background-color: #d0d0d0;
+    background-color: var(--accent);
+    color: var(--bg-page);
 }
 
 .button-row button:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
 }
 
 .button-row button.stop {
-    background-color: #e74c3c;
+    background-color: var(--error);
     color: white;
-    border-color: #c0392b;
+    border-color: var(--error);
 }
 
 .button-row button.stop:hover:not(:disabled) {
-    background-color: #c0392b;
+    background-color: #c62828;
 }
 
 .progress-bar {
     width: 100%;
     height: 6px;
     margin: 12px 0;
-    background-color: #3a3a3a;
+    background-color: var(--bg-card);
     border-radius: 3px;
     overflow: hidden;
 }
@@ -112,7 +121,7 @@
 .progress-bar .progress-fill {
     height: 100%;
     width: 30%;
-    background-color: #3498db;
+    background-color: var(--accent);
     border-radius: 3px;
     animation: indeterminate 1.5s ease-in-out infinite;
 }
@@ -125,17 +134,17 @@
 .status-text {
     text-align: center;
     font-size: 12px;
-    color: #ccc;
+    color: var(--text-muted);
     margin-top: 4px;
 }
 
 .error-text {
-    color: #e74c3c;
+    color: var(--error);
 }
 
 .version-text {
     text-align: center;
     font-size: 11px;
-    color: #999;
+    color: var(--text-muted);
     margin-top: 16px;
 }

@@ -20,22 +20,20 @@ func main() {
 	err := wails.Run(&options.App{
 		Title:     "PortFinder",
 		Width:     480,
-		Height:    560,
+		Height:    420,
 		MinWidth:  400,
-		MinHeight: 480,
+		MinHeight: 300,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 80, G: 80, B: 80, A: 1},
+		BackgroundColour: &options.RGBA{R: 0, G: 24, B: 37, A: 1},
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		Bind: []interface{}{
 			app,
 		},
 		Mac: &mac.Options{
-			TitleBar: &mac.TitleBar{
-				TitlebarAppearsTransparent: true,
-			},
+			TitleBar: mac.TitleBarDefault(),
 			About: &mac.AboutInfo{
 				Title:   "PortFinder",
 				Message: "Network switch port discovery tool\nVersion " + Version,
