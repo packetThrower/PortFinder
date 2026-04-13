@@ -87,16 +87,21 @@ jobs:
           VERSION=${GITHUB_REF_NAME#v}
           wails build -platform darwin/universal -ldflags "-X main.Version=$VERSION"
 
-      - name: Package
+      - name: Package app
         run: |
           cd build/bin
           zip -r ../../PortFinder-macOS.zip PortFinder.app
+
+      - name: Build BPF helper pkg
+        run: ./packaging/macos/build-pkg.sh
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-package
-          path: PortFinder-macOS.zip
+          path: |
+            PortFinder-macOS.zip
+            dist/PortFinder-BPF-*.pkg
 
   build-windows:
     runs-on: windows-latest

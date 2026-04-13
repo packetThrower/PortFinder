@@ -1,0 +1,68 @@
+#!/bin/sh
+# uninstall-bpf.sh - Remove PortFinder BPF helper and restore default permissions
+# Usage: sudo ./uninstall-bpf.sh
+#
+# This reverses everything the BPF installer does:
+# 1. Unloads and removes the LaunchDaemon
+# 2. Removes the ChmodBPF script
+# 3. Removes the current user from the access_bpf group
+# 4. Restores default BPF device permissions
+# 5. Optionally deletes the access_bpf group
+
+set -e
+
+DAEMON_PLIST="/Library/LaunchDaemons/coop.otec.portfinder.ChmodBPF.plist"
+INSTALL_DIR="/Library/Application Support/PortFinder"
+BPF_GROUP="access_bpf"
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "This script must be run as root: sudo $0"
+    exit 1
+fi
+
+echo "Uninstalling PortFinder BPF helper..."
+
+# Unload the LaunchDaemon
+if [ -f "$DAEMON_PLIST" ]; then
+    launchctl unload "$DAEMON_PLIST" 2>/dev/null || true
+    rm -f "$DAEMON_PLIST"
+    echo "  Removed LaunchDaemon"
+else
+    echo "  LaunchDaemon not found (already removed?)"
+fi
+
+# Remove the ChmodBPF script
+if [ -d "$INSTALL_DIR" ]; then
+    rm -rf "$INSTALL_DIR"
+    echo "  Removed $INSTALL_DIR"
+fi
+
+# Remove current console user from access_bpf group
+CONSOLE_USER=$(stat -f "%Su" /dev/console 2>/dev/null)
+if [ -n "$CONSOLE_USER" ] && [ "$CONSOLE_USER" != "root" ]; then
+    if dseditgroup -o checkmember -m "$CONSOLE_USER" "$BPF_GROUP" > /dev/null 2>&1; then
+        dseditgroup -o edit -d "$CONSOLE_USER" -t user "$BPF_GROUP"
+        echo "  Removed $CONSOLE_USER from $BPF_GROUP group"
+    fi
+fi
+
+# Restore default BPF device permissions (root-only)
+chown root:wheel /dev/bpf* 2>/dev/null || true
+chmod 600 /dev/bpf* 2>/dev/null || true
+echo "  Restored BPF devices to root-only access"
+
+# Delete the group if no members remain and Wireshark isn't using it
+if ! [ -f "/Library/LaunchDaemons/org.wireshark.ChmodBPF.plist" ]; then
+    MEMBERS=$(dscl . -read /Groups/$BPF_GROUP GroupMembership 2>/dev/null | sed 's/GroupMembership: //')
+    if [ -z "$MEMBERS" ] || [ "$MEMBERS" = "GroupMembership:" ]; then
+        dseditgroup -o delete "$BPF_GROUP" 2>/dev/null || true
+        echo "  Deleted $BPF_GROUP group (no remaining members)"
+    else
+        echo "  Kept $BPF_GROUP group (other members: $MEMBERS)"
+    fi
+else
+    echo "  Kept $BPF_GROUP group (Wireshark ChmodBPF is installed)"
+fi
+
+echo ""
+echo "BPF helper uninstalled. Packet capture now requires sudo."
