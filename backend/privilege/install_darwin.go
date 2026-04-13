@@ -2,16 +2,83 @@
 
 package privilege
 
+/*
+#cgo CFLAGS: -x objective-c
+#cgo LDFLAGS: -framework Security
+#include <Security/Authorization.h>
+#include <Security/AuthorizationTags.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <dlfcn.h>
+
+// AuthorizationExecuteWithPrivileges is deprecated but still functional
+// on all current macOS versions. We load it dynamically to avoid
+// build warnings while keeping the native auth dialog that shows
+// the calling app name (PortFinder) instead of "osascript".
+typedef OSStatus (*AuthExecFn)(AuthorizationRef, const char *,
+    AuthorizationFlags, char *const *, FILE **);
+
+int runPrivileged(const char *path, const char *arg) {
+    AuthorizationRef authRef;
+    OSStatus status;
+
+    status = AuthorizationCreate(NULL, kAuthorizationEmptyEnvironment,
+        kAuthorizationFlagDefaults, &authRef);
+    if (status != errAuthorizationSuccess) {
+        return (int)status;
+    }
+
+    AuthorizationItem items = {kAuthorizationRightExecute, 0, NULL, 0};
+    AuthorizationRights rights = {1, &items};
+    AuthorizationFlags flags = kAuthorizationFlagDefaults |
+        kAuthorizationFlagInteractionAllowed |
+        kAuthorizationFlagPreAuthorize |
+        kAuthorizationFlagExtendRights;
+
+    status = AuthorizationCopyRights(authRef, &rights, NULL, flags, NULL);
+    if (status != errAuthorizationSuccess) {
+        AuthorizationFree(authRef, kAuthorizationFlagDefaults);
+        return (int)status;
+    }
+
+    void *lib = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY);
+    if (!lib) {
+        AuthorizationFree(authRef, kAuthorizationFlagDefaults);
+        return -1;
+    }
+
+    AuthExecFn execFn = (AuthExecFn)dlsym(lib, "AuthorizationExecuteWithPrivileges");
+    if (!execFn) {
+        dlclose(lib);
+        AuthorizationFree(authRef, kAuthorizationFlagDefaults);
+        return -2;
+    }
+
+    char *args[] = { (char *)arg, NULL };
+    FILE *pipe = NULL;
+    status = execFn(authRef, path, kAuthorizationFlagDefaults, args, &pipe);
+
+    if (pipe) {
+        char buf[256];
+        while (fgets(buf, sizeof(buf), pipe)) {}
+        fclose(pipe);
+    }
+
+    dlclose(lib);
+    AuthorizationFree(authRef, kAuthorizationFlagDefaults);
+    return (int)status;
+}
+*/
+import "C"
+
 import (
 	"fmt"
-	"os/exec"
+	"os"
+	"unsafe"
 )
 
-// installHelper installs the BPF helper on macOS using osascript
-// to prompt for admin privileges. This creates the access_bpf group,
-// adds the current user, installs the LaunchDaemon, and runs it.
 func installHelper() error {
-	script := `
+	script := `#!/bin/sh
 BPF_GROUP="access_bpf"
 INSTALL_DIR="/Library/Application Support/PortFinder"
 DAEMON_PLIST="/Library/LaunchDaemons/coop.otec.portfinder.ChmodBPF.plist"
@@ -73,28 +140,36 @@ launchctl load "$DAEMON_PLIST"
 "$INSTALL_DIR/ChmodBPF"
 `
 
-	cmd := exec.Command("osascript", "-e",
-		fmt.Sprintf(`do shell script "%s" with administrator privileges`, escapeForAppleScript(script)))
-
-	output, err := cmd.CombinedOutput()
+	// Write script to temp file
+	tmpFile, err := os.CreateTemp("", "portfinder-bpf-*.sh")
 	if err != nil {
-		return fmt.Errorf("BPF helper installation failed: %w (output: %s)", err, string(output))
+		return fmt.Errorf("failed to create temp script: %w", err)
 	}
-	return nil
-}
+	defer os.Remove(tmpFile.Name())
 
-func escapeForAppleScript(s string) string {
-	// Escape backslashes first, then double quotes
-	result := ""
-	for _, c := range s {
-		switch c {
-		case '\\':
-			result += "\\\\"
-		case '"':
-			result += "\\\""
-		default:
-			result += string(c)
-		}
+	if _, err := tmpFile.WriteString(script); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write install script: %w", err)
 	}
-	return result
+	if err := tmpFile.Chmod(0755); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to chmod install script: %w", err)
+	}
+	tmpFile.Close()
+
+	cPath := C.CString("/bin/sh")
+	defer C.free(unsafe.Pointer(cPath))
+
+	cArg := C.CString(tmpFile.Name())
+	defer C.free(unsafe.Pointer(cArg))
+
+	status := C.runPrivileged(cPath, cArg)
+	if status != 0 {
+		if status == -60006 {
+			return fmt.Errorf("authorization cancelled by user")
+		}
+		return fmt.Errorf("BPF helper installation failed (status: %d)", status)
+	}
+
+	return nil
 }
