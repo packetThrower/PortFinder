@@ -53,7 +53,12 @@ make package-linux      # all three
 
 ## Versioning
 
-Uses [CalVer](https://calver.org/) format `YYYY.M.D` (e.g., `2026.4.13`). Version is stored in `version.txt` and injected at build time.
+Uses [CalVer](https://calver.org/) format `YYYY.M.D-PATCH` (e.g., `2026.4.13`, `2026.4.13-1`). Version is stored in `version.txt` and injected at build time.
+
+```bash
+make bump     # new day release: 2026.4.14
+make patch    # increment patch: 2026.4.14-1, 2026.4.14-2, ...
+```
 
 ## Tech Stack
 
