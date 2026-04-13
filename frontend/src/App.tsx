@@ -30,7 +30,7 @@ interface PrivilegeStatus {
 function App() {
     const [interfaces, setInterfaces] = useState<InterfaceInfo[]>([]);
     const [selectedInterface, setSelectedInterface] = useState('');
-    const [protocol, setProtocol] = useState<'CDP' | 'LLDP'>('CDP');
+    const [protocol, setProtocol] = useState<'CDP' | 'LLDP'>('LLDP');
     const [isCapturing, setIsCapturing] = useState(false);
     const [result, setResult] = useState<CaptureResult | null>(null);
     const [status, setStatus] = useState('Ready');
