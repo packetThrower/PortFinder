@@ -69,3 +69,11 @@ func (a *App) GetVersion() string {
 func (a *App) CheckPrivileges() bool {
 	return privilege.HasCapturePrivilege()
 }
+
+func (a *App) GetPrivilegeStatus() privilege.PrivilegeStatus {
+	return privilege.GetPrivilegeStatus()
+}
+
+func (a *App) InstallBPFHelper() error {
+	return privilege.InstallBPFHelper()
+}

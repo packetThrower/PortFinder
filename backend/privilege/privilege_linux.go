@@ -19,12 +19,16 @@ func hasPlatformPrivilege() bool {
 	for _, line := range strings.Split(string(data), "\n") {
 		if strings.HasPrefix(line, "CapEff:") {
 			caps := strings.TrimSpace(strings.TrimPrefix(line, "CapEff:"))
-			// CAP_NET_RAW is bit 13
-			// A non-zero effective capability set that includes bit 13
 			if len(caps) > 0 && caps != "0000000000000000" {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func fillPlatformStatus(status *PrivilegeStatus) {
+	status.HelperInstalled = false
+	status.InBPFGroup = false
+	status.CanInstall = false
 }

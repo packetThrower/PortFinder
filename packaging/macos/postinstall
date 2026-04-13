@@ -1,0 +1,44 @@
+#!/bin/sh
+# postinstall - Runs with root privileges during .pkg installation
+# Sets up BPF access for PortFinder packet capture on macOS.
+
+BPF_GROUP="access_bpf"
+INSTALL_DIR="/Library/Application Support/PortFinder"
+DAEMON_PLIST="/Library/LaunchDaemons/coop.otec.portfinder.ChmodBPF.plist"
+SCRIPT_DIR="$(dirname "$0")"
+
+# Determine the console user (the one who ran the installer)
+CONSOLE_USER=$(stat -f "%Su" /dev/console 2>/dev/null)
+if [ -z "$CONSOLE_USER" ] || [ "$CONSOLE_USER" = "root" ]; then
+    CONSOLE_USER=$(who | grep console | head -1 | awk '{print $1}')
+fi
+
+# Create access_bpf group if it doesn't exist
+if ! dseditgroup -o read "$BPF_GROUP" > /dev/null 2>&1; then
+    dseditgroup -o create "$BPF_GROUP"
+fi
+
+# Add the console user to the group
+if [ -n "$CONSOLE_USER" ]; then
+    dseditgroup -o edit -a "$CONSOLE_USER" -t user "$BPF_GROUP"
+fi
+
+# Install the ChmodBPF script
+mkdir -p "$INSTALL_DIR"
+cp "$SCRIPT_DIR/ChmodBPF.sh" "$INSTALL_DIR/ChmodBPF"
+chmod 755 "$INSTALL_DIR/ChmodBPF"
+chown root:wheel "$INSTALL_DIR/ChmodBPF"
+
+# Install the LaunchDaemon
+cp "$SCRIPT_DIR/coop.otec.portfinder.ChmodBPF.plist" "$DAEMON_PLIST"
+chown root:wheel "$DAEMON_PLIST"
+chmod 644 "$DAEMON_PLIST"
+
+# Unload if already loaded, then load
+launchctl unload "$DAEMON_PLIST" 2>/dev/null
+launchctl load "$DAEMON_PLIST"
+
+# Run immediately so it works without reboot
+"$INSTALL_DIR/ChmodBPF"
+
+exit 0

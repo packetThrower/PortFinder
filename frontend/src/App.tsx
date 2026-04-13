@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
-import { GetInterfaces, StartCapture, StopCapture, GetVersion, CheckPrivileges } from '../wailsjs/go/main/App';
+import { GetInterfaces, StartCapture, StopCapture, GetVersion, GetPrivilegeStatus, InstallBPFHelper } from '../wailsjs/go/main/App';
 
 interface InterfaceInfo {
     name: string;
@@ -17,6 +17,14 @@ interface CaptureResult {
     switchModel: string;
 }
 
+interface PrivilegeStatus {
+    hasAccess: boolean;
+    helperInstalled: boolean;
+    inBPFGroup: boolean;
+    canInstall: boolean;
+    platform: string;
+}
+
 function App() {
     const [interfaces, setInterfaces] = useState<InterfaceInfo[]>([]);
     const [selectedInterface, setSelectedInterface] = useState('');
@@ -25,8 +33,13 @@ function App() {
     const [result, setResult] = useState<CaptureResult | null>(null);
     const [status, setStatus] = useState('Ready');
     const [error, setError] = useState('');
-    const [hasPrivileges, setHasPrivileges] = useState(true);
+    const [privStatus, setPrivStatus] = useState<PrivilegeStatus | null>(null);
+    const [isInstalling, setIsInstalling] = useState(false);
     const [version, setVersion] = useState('');
+
+    const refreshPrivileges = () => {
+        GetPrivilegeStatus().then(setPrivStatus);
+    };
 
     useEffect(() => {
         GetInterfaces().then((ifaces) => {
@@ -35,9 +48,24 @@ function App() {
             setError('Failed to load interfaces: ' + err);
         });
 
-        CheckPrivileges().then(setHasPrivileges);
+        refreshPrivileges();
         GetVersion().then(setVersion);
     }, []);
+
+    const handleInstallBPF = async () => {
+        setIsInstalling(true);
+        setError('');
+        try {
+            await InstallBPFHelper();
+            setStatus('BPF access installed. You may need to restart the app.');
+            refreshPrivileges();
+        } catch (err: unknown) {
+            const msg = typeof err === 'string' ? err : (err instanceof Error ? err.message : 'Installation failed');
+            setError(msg);
+        } finally {
+            setIsInstalling(false);
+        }
+    };
 
     const handleStart = async () => {
         setIsCapturing(true);
@@ -72,14 +100,43 @@ function App() {
         setStatus('Stopping...');
     };
 
+    const renderPrivilegeWarning = () => {
+        if (!privStatus || privStatus.hasAccess) return null;
+
+        if (privStatus.platform === 'darwin' && privStatus.canInstall) {
+            return (
+                <div className="privilege-warning">
+                    <div>Packet capture requires BPF device access.</div>
+                    <button
+                        className="install-btn"
+                        onClick={handleInstallBPF}
+                        disabled={isInstalling}
+                    >
+                        {isInstalling ? 'Installing...' : 'Install BPF Access'}
+                    </button>
+                </div>
+            );
+        }
+
+        if (privStatus.platform === 'linux') {
+            return (
+                <div className="privilege-warning">
+                    Run with sudo or install the .deb/.rpm package (sets CAP_NET_RAW).
+                </div>
+            );
+        }
+
+        return (
+            <div className="privilege-warning">
+                Elevated privileges required for packet capture.
+                Run as Administrator (Windows) or with sudo.
+            </div>
+        );
+    };
+
     return (
         <div className="app">
-            {!hasPrivileges && (
-                <div className="privilege-warning">
-                    Elevated privileges required for packet capture.
-                    Run with sudo (Linux/macOS) or as Administrator (Windows).
-                </div>
-            )}
+            {renderPrivilegeWarning()}
 
             <div className="form-group">
                 <label>Select a NIC:</label>
