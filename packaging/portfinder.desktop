@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=PortFinder
+Comment=Network switch port discovery tool
+Exec=portfinder
+Icon=portfinder
+Terminal=false
+Type=Application
+Categories=Network;Utility;

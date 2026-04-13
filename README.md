@@ -1,96 +1,63 @@
-# get_switch_info
+# PortFinder
 
-Run these scripts to get lldp or cdp info from a switch that your computer is plugged into. get_port.py uses CDP.
+Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and LLDP (Link Layer Discovery Protocol) packets to identify what switch, port, and VLAN your device is connected to.
 
-* Written for linux environment.
+## What it does
 
-## Files
+1. Select a network interface (or sniff all)
+2. Choose protocol: CDP (Cisco) or LLDP (Aruba, HP, etc.)
+3. Click Start and PortFinder captures the next discovery packet
+4. Displays: Switch Name, Switch IP, Switchport, Native VLAN, Voice VLAN, Switch Model
 
-`PortFinder.py` - Main script with GUI. This can be compiled with pyinstaller for binaries, or ran as a script with python PortFiner. On Linux this script requires sudo privilages. It may require admin rights on Windows (untested).
+## Requirements
 
-`get_port.py` - Standalone script with no GUI. Pretty prints a table with the results. (May be merged into PortFinder in the future). Untested on Windows. (only CDP)
+- **libpcap** (Linux: `libpcap-dev`, macOS: included, Windows: [Npcap](https://npcap.com/))
+- **Elevated privileges** for packet capture:
+  - Linux: run as root, or the packaged binary has `CAP_NET_RAW` set
+  - macOS: run with `sudo`, or install ChmodBPF (comes with Wireshark)
+  - Windows: run as Administrator
 
-`get_ports.sh` = Shell script for running tcpdump to get the same info. (only CDP)
+## Development
 
-## TODO:
+### Prerequisites
 
-* Merge get_port.py into PortFinder.py for standalone arg.
-* Enable LLDP in get_port.py and get_ports.sh
+- [Go](https://go.dev/) 1.24+
+- [Node.js](https://nodejs.org/) 20+
+- [pnpm](https://pnpm.io/)
+- [Wails CLI](https://wails.io/) v2: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
 
-## How to
+### Setup
 
-PortFinder.exe and linux binaries are easy. Doubleclick and go. When the GUI appears, you can select a NIC if you know which one you want to sniff on. The default option "Sniff all Interfaces" does what it says. The default is the safest. 
+```bash
+make i          # install frontend dependencies
+make dev        # start dev server with hot reload
+```
 
-At the bottom of the window, you will see two radio buttons. You can select CDP or LLDP. CDP is for when your device is connected to a Cisco switch. LLDP may work agaist Cisco, but it has to be enabled on Cisco. LLDP will be used for Aruba. 
+### Build
 
-Click start. When the sniff is finished, the results will be displayed. Strings from the text boxes can be copied and pasted to other documents.
+```bash
+make build      # production build
+make bump       # update version to today's date (CalVer YYYY.M.D)
+```
 
-Stop will stop the scan. Useful if you have selected the wrong interface.
+## Linux Packaging
 
-* The other scripts can be ran from the command line.
+Requires [NFPM](https://nfpm.goreleaser.com/): `go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest`
 
-# Contributing
+```bash
+make package-deb        # .deb package
+make package-rpm        # .rpm package
+make package-archlinux  # .pkg.tar.zst package
+make package-linux      # all three
+```
 
-## To Contribute
+## Versioning
 
-- Be sure to install TK for the GUI dependencies on linux:
+Uses [CalVer](https://calver.org/) format `YYYY.M.D` (e.g., `2026.4.13`). Version is stored in `version.txt` and injected at build time.
 
-        sudo apt install python3-tk
+## Tech Stack
 
-
-- Create a python virtual evironment:
-
-        python3 -m venv --copies venv
-
-- Activate environment:
-
-        source venv/bin/activate
-
-- Install dependencies:
-
-        pip3 install -r requirements.txt
-
-- Run the application:
-
-        python3 get_port.py
-
-        or 
-
-        python3 PortFinder.py
-
-- Alternative execution:
-
-        /venv/bin/python3 get_port.py
-
-        or 
-
-        /venv/bin/python3 PortFinder.py
-
-Now you can edit and modify.
-
-
-# Build
-
-## Requirements for building
-
-- Windows
-
-        (Microsoft Visual C++ 14.0)[https://visualstudio.microsoft.com/visual-cpp-build-tools/] (Warning: Large download) - Required for netifaces.
-
-- Linux
-
-        sudo apt install python3-tk  - Required for the GUI (tkinter)
-
-### Build with pyinstaller
-
-Install pyinstaller
-
-        pip install pyinstaller
-
-- linux
-
-        pyinstaller --onefile --add-data="*.png:." PortFinder.py
-
-- Windows
-
-        pyinstaller.exe --onefile --noconsole --noupx --add-data="*.png;." .\PortFinder.py
+- **Backend:** Go + [gopacket](https://github.com/google/gopacket) (libpcap bindings)
+- **Frontend:** React + TypeScript + Vite
+- **Desktop:** [Wails](https://wails.io/) v2
+- **Packaging:** NFPM for Linux, Wails for macOS/Windows
