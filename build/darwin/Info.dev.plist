@@ -8,7 +8,7 @@
         <key>CFBundleExecutable</key>
         <string>{{.OutputFilename}}</string>
         <key>CFBundleIdentifier</key>
-        <string>com.wails.{{.Name}}</string>
+        <string>coop.otec.portfinder</string>
         <key>CFBundleVersion</key>
         <string>{{.Info.ProductVersion}}</string>
         <key>CFBundleGetInfoString</key>
@@ -59,6 +59,8 @@
           {{end}}
         </array>
         {{end}}
+        <key>NSLocalNetworkUsageDescription</key>
+        <string>PortFinder needs local network access to capture CDP and LLDP discovery packets from network switches.</string>
         <key>NSAppTransportSecurity</key>
         <dict>
             <key>NSAllowsLocalNetworking</key>
