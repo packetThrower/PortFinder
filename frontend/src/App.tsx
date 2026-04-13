@@ -23,6 +23,8 @@ interface PrivilegeStatus {
     inBPFGroup: boolean;
     canInstall: boolean;
     platform: string;
+    npcapInstalled: boolean;
+    npcapNonAdmin: boolean;
 }
 
 function App() {
@@ -126,10 +128,40 @@ function App() {
             );
         }
 
+        if (privStatus.platform === 'windows') {
+            if (!privStatus.npcapInstalled) {
+                return (
+                    <div className="privilege-warning">
+                        <div>Npcap is required for packet capture.</div>
+                        <a
+                            className="install-btn"
+                            href="https://npcap.com/#download"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            Download Npcap
+                        </a>
+                        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
+                            Enable "Allow non-administrators to capture" during install.
+                        </div>
+                    </div>
+                );
+            }
+            if (!privStatus.npcapNonAdmin) {
+                return (
+                    <div className="privilege-warning">
+                        <div>Npcap is installed but requires admin privileges.</div>
+                        <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
+                            Reinstall Npcap with "Allow non-administrators to capture" enabled, or run as Administrator.
+                        </div>
+                    </div>
+                );
+            }
+        }
+
         return (
             <div className="privilege-warning">
                 Elevated privileges required for packet capture.
-                Run as Administrator (Windows) or with sudo.
             </div>
         );
     };

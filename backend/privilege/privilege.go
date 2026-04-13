@@ -11,6 +11,8 @@ type PrivilegeStatus struct {
 	InBPFGroup      bool   `json:"inBPFGroup"`
 	CanInstall      bool   `json:"canInstall"`
 	Platform        string `json:"platform"`
+	NpcapInstalled  bool   `json:"npcapInstalled"`
+	NpcapNonAdmin   bool   `json:"npcapNonAdmin"`
 }
 
 // HasCapturePrivilege checks if the current process has sufficient

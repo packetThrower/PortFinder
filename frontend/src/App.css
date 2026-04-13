@@ -30,6 +30,10 @@
     transition: opacity 0.15s;
 }
 
+a.install-btn {
+    text-decoration: none;
+}
+
 .privilege-warning .install-btn:hover:not(:disabled) {
     opacity: 0.85;
 }

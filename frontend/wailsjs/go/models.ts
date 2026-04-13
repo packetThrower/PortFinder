@@ -55,3 +55,32 @@ export namespace capture {
 
 }
 
+export namespace privilege {
+	
+	export class PrivilegeStatus {
+	    hasAccess: boolean;
+	    helperInstalled: boolean;
+	    inBPFGroup: boolean;
+	    canInstall: boolean;
+	    platform: string;
+	    npcapInstalled: boolean;
+	    npcapNonAdmin: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new PrivilegeStatus(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hasAccess = source["hasAccess"];
+	        this.helperInstalled = source["helperInstalled"];
+	        this.inBPFGroup = source["inBPFGroup"];
+	        this.canInstall = source["canInstall"];
+	        this.platform = source["platform"];
+	        this.npcapInstalled = source["npcapInstalled"];
+	        this.npcapNonAdmin = source["npcapNonAdmin"];
+	    }
+	}
+
+}
+
