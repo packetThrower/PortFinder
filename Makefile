@@ -2,7 +2,7 @@ VERSION := $(shell cat version.txt)
 GOPATH ?= $(shell go env GOPATH)
 WAILS := $(shell command -v wails 2> /dev/null || echo $(GOPATH)/bin/wails)
 
-.PHONY: i dev build build-linux bump patch package-deb package-rpm package-archlinux package-linux clean
+.PHONY: i dev build build-linux bump patch tag package-deb package-rpm package-archlinux package-linux clean
 
 i:
 	cd frontend && pnpm install
@@ -39,6 +39,11 @@ patch:
 	echo "$$NEW_VERSION" > version.txt; \
 	sed -i '' 's/"productVersion": ".*"/"productVersion": "'$$NEW_VERSION'"/' wails.json; \
 	echo "Version patched to $$NEW_VERSION"
+
+# tag: create and push a git tag from version.txt (triggers release workflow)
+tag:
+	git tag v$(VERSION)
+	git push origin v$(VERSION)
 
 package-deb: build-linux
 	VERSION=$(VERSION) nfpm package --packager deb --target dist/

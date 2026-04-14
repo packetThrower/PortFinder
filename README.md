@@ -58,6 +58,7 @@ Uses [CalVer](https://calver.org/) format `YYYY.M.D-PATCH` (e.g., `2026.4.13`, `
 ```bash
 make bump     # new day release: 2026.4.14
 make patch    # increment patch: 2026.4.14-1, 2026.4.14-2, ...
+make tag      # git tag + push (triggers GitHub release)
 ```
 
 ## Tech Stack
