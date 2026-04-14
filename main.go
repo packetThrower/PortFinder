@@ -23,8 +23,6 @@ func main() {
 	}
 	app := NewApp()
 
-	// Platform-specific heights: macOS title bars are thinner than
-	// Windows/Linux chrome, so less vertical space is needed.
 	height := 500
 	if runtime.GOOS == "darwin" {
 		height = 460

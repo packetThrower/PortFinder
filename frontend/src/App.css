@@ -89,6 +89,7 @@ a.install-btn {
     display: flex;
     align-items: center;
     gap: 6px;
+    margin: 0 0 8px 128px;
     font-size: 13px;
     color: var(--text-secondary);
     cursor: pointer;

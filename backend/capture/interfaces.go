@@ -37,6 +37,7 @@ func ListInterfaces() ([]InterfaceInfo, error) {
 			Name:        dev.Name,
 			Description: description,
 			Addresses:   addrs,
+			HasIP:       hasRoutableIP(dev.Addresses),
 		})
 	}
 
@@ -56,6 +57,19 @@ func isBluetoothAdapter(dev pcap.Interface) bool {
 	name := strings.ToLower(dev.Name)
 	desc := strings.ToLower(dev.Description)
 	return strings.Contains(name, "bluetooth") || strings.Contains(desc, "bluetooth")
+}
+
+// hasRoutableIP reports whether any of the interface's addresses is a
+// non-loopback, non-link-local IP — i.e. something usable for capture.
+func hasRoutableIP(addrs []pcap.InterfaceAddress) bool {
+	for _, addr := range addrs {
+		ip := addr.IP
+		if ip == nil || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func formatAddresses(addrs []pcap.InterfaceAddress) string {

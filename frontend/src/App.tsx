@@ -6,6 +6,7 @@ interface InterfaceInfo {
     name: string;
     description: string;
     addresses: string;
+    hasIP: boolean;
 }
 
 interface CaptureResult {
@@ -40,15 +41,8 @@ function App() {
     const [version, setVersion] = useState('');
     const [showOnlyWithIPs, setShowOnlyWithIPs] = useState(true);
 
-    const hasRealIP = (addresses: string) => {
-        if (!addresses) return false;
-        return addresses.split(', ').some(addr =>
-            addr.includes('.') || (addr.includes(':') && !addr.startsWith('fe80:'))
-        );
-    };
-
     const filteredInterfaces = showOnlyWithIPs
-        ? interfaces.filter((iface) => iface.name === '' || hasRealIP(iface.addresses))
+        ? interfaces.filter((iface) => iface.name === '' || iface.hasIP)
         : interfaces;
 
     const refreshPrivileges = () => {
@@ -198,18 +192,15 @@ function App() {
                 </select>
             </div>
 
-            <div className="form-group">
-                <label></label>
-                <label className="checkbox-label">
-                    <input
-                        type="checkbox"
-                        checked={showOnlyWithIPs}
-                        onChange={(e) => setShowOnlyWithIPs(e.target.checked)}
-                        disabled={isCapturing}
-                    />
-                    Show only interfaces with IPs
-                </label>
-            </div>
+            <label className="checkbox-label">
+                <input
+                    type="checkbox"
+                    checked={showOnlyWithIPs}
+                    onChange={(e) => setShowOnlyWithIPs(e.target.checked)}
+                    disabled={isCapturing}
+                />
+                Show only interfaces with IPs
+            </label>
 
             <div className="form-group">
                 <label>Switch:</label>

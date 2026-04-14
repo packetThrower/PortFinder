@@ -4,6 +4,7 @@ type InterfaceInfo struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Addresses   string `json:"addresses"`
+	HasIP       bool   `json:"hasIP"`
 }
 
 type CaptureRequest struct {
