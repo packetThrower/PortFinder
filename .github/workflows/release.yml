@@ -9,7 +9,11 @@ permissions:
   contents: write
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   build-linux:
+    needs: [ci]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +63,7 @@ jobs:
           path: dist/
 
   build-macos:
+    needs: [ci]
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -104,6 +109,7 @@ jobs:
             dist/PortFinder-BPF-*.pkg
 
   build-windows:
+    needs: [ci]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
