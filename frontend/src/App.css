@@ -69,6 +69,11 @@ a.install-btn {
     color: var(--input-text);
 }
 
+.form-group select option {
+    background-color: var(--bg-input);
+    color: var(--input-text);
+}
+
 .form-group select:focus,
 .form-group input[type="text"]:focus {
     outline: none;

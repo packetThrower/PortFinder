@@ -1,5 +1,6 @@
 /* OTEC Dark Theme (default) */
 :root {
+    color-scheme: dark;
     --bg-page: #001825;
     --bg-card: #002535;
     --bg-input: #001520;
@@ -23,6 +24,7 @@
 /* OTEC Light Theme */
 @media (prefers-color-scheme: light) {
     :root {
+        color-scheme: light;
         --bg-page: #EDF2E5;
         --bg-card: #FFFFFF;
         --bg-input: #f0f0f0;
