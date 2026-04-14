@@ -65,11 +65,11 @@ export namespace privilege {
 	    platform: string;
 	    npcapInstalled: boolean;
 	    npcapNonAdmin: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new PrivilegeStatus(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.hasAccess = source["hasAccess"];
