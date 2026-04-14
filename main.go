@@ -26,9 +26,9 @@ func main() {
 	err := wails.Run(&options.App{
 		Title:     "PortFinder",
 		Width:     480,
-		Height:    420,
+		Height:    460,
 		MinWidth:  400,
-		MinHeight: 300,
+		MinHeight: 460,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

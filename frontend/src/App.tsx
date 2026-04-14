@@ -38,6 +38,18 @@ function App() {
     const [privStatus, setPrivStatus] = useState<PrivilegeStatus | null>(null);
     const [isInstalling, setIsInstalling] = useState(false);
     const [version, setVersion] = useState('');
+    const [showOnlyWithIPs, setShowOnlyWithIPs] = useState(true);
+
+    const hasRealIP = (addresses: string) => {
+        if (!addresses) return false;
+        return addresses.split(', ').some(addr =>
+            addr.includes('.') || (addr.includes(':') && !addr.startsWith('fe80:'))
+        );
+    };
+
+    const filteredInterfaces = showOnlyWithIPs
+        ? interfaces.filter((iface) => iface.name === '' || hasRealIP(iface.addresses))
+        : interfaces;
 
     const refreshPrivileges = () => {
         GetPrivilegeStatus().then(setPrivStatus);
@@ -177,13 +189,26 @@ function App() {
                     onChange={(e) => setSelectedInterface(e.target.value)}
                     disabled={isCapturing}
                 >
-                    {interfaces.map((iface) => (
+                    {filteredInterfaces.map((iface) => (
                         <option key={iface.name || '__all__'} value={iface.name}>
                             {iface.description || iface.name || 'Sniff all Interfaces'}
                             {iface.addresses ? ` (${iface.addresses})` : ''}
                         </option>
                     ))}
                 </select>
+            </div>
+
+            <div className="form-group">
+                <label></label>
+                <label className="checkbox-label">
+                    <input
+                        type="checkbox"
+                        checked={showOnlyWithIPs}
+                        onChange={(e) => setShowOnlyWithIPs(e.target.checked)}
+                        disabled={isCapturing}
+                    />
+                    Show only interfaces with IPs
+                </label>
             </div>
 
             <div className="form-group">
