@@ -94,8 +94,9 @@ jobs:
 
       - name: Package app
         run: |
+          VERSION=${GITHUB_REF_NAME#v}
           cd build/bin
-          zip -r ../../PortFinder-macOS.zip PortFinder.app
+          zip -r ../../PortFinder-macOS-${VERSION}.zip PortFinder.app
 
       - name: Build BPF helper pkg
         run: ./packaging/macos/build-pkg.sh
@@ -105,7 +106,7 @@ jobs:
         with:
           name: macos-package
           path: |
-            PortFinder-macOS.zip
+            PortFinder-macOS-*.zip
             dist/PortFinder-BPF-*.pkg
 
   build-windows:
@@ -114,10 +115,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Npcap SDK
+      - name: Cache Npcap SDK
+        id: cache-npcap
+        uses: actions/cache@v4
+        with:
+          path: npcap-sdk
+          key: npcap-sdk-1.13
+
+      - name: Download Npcap SDK
+        if: steps.cache-npcap.outputs.cache-hit != 'true'
         run: |
           Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile npcap-sdk.zip
           Expand-Archive npcap-sdk.zip -DestinationPath npcap-sdk
+        shell: powershell
+
+      - name: Configure Npcap SDK env
+        run: |
           echo "CGO_CFLAGS=-I${{ github.workspace }}\npcap-sdk\Include" >> $env:GITHUB_ENV
           echo "CGO_LDFLAGS=-L${{ github.workspace }}\npcap-sdk\Lib\x64" >> $env:GITHUB_ENV
         shell: powershell
@@ -152,14 +165,15 @@ jobs:
 
       - name: Package
         run: |
-          Compress-Archive -Path build\bin\PortFinder.exe -DestinationPath PortFinder-Windows.zip
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          Compress-Archive -Path build\bin\PortFinder.exe -DestinationPath "PortFinder-Windows-${version}.zip"
         shell: powershell
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-package
-          path: PortFinder-Windows.zip
+          path: PortFinder-Windows-*.zip
 
   release:
     needs: [build-linux, build-macos, build-windows]

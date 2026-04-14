@@ -23,12 +23,19 @@ func main() {
 	}
 	app := NewApp()
 
+	// Platform-specific heights: macOS title bars are thinner than
+	// Windows/Linux chrome, so less vertical space is needed.
+	height := 500
+	if runtime.GOOS == "darwin" {
+		height = 460
+	}
+
 	err := wails.Run(&options.App{
 		Title:     "PortFinder",
 		Width:     480,
-		Height:    460,
+		Height:    height,
 		MinWidth:  400,
-		MinHeight: 460,
+		MinHeight: height,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
