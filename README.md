@@ -64,6 +64,6 @@ make tag      # git tag + push (triggers GitHub release)
 ## Tech Stack
 
 - **Backend:** Go + [gopacket](https://github.com/google/gopacket) (libpcap bindings)
-- **Frontend:** React + TypeScript + Vite
+- **Frontend:** [Svelte 5](https://svelte.dev/) + TypeScript + Vite
 - **Desktop:** [Wails](https://wails.io/) v2
 - **Packaging:** NFPM for Linux, Wails for macOS/Windows

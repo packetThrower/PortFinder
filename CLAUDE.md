@@ -2,7 +2,7 @@
 
 ## Project
 PortFinder — Network switch port discovery tool using CDP/LLDP.
-Go backend (gopacket) + React/TypeScript frontend via Wails v2.
+Go backend (gopacket) + Svelte 5/TypeScript frontend via Wails v2.
 
 ## Build
 ```bash
@@ -18,8 +18,9 @@ make tag        # git tag + push from version.txt (triggers release CI)
 main.go / app.go — Wails entrypoint and bound methods
 backend/capture/ — gopacket packet capture (CDP/LLDP)
 backend/privilege/ — platform-specific privilege detection + macOS BPF installer
-frontend/src/App.tsx — single-component React UI
+frontend/src/App.svelte — single-component Svelte 5 UI (runes: $state, $derived, $effect)
 frontend/src/App.css / style.css — OTEC theme with system dark/light matching
+frontend/svelte.config.js — Svelte preprocessor config
 packaging/macos/ — BPF helper installer, LaunchDaemon, uninstall script
 packaging/ — Linux desktop entry, postinstall (CAP_NET_RAW)
 
