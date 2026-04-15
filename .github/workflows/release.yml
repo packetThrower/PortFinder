@@ -57,7 +57,7 @@ jobs:
           VERSION=$VERSION nfpm package --packager archlinux --target dist/
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-packages
           path: dist/
@@ -102,7 +102,7 @@ jobs:
         run: ./packaging/macos/build-pkg.sh
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-package
           path: |
@@ -170,7 +170,7 @@ jobs:
         shell: powershell
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-package
           path: PortFinder-Windows-*.zip
