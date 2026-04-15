@@ -16,7 +16,7 @@ jobs:
     needs: [ci]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libpcap-dev libgtk-3-dev libwebkit2gtk-4.1-dev
@@ -66,7 +66,7 @@ jobs:
     needs: [ci]
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -113,7 +113,7 @@ jobs:
     needs: [ci]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache Npcap SDK
         id: cache-npcap
