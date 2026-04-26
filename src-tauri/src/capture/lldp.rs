@@ -5,12 +5,17 @@ const TLV_END: u8 = 0;
 const TLV_PORT_ID: u8 = 2;
 const TLV_PORT_DESCRIPTION: u8 = 4;
 const TLV_SYSTEM_NAME: u8 = 5;
+const TLV_SYSTEM_DESCRIPTION: u8 = 6;
 const TLV_MGMT_ADDRESS: u8 = 8;
 const TLV_ORG_SPECIFIC: u8 = 127;
 
 // IEEE 802.1 OUI for Port VLAN ID TLV
 const IEEE_8021_OUI: [u8; 3] = [0x00, 0x80, 0xC2];
 const SUBTYPE_PORT_VLAN_ID: u8 = 1;
+
+// IEEE 802.3 OUI for Maximum Frame Size TLV
+const IEEE_8023_OUI: [u8; 3] = [0x00, 0x12, 0x0F];
+const SUBTYPE_MAX_FRAME_SIZE: u8 = 4;
 
 pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
     let payload = strip_ethernet_8021q(frame, 0x88CC)?;
@@ -21,6 +26,7 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
         switch_port: "N/A".into(),
         native_vlan: "N/A".into(),
         voice_vlan: "N/A".into(),
+        mtu: "N/A".into(),
         switch_model: "N/A".into(),
     };
 
@@ -43,6 +49,9 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
             TLV_SYSTEM_NAME => {
                 result.switch_name = String::from_utf8_lossy(value).into_owned();
             }
+            TLV_SYSTEM_DESCRIPTION => {
+                result.switch_model = String::from_utf8_lossy(value).into_owned();
+            }
             TLV_MGMT_ADDRESS => {
                 if let Some(ip) = parse_mgmt_address(value) {
                     if result.switch_ip == "N/A" {
@@ -57,6 +66,12 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
                 if oui == IEEE_8021_OUI && subtype == SUBTYPE_PORT_VLAN_ID && info.len() >= 2 {
                     let vlan = u16::from_be_bytes([info[0], info[1]]);
                     result.native_vlan = vlan.to_string();
+                } else if oui == IEEE_8023_OUI
+                    && subtype == SUBTYPE_MAX_FRAME_SIZE
+                    && info.len() >= 2
+                {
+                    let mtu = u16::from_be_bytes([info[0], info[1]]);
+                    result.mtu = mtu.to_string();
                 }
             }
             _ => {}

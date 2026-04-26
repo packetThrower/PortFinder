@@ -69,6 +69,41 @@ a.install-btn {
     color: var(--input-text);
 }
 
+.nic-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.nic-row select {
+    flex: 1;
+    min-width: 0;
+}
+
+.refresh-btn {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--input-border);
+    border-radius: 3px;
+    background-color: var(--bg-input);
+    color: var(--input-text);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.refresh-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .form-group select option {
     background-color: var(--bg-input);
     color: var(--input-text);

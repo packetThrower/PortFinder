@@ -29,6 +29,7 @@ pub struct CaptureResult {
     pub switch_port: String,
     pub native_vlan: String,
     pub voice_vlan: String,
+    pub mtu: String,
     pub switch_model: String,
 }
 
@@ -110,8 +111,8 @@ pub fn run() {
             {
                 use tauri::Manager;
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.set_size(tauri::LogicalSize::new(480.0, 460.0));
-                    let _ = window.set_min_size(Some(tauri::LogicalSize::new(400.0, 460.0)));
+                    let _ = window.set_size(tauri::LogicalSize::new(480.0, 495.0));
+                    let _ = window.set_min_size(Some(tauri::LogicalSize::new(400.0, 495.0)));
                 }
             }
             let _ = app;

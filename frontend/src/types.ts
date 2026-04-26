@@ -12,10 +12,11 @@ export interface CaptureRequest {
 
 export interface CaptureResult {
     switchName: string;
-    switchIP: string;
+    switchIp: string;
     switchPort: string;
-    nativeVLAN: string;
-    voiceVLAN: string;
+    nativeVlan: string;
+    voiceVlan: string;
+    mtu: string;
     switchModel: string;
 }
 

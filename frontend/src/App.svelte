@@ -43,7 +43,7 @@
         GetPrivilegeStatus().then((s) => (privStatus = s));
     }
 
-    $effect(() => {
+    function refreshInterfaces() {
         GetInterfaces()
             .then((ifaces) => {
                 interfaces = ifaces || [];
@@ -51,7 +51,10 @@
             .catch((err) => {
                 error = 'Failed to load interfaces: ' + err;
             });
+    }
 
+    $effect(() => {
+        refreshInterfaces();
         refreshPrivileges();
         GetVersion().then((v) => (version = v));
     });
@@ -156,17 +159,29 @@
 
     <div class="form-group">
         <label for="nic-select">Select a NIC:</label>
-        <select
-            id="nic-select"
-            bind:value={selectedInterface}
-            disabled={isCapturing}
-        >
-            {#each filteredInterfaces as iface (iface.name || '__all__')}
-                <option value={iface.name}>
-                    {iface.description || iface.name || 'Sniff all Interfaces'}{iface.addresses ? ` (${iface.addresses})` : ''}
-                </option>
-            {/each}
-        </select>
+        <div class="nic-row">
+            <select
+                id="nic-select"
+                bind:value={selectedInterface}
+                disabled={isCapturing}
+            >
+                {#each filteredInterfaces as iface (iface.name || '__all__')}
+                    <option value={iface.name}>
+                        {iface.description || iface.name || 'Sniff all Interfaces'}{iface.addresses ? ` (${iface.addresses})` : ''}
+                    </option>
+                {/each}
+            </select>
+            <button
+                type="button"
+                class="refresh-btn"
+                onclick={refreshInterfaces}
+                disabled={isCapturing}
+                title="Refresh interface list"
+                aria-label="Refresh interface list"
+            >
+                ↻
+            </button>
+        </div>
     </div>
 
     <label class="checkbox-label">
@@ -185,7 +200,7 @@
 
     <div class="form-group">
         <label for="switch-ip">Switch IP:</label>
-        <input id="switch-ip" type="text" readonly value={result?.switchIP ?? ''} />
+        <input id="switch-ip" type="text" readonly value={result?.switchIp ?? ''} />
     </div>
 
     <div class="form-group">
@@ -195,12 +210,17 @@
 
     <div class="form-group">
         <label for="vlan">VLAN:</label>
-        <input id="vlan" type="text" readonly value={result?.nativeVLAN ?? ''} />
+        <input id="vlan" type="text" readonly value={result?.nativeVlan ?? ''} />
     </div>
 
     <div class="form-group">
         <label for="voice-vlan">Voice VLAN:</label>
-        <input id="voice-vlan" type="text" readonly value={result?.voiceVLAN ?? ''} />
+        <input id="voice-vlan" type="text" readonly value={result?.voiceVlan ?? ''} />
+    </div>
+
+    <div class="form-group">
+        <label for="mtu">MTU:</label>
+        <input id="mtu" type="text" readonly value={result?.mtu ?? ''} />
     </div>
 
     <div class="form-group">

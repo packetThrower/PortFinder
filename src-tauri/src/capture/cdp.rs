@@ -24,6 +24,7 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
         switch_port: String::new(),
         native_vlan: "N/A".into(),
         voice_vlan: "N/A".into(),
+        mtu: "N/A".into(),
         switch_model: "N/A".into(),
     };
 

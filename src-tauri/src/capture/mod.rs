@@ -115,13 +115,7 @@ fn capture_blocking(
     protocol: Protocol,
     cancel: CancellationToken,
 ) -> Result<Vec<u8>, String> {
-    let mut cap = pcap::Capture::from_device(iface)
-        .map_err(|e| format!("device {iface}: {e}"))?
-        .promisc(true)
-        .snaplen(SNAP_LEN)
-        .timeout(PCAP_TIMEOUT_MS)
-        .open()
-        .map_err(|e| format!("open {iface}: {e}"))?;
+    let mut cap = open_capture(iface)?;
 
     cap.filter(protocol.filter(), true)
         .map_err(|e| format!("filter on {iface}: {e}"))?;
@@ -137,6 +131,43 @@ fn capture_blocking(
                 continue;
             }
             Err(e) => return Err(format!("read on {iface}: {e}")),
+        }
+    }
+}
+
+/// Open a pcap handle for the interface. Tries promiscuous mode first
+/// (needed on mirror/SPAN ports to see traffic destined elsewhere) and
+/// falls back to non-promiscuous if the interface refuses — Wi-Fi on
+/// macOS rejects BIOCPROMISC, but CDP/LLDP arrive on multicast addresses
+/// the NIC accepts in normal mode anyway.
+fn open_capture(iface: &str) -> Result<pcap::Capture<pcap::Active>, String> {
+    let build = || {
+        pcap::Capture::from_device(iface)
+            .map_err(|e| format!("device {iface}: {e}"))
+    };
+
+    let try_open = |promisc: bool| -> Result<pcap::Capture<pcap::Active>, pcap::Error> {
+        build()
+            .map_err(|e| pcap::Error::PcapError(e))?
+            .promisc(promisc)
+            .snaplen(SNAP_LEN)
+            .timeout(PCAP_TIMEOUT_MS)
+            .open()
+    };
+
+    match try_open(true) {
+        Ok(cap) => Ok(cap),
+        Err(e) => {
+            let msg = e.to_string();
+            // macOS Wi-Fi (and some other adapters) reject promisc mode.
+            if msg.contains("BIOCPROMISC")
+                || msg.contains("Operation not supported")
+                || msg.contains("not supported on")
+            {
+                try_open(false).map_err(|e| format!("open {iface}: {e}"))
+            } else {
+                Err(format!("open {iface}: {e}"))
+            }
         }
     }
 }
@@ -204,6 +235,11 @@ mod tests {
         let header = ((127u16) << 9) | (body.len() as u16);
         frame.extend_from_slice(&header.to_be_bytes());
         frame.extend_from_slice(&body);
+        // TLV: Org-specific (type 127), OUI 00:12:0F subtype 4 (Max Frame Size), 9000
+        let body = [0x00, 0x12, 0x0F, 0x04, 0x23, 0x28];
+        let header = ((127u16) << 9) | (body.len() as u16);
+        frame.extend_from_slice(&header.to_be_bytes());
+        frame.extend_from_slice(&body);
         // End TLV
         frame.extend_from_slice(&[0, 0]);
 
@@ -211,5 +247,6 @@ mod tests {
         assert_eq!(result.switch_name, "switch2");
         assert_eq!(result.switch_port, "Port 24");
         assert_eq!(result.native_vlan, "200");
+        assert_eq!(result.mtu, "9000");
     }
 }
