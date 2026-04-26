@@ -35,7 +35,7 @@
 
     const filteredInterfaces = $derived(
         showOnlyWithIPs
-            ? interfaces.filter((iface) => iface.name === '' || iface.hasIP)
+            ? interfaces.filter((iface) => iface.name === '' || iface.hasIp)
             : interfaces
     );
 

@@ -2,7 +2,7 @@ export interface InterfaceInfo {
     name: string;
     description: string;
     addresses: string;
-    hasIP: boolean;
+    hasIp: boolean;
 }
 
 export interface CaptureRequest {
