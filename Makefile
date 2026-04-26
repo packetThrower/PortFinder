@@ -1,31 +1,26 @@
 VERSION := $(shell cat version.txt)
-GOPATH ?= $(shell go env GOPATH)
-WAILS := $(shell command -v wails 2> /dev/null || echo $(GOPATH)/bin/wails)
 
-.PHONY: i dev build build-linux bump patch tag package-deb package-rpm package-archlinux package-linux clean
+.PHONY: i dev build bump patch tag clean
 
 i:
 	cd frontend && pnpm install
 
 dev:
-	$(WAILS) dev
+	cd src-tauri && cargo tauri dev
 
 build:
 	@echo "Building PortFinder v$(VERSION)"
-	$(WAILS) build -ldflags "-X main.Version=$(VERSION)"
-
-build-linux:
-	@echo "Building PortFinder for Linux v$(VERSION)"
-	$(WAILS) build -platform linux/amd64 -ldflags "-X main.Version=$(VERSION)"
+	cd src-tauri && cargo tauri build
 
 # bump: set version to today's date (new day release)
 bump:
 	@NEW_VERSION=$$(date +"%Y.%-m.%-d"); \
 	echo "$$NEW_VERSION" > version.txt; \
-	sed -i '' 's/"productVersion": ".*"/"productVersion": "'$$NEW_VERSION'"/' wails.json; \
+	sed -i '' 's/^version = ".*"/version = "'$$NEW_VERSION'"/' src-tauri/Cargo.toml; \
+	sed -i '' 's/"version": ".*"/"version": "'$$NEW_VERSION'"/' src-tauri/tauri.conf.json; \
 	echo "Version bumped to $$NEW_VERSION"
 
-# patch: increment the patch number for today's version (e.g., 2026.4.13 -> 2026.4.13-1, 2026.4.13-1 -> 2026.4.13-2)
+# patch: increment the patch number for today's version
 patch:
 	@CURRENT=$$(cat version.txt); \
 	DATE_PART=$$(echo "$$CURRENT" | cut -d'-' -f1); \
@@ -37,7 +32,8 @@ patch:
 		NEW_VERSION="$$DATE_PART-$$NEW_PATCH"; \
 	fi; \
 	echo "$$NEW_VERSION" > version.txt; \
-	sed -i '' 's/"productVersion": ".*"/"productVersion": "'$$NEW_VERSION'"/' wails.json; \
+	sed -i '' 's/^version = ".*"/version = "'$$NEW_VERSION'"/' src-tauri/Cargo.toml; \
+	sed -i '' 's/"version": ".*"/"version": "'$$NEW_VERSION'"/' src-tauri/tauri.conf.json; \
 	echo "Version patched to $$NEW_VERSION"
 
 # tag: create and push a git tag from version.txt (triggers release workflow)
@@ -45,18 +41,8 @@ tag:
 	git tag v$(VERSION)
 	git push origin v$(VERSION)
 
-package-deb: build-linux
-	VERSION=$(VERSION) nfpm package --packager deb --target dist/
-
-package-rpm: build-linux
-	VERSION=$(VERSION) nfpm package --packager rpm --target dist/
-
-package-archlinux: build-linux
-	VERSION=$(VERSION) nfpm package --packager archlinux --target dist/
-
-package-linux: package-deb package-rpm package-archlinux
-
 clean:
-	rm -rf build/bin dist/
+	cd src-tauri && cargo clean
+	rm -rf frontend/dist
 
 .DEFAULT_GOAL := build

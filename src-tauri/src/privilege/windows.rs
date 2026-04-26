@@ -17,13 +17,11 @@ fn is_admin() -> bool {
     let Ok(output) = Command::new("net").arg("session").output() else {
         return false;
     };
-    !String::from_utf8_lossy(&output.stderr).contains("Access is denied")
-        && output.status.success()
+    !String::from_utf8_lossy(&output.stderr).contains("Access is denied") && output.status.success()
 }
 
 fn is_npcap_installed() -> bool {
-    let system_root =
-        std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".to_string());
+    let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".to_string());
     let npcap_dir = PathBuf::from(&system_root).join("System32").join("Npcap");
     if npcap_dir.exists() {
         return true;

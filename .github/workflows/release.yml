@@ -12,110 +12,39 @@ jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
-  build-linux:
+  build:
     needs: [ci]
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+            rust-targets: 'aarch64-apple-darwin,x86_64-apple-darwin'
+          - platform: ubuntu-22.04
+            args: ''
+            rust-targets: ''
+          - platform: windows-latest
+            args: ''
+            rust-targets: ''
+
+    runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libpcap-dev libgtk-3-dev libwebkit2gtk-4.1-dev
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-
-      - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Install NFPM
-        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
-
-      - name: Build
+      - name: Install Linux system deps
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
-          cd frontend && pnpm install && cd ..
-          VERSION=${GITHUB_REF_NAME#v}
-          wails build -platform linux/amd64 -tags webkit2_41 -ldflags "-X main.Version=$VERSION"
-
-      - name: Package
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          mkdir -p dist
-          VERSION=$VERSION nfpm package --packager deb --target dist/
-          VERSION=$VERSION nfpm package --packager rpm --target dist/
-          VERSION=$VERSION nfpm package --packager archlinux --target dist/
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: linux-packages
-          path: dist/
-
-  build-macos:
-    needs: [ci]
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-
-      - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
-      - name: Build
-        run: |
-          cd frontend && pnpm install && cd ..
-          VERSION=${GITHUB_REF_NAME#v}
-          wails build -platform darwin/universal -ldflags "-X main.Version=$VERSION"
-
-      - name: Package app
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          cd build/bin
-          zip -r ../../PortFinder-macOS-${VERSION}.zip PortFinder.app
-
-      - name: Build BPF helper pkg
-        run: ./packaging/macos/build-pkg.sh
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: macos-package
-          path: |
-            PortFinder-macOS-*.zip
-            dist/PortFinder-BPF-*.pkg
-
-  build-windows:
-    needs: [ci]
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
+          sudo apt-get update
+          sudo apt-get install -y \
+            libpcap-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
 
       - name: Cache Npcap SDK
+        if: matrix.platform == 'windows-latest'
         id: cache-npcap
         uses: actions/cache@v4
         with:
@@ -123,20 +52,30 @@ jobs:
           key: npcap-sdk-1.13
 
       - name: Download Npcap SDK
-        if: steps.cache-npcap.outputs.cache-hit != 'true'
+        if: matrix.platform == 'windows-latest' && steps.cache-npcap.outputs.cache-hit != 'true'
         run: |
           Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile npcap-sdk.zip
           Expand-Archive npcap-sdk.zip -DestinationPath npcap-sdk
         shell: powershell
 
-      - name: Configure Npcap SDK env
+      - name: Configure Npcap link path
+        if: matrix.platform == 'windows-latest'
         run: |
-          echo "CGO_CFLAGS=-I${{ github.workspace }}\npcap-sdk\Include" >> $env:GITHUB_ENV
-          echo "CGO_LDFLAGS=-L${{ github.workspace }}\npcap-sdk\Lib\x64" >> $env:GITHUB_ENV
+          echo "LIB=${{ github.workspace }}\npcap-sdk\Lib\x64;$env:LIB" >> $env:GITHUB_ENV
         shell: powershell
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-targets }}
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -145,50 +84,29 @@ jobs:
         with:
           version: 9
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-
-      - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-
       - name: Install frontend deps
         run: pnpm install
         working-directory: frontend
 
-      - name: Build
-        run: |
-          $version = "${{ github.ref_name }}".TrimStart("v")
-          wails build -ldflags "-X main.Version=$version"
-        shell: powershell
-
-      - name: Package
-        run: |
-          $version = "${{ github.ref_name }}".TrimStart("v")
-          Compress-Archive -Path build\bin\PortFinder.exe -DestinationPath "PortFinder-Windows-${version}.zip"
-        shell: powershell
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+      - name: Build with tauri-action
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: windows-package
-          path: PortFinder-Windows-*.zip
+          projectPath: src-tauri
+          tagName: ${{ github.ref_name }}
+          releaseName: 'PortFinder ${{ github.ref_name }}'
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
 
-  release:
-    needs: [build-linux, build-macos, build-windows]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: artifacts
+      - name: Build BPF helper pkg (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: ./packaging/macos/build-pkg.sh
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v3
+      - name: Upload BPF helper pkg
+        if: matrix.platform == 'macos-latest'
+        uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/linux-packages/*
-            artifacts/macos-package/*
-            artifacts/windows-package/*
-          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
+          files: dist/PortFinder-BPF-*.pkg

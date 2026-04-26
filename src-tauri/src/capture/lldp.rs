@@ -32,12 +32,11 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
             break;
         }
         match typ {
-            TLV_PORT_ID => {
+            TLV_PORT_ID
                 // value: subtype(1) + id(N). Show id as text.
-                if value.len() > 1 {
+                if value.len() > 1 => {
                     port_id_text = Some(String::from_utf8_lossy(&value[1..]).into_owned());
                 }
-            }
             TLV_PORT_DESCRIPTION => {
                 port_desc_text = Some(String::from_utf8_lossy(value).into_owned());
             }
@@ -110,9 +109,9 @@ fn parse_mgmt_address(value: &[u8]) -> Option<String> {
     let addr = &value[2..1 + addr_str_len];
 
     match subtype {
-        1 if addr.len() == 4 => Some(
-            std::net::Ipv4Addr::new(addr[0], addr[1], addr[2], addr[3]).to_string(),
-        ),
+        1 if addr.len() == 4 => {
+            Some(std::net::Ipv4Addr::new(addr[0], addr[1], addr[2], addr[3]).to_string())
+        }
         2 if addr.len() == 16 => {
             let arr: [u8; 16] = addr.try_into().ok()?;
             Some(std::net::Ipv6Addr::from(arr).to_string())

@@ -62,7 +62,8 @@ async fn capture_one_interface(
     cancel: CancellationToken,
 ) -> Result<Vec<u8>, String> {
     let cancel_clone = cancel.clone();
-    let blocking = tokio::task::spawn_blocking(move || capture_blocking(&iface, protocol, cancel_clone));
+    let blocking =
+        tokio::task::spawn_blocking(move || capture_blocking(&iface, protocol, cancel_clone));
 
     tokio::select! {
         res = blocking => res.map_err(|e| format!("capture task panicked: {e}"))?,
@@ -107,82 +108,6 @@ async fn capture_all_interfaces(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn smoke_list_interfaces() {
-        let ifaces = list_interfaces().expect("list_interfaces should succeed");
-        assert!(!ifaces.is_empty());
-        assert_eq!(ifaces[0].name, "", "first entry must be 'Sniff all'");
-        // Print so `cargo test -- --nocapture` shows the live result.
-        for i in &ifaces {
-            println!(
-                "  {:<20} hasIP={} addrs={}",
-                i.name, i.has_ip, i.addresses
-            );
-        }
-    }
-
-    #[test]
-    fn cdp_parser_smoke() {
-        // Minimal valid CDP frame: ethernet header + SNAP + ver/ttl/checksum + Device ID TLV
-        let mut frame = vec![0u8; 12]; // dst+src
-        frame.extend_from_slice(&[0x00, 0x40]); // length
-        frame.extend_from_slice(&[0xAA, 0xAA, 0x03, 0x00, 0x00, 0x0C, 0x20, 0x00]); // SNAP
-        frame.extend_from_slice(&[0x02, 0xb4, 0x00, 0x00]); // ver, ttl, checksum
-        // TLV: Device ID = "switch1.example.com"
-        let val = b"switch1.example.com";
-        let len = (4 + val.len()) as u16;
-        frame.extend_from_slice(&[0, 1]); // type
-        frame.extend_from_slice(&len.to_be_bytes()); // length
-        frame.extend_from_slice(val);
-        // TLV: Port ID = "Gi1/0/24"
-        let val = b"Gi1/0/24";
-        let len = (4 + val.len()) as u16;
-        frame.extend_from_slice(&[0, 3]);
-        frame.extend_from_slice(&len.to_be_bytes());
-        frame.extend_from_slice(val);
-        // TLV: Native VLAN = 100
-        frame.extend_from_slice(&[0, 0x0A, 0, 6, 0x00, 0x64]);
-
-        let result = cdp::parse(&frame).expect("CDP parse should succeed");
-        assert_eq!(result.switch_name, "switch1.example.com");
-        assert_eq!(result.switch_port, "Gi1/0/24");
-        assert_eq!(result.native_vlan, "100");
-    }
-
-    #[test]
-    fn lldp_parser_smoke() {
-        // Minimal LLDP frame: ethernet header + ethertype + TLVs
-        let mut frame = vec![0u8; 12]; // dst+src
-        frame.extend_from_slice(&[0x88, 0xCC]); // ethertype LLDP
-        // TLV: System Name (type 5, "switch2")
-        let val = b"switch2";
-        let header = ((5u16) << 9) | (val.len() as u16);
-        frame.extend_from_slice(&header.to_be_bytes());
-        frame.extend_from_slice(val);
-        // TLV: Port Description (type 4, "Port 24")
-        let val = b"Port 24";
-        let header = ((4u16) << 9) | (val.len() as u16);
-        frame.extend_from_slice(&header.to_be_bytes());
-        frame.extend_from_slice(val);
-        // TLV: Org-specific (type 127), OUI 00:80:C2 subtype 1, VLAN 200
-        let body = [0x00, 0x80, 0xC2, 0x01, 0x00, 0xC8];
-        let header = ((127u16) << 9) | (body.len() as u16);
-        frame.extend_from_slice(&header.to_be_bytes());
-        frame.extend_from_slice(&body);
-        // End TLV
-        frame.extend_from_slice(&[0, 0]);
-
-        let result = lldp::parse(&frame).expect("LLDP parse should succeed");
-        assert_eq!(result.switch_name, "switch2");
-        assert_eq!(result.switch_port, "Port 24");
-        assert_eq!(result.native_vlan, "200");
-    }
-}
-
 /// Blocking capture loop. Polls pcap with a short timeout so we can react
 /// to cancellation between reads.
 fn capture_blocking(
@@ -213,5 +138,78 @@ fn capture_blocking(
             }
             Err(e) => return Err(format!("read on {iface}: {e}")),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn smoke_list_interfaces() {
+        let ifaces = list_interfaces().expect("list_interfaces should succeed");
+        assert!(!ifaces.is_empty());
+        assert_eq!(ifaces[0].name, "", "first entry must be 'Sniff all'");
+        // Print so `cargo test -- --nocapture` shows the live result.
+        for i in &ifaces {
+            println!("  {:<20} hasIP={} addrs={}", i.name, i.has_ip, i.addresses);
+        }
+    }
+
+    #[test]
+    fn cdp_parser_smoke() {
+        // Minimal valid CDP frame: ethernet header + SNAP + ver/ttl/checksum + Device ID TLV
+        let mut frame = vec![0u8; 12]; // dst+src
+        frame.extend_from_slice(&[0x00, 0x40]); // length
+        frame.extend_from_slice(&[0xAA, 0xAA, 0x03, 0x00, 0x00, 0x0C, 0x20, 0x00]); // SNAP
+        frame.extend_from_slice(&[0x02, 0xb4, 0x00, 0x00]); // ver, ttl, checksum
+                                                            // TLV: Device ID = "switch1.example.com"
+        let val = b"switch1.example.com";
+        let len = (4 + val.len()) as u16;
+        frame.extend_from_slice(&[0, 1]); // type
+        frame.extend_from_slice(&len.to_be_bytes()); // length
+        frame.extend_from_slice(val);
+        // TLV: Port ID = "Gi1/0/24"
+        let val = b"Gi1/0/24";
+        let len = (4 + val.len()) as u16;
+        frame.extend_from_slice(&[0, 3]);
+        frame.extend_from_slice(&len.to_be_bytes());
+        frame.extend_from_slice(val);
+        // TLV: Native VLAN = 100
+        frame.extend_from_slice(&[0, 0x0A, 0, 6, 0x00, 0x64]);
+
+        let result = cdp::parse(&frame).expect("CDP parse should succeed");
+        assert_eq!(result.switch_name, "switch1.example.com");
+        assert_eq!(result.switch_port, "Gi1/0/24");
+        assert_eq!(result.native_vlan, "100");
+    }
+
+    #[test]
+    fn lldp_parser_smoke() {
+        // Minimal LLDP frame: ethernet header + ethertype + TLVs
+        let mut frame = vec![0u8; 12]; // dst+src
+        frame.extend_from_slice(&[0x88, 0xCC]); // ethertype LLDP
+                                                // TLV: System Name (type 5, "switch2")
+        let val = b"switch2";
+        let header = ((5u16) << 9) | (val.len() as u16);
+        frame.extend_from_slice(&header.to_be_bytes());
+        frame.extend_from_slice(val);
+        // TLV: Port Description (type 4, "Port 24")
+        let val = b"Port 24";
+        let header = ((4u16) << 9) | (val.len() as u16);
+        frame.extend_from_slice(&header.to_be_bytes());
+        frame.extend_from_slice(val);
+        // TLV: Org-specific (type 127), OUI 00:80:C2 subtype 1, VLAN 200
+        let body = [0x00, 0x80, 0xC2, 0x01, 0x00, 0xC8];
+        let header = ((127u16) << 9) | (body.len() as u16);
+        frame.extend_from_slice(&header.to_be_bytes());
+        frame.extend_from_slice(&body);
+        // End TLV
+        frame.extend_from_slice(&[0, 0]);
+
+        let result = lldp::parse(&frame).expect("LLDP parse should succeed");
+        assert_eq!(result.switch_name, "switch2");
+        assert_eq!(result.switch_port, "Port 24");
+        assert_eq!(result.native_vlan, "200");
     }
 }

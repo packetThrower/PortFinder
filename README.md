@@ -13,57 +13,49 @@ Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and 
 
 - **libpcap** (Linux: `libpcap-dev`, macOS: included, Windows: [Npcap](https://npcap.com/))
 - **Elevated privileges** for packet capture:
-  - Linux: run as root, or the packaged binary has `CAP_NET_RAW` set
-  - macOS: run with `sudo`, or install ChmodBPF (comes with Wireshark)
-  - Windows: run as Administrator
+  - Linux: install the .deb/.rpm package (postinstall sets `CAP_NET_RAW`), or run as root
+  - macOS: click "Install BPF Access" in the app (one-time), or install ChmodBPF from Wireshark
+  - Windows: install Npcap with "Allow non-administrators to capture" enabled
 
 ## Development
 
 ### Prerequisites
 
-- [Go](https://go.dev/) 1.24+
+- [Rust](https://rustup.rs/) 1.80+ (stable)
 - [Node.js](https://nodejs.org/) 20+
 - [pnpm](https://pnpm.io/)
-- [Wails CLI](https://wails.io/) v2: `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+- [Tauri CLI](https://tauri.app/) v2: `cargo install tauri-cli --version "^2.0"`
+- Platform-specific deps:
+  - Linux: `libpcap-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev`
+  - macOS: Xcode command-line tools
+  - Windows: [Npcap SDK](https://npcap.com/) on the link path
 
 ### Setup
 
 ```bash
 make i          # install frontend dependencies
-make dev        # start dev server with hot reload
+make dev        # cargo tauri dev — hot reload
 ```
 
 ### Build
 
 ```bash
-make build      # production build
-make bump       # update version to today's date (CalVer YYYY.M.D)
-```
-
-## Linux Packaging
-
-Requires [NFPM](https://nfpm.goreleaser.com/): `go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest`
-
-```bash
-make package-deb        # .deb package
-make package-rpm        # .rpm package
-make package-archlinux  # .pkg.tar.zst package
-make package-linux      # all three
+make build      # cargo tauri build — produces .dmg / .deb / .rpm / .msi
 ```
 
 ## Versioning
 
-Uses [CalVer](https://calver.org/) format `YYYY.M.D-PATCH` (e.g., `2026.4.13`, `2026.4.13-1`). Version is stored in `version.txt` and injected at build time.
+Uses [CalVer](https://calver.org/) format `YYYY.M.D-PATCH` (e.g., `2026.4.15`, `2026.4.15-1`). Version is stored in `version.txt` and propagated to `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json` by `make bump`/`make patch`.
 
 ```bash
-make bump     # new day release: 2026.4.14
-make patch    # increment patch: 2026.4.14-1, 2026.4.14-2, ...
+make bump     # new day release: 2026.4.15
+make patch    # increment patch: 2026.4.15-1, 2026.4.15-2, ...
 make tag      # git tag + push (triggers GitHub release)
 ```
 
 ## Tech Stack
 
-- **Backend:** Go + [gopacket](https://github.com/google/gopacket) (libpcap bindings)
+- **Backend:** Rust + [pcap](https://crates.io/crates/pcap) crate (libpcap bindings) + [Tokio](https://tokio.rs/) for async/cancellation
 - **Frontend:** [Svelte 5](https://svelte.dev/) + TypeScript + Vite
-- **Desktop:** [Wails](https://wails.io/) v2
-- **Packaging:** NFPM for Linux, Wails for macOS/Windows
+- **Desktop:** [Tauri](https://tauri.app/) v2
+- **Bundler:** Tauri's built-in bundler (`.dmg`, `.deb`, `.rpm`, `.msi`)

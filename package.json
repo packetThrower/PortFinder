@@ -1,0 +1,10 @@
+{
+  "name": "portfinder",
+  "private": true,
+  "version": "2026.4.15",
+  "scripts": {
+    "dev": "pnpm --dir frontend dev",
+    "build": "pnpm --dir frontend build",
+    "tauri": "pnpm --dir src-tauri tauri"
+  }
+}

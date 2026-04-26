@@ -2,31 +2,44 @@
 
 ## Project
 PortFinder — Network switch port discovery tool using CDP/LLDP.
-Go backend (gopacket) + Svelte 5/TypeScript frontend via Wails v2.
+Rust backend (pcap crate) + Svelte 5/TypeScript frontend via Tauri 2.x.
 
 ## Build
 ```bash
 make i          # install frontend deps (pnpm)
-make dev        # dev server with hot reload (needs sudo for capture)
-make build      # production build
+make dev        # cargo tauri dev — hot reload, runs the app
+make build      # cargo tauri build — production bundles
 make bump       # new day version: YYYY.M.D
 make patch      # increment patch: YYYY.M.D-N
 make tag        # git tag + push from version.txt (triggers release CI)
 ```
 
 ## Key paths
-main.go / app.go — Wails entrypoint and bound methods
-backend/capture/ — gopacket packet capture (CDP/LLDP)
-backend/privilege/ — platform-specific privilege detection + macOS BPF installer
-frontend/src/App.svelte — single-component Svelte 5 UI (runes: $state, $derived, $effect)
+src-tauri/src/lib.rs — Tauri command handlers + CaptureState
+src-tauri/src/main.rs — binary entrypoint
+src-tauri/src/capture/ — pcap capture, CDP and LLDP parsers (hand-rolled)
+src-tauri/src/privilege/ — platform-specific privilege detection + macOS BPF installer
+src-tauri/tauri.conf.json — window/bundle/identifier config
+src-tauri/Cargo.toml — Rust deps (tauri, pcap, tokio, nix, serde)
+src-tauri/scripts/postinstall.sh — Linux setcap CAP_NET_RAW hook
+frontend/src/App.svelte — single-component Svelte 5 UI (runes)
+frontend/src/types.ts — TypeScript interfaces shared with Rust commands
 frontend/src/App.css / style.css — OTEC theme with system dark/light matching
-frontend/svelte.config.js — Svelte preprocessor config
-packaging/macos/ — BPF helper installer, LaunchDaemon, uninstall script
-packaging/ — Linux desktop entry, postinstall (CAP_NET_RAW)
+packaging/macos/ — BPF helper installer pkg, LaunchDaemon, uninstall script
 
 ## Conventions
-CalVer versioning: YYYY.M.D-PATCH in version.txt
-OTEC brand colors defined in CSS custom properties (style.css)
-Wails bindings: update frontend/wailsjs/go/main/App.{js,d.ts} and models.ts when Go API changes
-sudo wails dev creates root-owned files — avoid; use BPF installer instead
-CI requires webkit2_41 build tag for Ubuntu 24.04
+CalVer versioning: YYYY.M.D-PATCH in version.txt; `make bump`/`make patch`
+keep src-tauri/Cargo.toml and tauri.conf.json in sync.
+OTEC brand colors defined in CSS custom properties (style.css).
+Tauri commands use snake_case in Rust; serde rename_all = "camelCase"
+keeps the JSON wire format consistent for the frontend.
+sudo on dev creates root-owned files in target/, dist/, and node_modules/
+— avoid; use the BPF installer instead so capture works without sudo.
+
+## Platform notes
+- macOS capture requires the BPF helper (one-click install in the app, or
+  ChmodBPF from Wireshark). Window height is 460 on macOS, 500 elsewhere.
+- Linux deb/rpm runs setcap cap_net_raw+ep on /usr/bin/portfinder via
+  postInstallScript so non-root capture works.
+- Windows requires Npcap (downloaded at CI build time; user installs at runtime).
+  CI sets LIB to the Npcap SDK path so the pcap crate links against wpcap.lib.

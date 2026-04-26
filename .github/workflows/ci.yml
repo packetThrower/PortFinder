@@ -9,15 +9,22 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libpcap-dev libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libpcap-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -26,10 +33,15 @@ jobs:
         with:
           version: 9
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          go-version: '1.24'
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Build frontend
         working-directory: frontend
@@ -37,8 +49,14 @@ jobs:
           pnpm install
           pnpm run build
 
-      - name: Go checks
-        run: |
-          go mod tidy
-          go vet -tags webkit2_41 ./...
-          go build -tags webkit2_41 ./...
+      - name: Cargo fmt
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Cargo test
+        working-directory: src-tauri
+        run: cargo test --lib

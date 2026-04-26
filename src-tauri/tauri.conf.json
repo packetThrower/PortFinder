@@ -4,14 +4,15 @@
   "version": "2026.4.15",
   "identifier": "com.packetthrower.portfinder",
   "build": {
-    "beforeDevCommand": "cd ../frontend && pnpm dev",
-    "beforeBuildCommand": "cd ../frontend && pnpm build",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../frontend/dist"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "PortFinder",
         "width": 480,
         "height": 500,
@@ -27,12 +28,30 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "category": "Utility",
+    "shortDescription": "Network switch port discovery via CDP/LLDP",
+    "longDescription": "PortFinder captures CDP and LLDP packets to identify what switch, port, and VLAN your device is connected to.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "linux": {
+      "deb": {
+        "depends": ["libpcap0.8"],
+        "postInstallScript": "scripts/postinstall.sh"
+      },
+      "rpm": {
+        "depends": ["libpcap"],
+        "postInstallScript": "scripts/postinstall.sh"
+      }
+    },
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      }
+    }
   }
 }

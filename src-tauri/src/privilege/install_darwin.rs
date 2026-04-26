@@ -109,8 +109,5 @@ pub fn install() -> Result<(), String> {
     if stderr.contains("-128") || stderr.to_lowercase().contains("user canceled") {
         return Err("authorization cancelled by user".into());
     }
-    Err(format!(
-        "BPF helper installation failed: {}",
-        stderr.trim()
-    ))
+    Err(format!("BPF helper installation failed: {}", stderr.trim()))
 }

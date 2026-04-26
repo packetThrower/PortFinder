@@ -35,15 +35,14 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
             TLV_NATIVE_VLAN if value.len() >= 2 => {
                 result.native_vlan = u16::from_be_bytes([value[0], value[1]]).to_string();
             }
-            TLV_VOICE_VLAN => {
+            TLV_VOICE_VLAN
                 // Voice VLAN TLV layout: appliance ID (1 byte), VLAN (2 bytes)
-                if value.len() >= 3 {
+                if value.len() >= 3 => {
                     let vlan = u16::from_be_bytes([value[1], value[2]]);
                     if vlan != 0 {
                         result.voice_vlan = vlan.to_string();
                     }
                 }
-            }
             TLV_MGMT_ADDRESS | TLV_ADDRESSES => {
                 if let Some(ip) = first_address_from_tlv(value) {
                     if result.switch_ip == "N/A" {
@@ -78,7 +77,7 @@ fn strip_ethernet_and_snap(frame: &[u8]) -> Result<&[u8], String> {
     if frame.len() < snap_end {
         return Err("frame too short for SNAP/CDP header".into());
     }
-    if &frame[offset..snap_end] != SNAP_LLC {
+    if frame[offset..snap_end] != SNAP_LLC {
         return Err("frame is not CDP (SNAP header mismatch)".into());
     }
     Ok(&frame[snap_end..])
