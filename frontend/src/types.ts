@@ -22,7 +22,7 @@ export interface CaptureResult {
 export interface PrivilegeStatus {
     hasAccess: boolean;
     helperInstalled: boolean;
-    inBPFGroup: boolean;
+    inBpfGroup: boolean;
     canInstall: boolean;
     platform: string;
     npcapInstalled: boolean;

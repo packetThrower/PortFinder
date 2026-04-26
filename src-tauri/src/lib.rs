@@ -1,3 +1,5 @@
+mod privilege;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
@@ -27,18 +29,6 @@ pub struct CaptureResult {
     pub switch_model: String,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PrivilegeStatus {
-    pub has_access: bool,
-    pub helper_installed: bool,
-    pub in_bpf_group: bool,
-    pub can_install: bool,
-    pub platform: String,
-    pub npcap_installed: bool,
-    pub npcap_non_admin: bool,
-}
-
 #[tauri::command]
 fn get_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
@@ -61,25 +51,17 @@ fn stop_capture() -> Result<(), String> {
 
 #[tauri::command]
 fn check_privileges() -> bool {
-    false
+    privilege::has_capture_privilege()
 }
 
 #[tauri::command]
-fn get_privilege_status() -> PrivilegeStatus {
-    PrivilegeStatus {
-        has_access: false,
-        helper_installed: false,
-        in_bpf_group: false,
-        can_install: false,
-        platform: std::env::consts::OS.to_string(),
-        npcap_installed: false,
-        npcap_non_admin: false,
-    }
+fn get_privilege_status() -> privilege::PrivilegeStatus {
+    privilege::get_privilege_status()
 }
 
 #[tauri::command]
 fn install_bpf_helper() -> Result<(), String> {
-    Err("install_bpf_helper: not yet implemented (Phase 5)".into())
+    privilege::install_bpf_helper()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
