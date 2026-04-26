@@ -16,6 +16,7 @@ if (mode !== 'day' && mode !== 'patch') {
 const VERSION_FILE = 'version.txt';
 const CARGO_TOML = 'src-tauri/Cargo.toml';
 const TAURI_CONF = 'src-tauri/tauri.conf.json';
+const ROOT_PKG = 'package.json';
 
 const current = readFileSync(VERSION_FILE, 'utf8').trim();
 
@@ -47,5 +48,13 @@ const conf = readFileSync(TAURI_CONF, 'utf8').replace(
     `"version": "${next}"`,
 );
 writeFileSync(TAURI_CONF, conf);
+
+// Root package.json carries a version too — keep it in sync so
+// `pnpm <script>` doesn't print a stale version banner.
+const pkg = readFileSync(ROOT_PKG, 'utf8').replace(
+    /"version": ".*"/,
+    `"version": "${next}"`,
+);
+writeFileSync(ROOT_PKG, pkg);
 
 console.log(`Version ${mode === 'day' ? 'bumped' : 'patched'} to ${next}`);
