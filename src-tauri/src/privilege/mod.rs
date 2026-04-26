@@ -4,6 +4,8 @@ use serde::Serialize;
 mod linux;
 #[cfg(target_os = "macos")]
 mod darwin;
+#[cfg(target_os = "macos")]
+mod install_darwin;
 #[cfg(target_os = "windows")]
 mod windows;
 
@@ -43,7 +45,7 @@ pub fn get_privilege_status() -> PrivilegeStatus {
 pub fn install_bpf_helper() -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        Err("install_bpf_helper: not yet implemented (Phase 5)".into())
+        install_darwin::install()
     }
     #[cfg(not(target_os = "macos"))]
     {
