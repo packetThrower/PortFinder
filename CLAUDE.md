@@ -7,12 +7,13 @@ Rust backend (pcap crate) + Svelte 5/TypeScript frontend via Tauri 2.x.
 ## Build
 All scripts live in the root `package.json`. Run with `pnpm <script>`.
 ```bash
-pnpm i              # install frontend deps (proxies to frontend/)
-pnpm tauri:dev      # tauri dev — hot reload, runs the app
-pnpm tauri:build    # tauri build — production bundles
-pnpm bump           # new day version: YYYY.M.D
-pnpm bump:patch     # increment patch: YYYY.M.D-N
-pnpm tag            # git tag + push from version.txt (triggers release CI)
+pnpm install                # root deps (Tauri CLI)
+pnpm install --dir frontend # frontend deps (Svelte / Vite)
+pnpm tauri:dev              # hot reload, runs the app
+pnpm tauri:build            # production bundles
+pnpm bump                   # new day version: YYYY.M.D
+pnpm bump:patch             # increment patch: YYYY.M.D-N
+pnpm tag                    # git tag + push from version.txt (triggers release CI)
 ```
 Internal scripts (called by Tauri's beforeDevCommand / beforeBuildCommand):
 - `pnpm dev` / `pnpm build` — Vite dev server / Vite production build (frontend only)

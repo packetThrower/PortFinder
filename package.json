@@ -3,7 +3,6 @@
   "private": true,
   "version": "2026.4.15",
   "scripts": {
-    "i": "pnpm --dir frontend install",
     "dev": "pnpm --dir frontend dev",
     "build": "pnpm --dir frontend build",
     "tauri": "tauri",
