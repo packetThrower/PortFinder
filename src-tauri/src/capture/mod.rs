@@ -141,14 +141,11 @@ fn capture_blocking(
 /// macOS rejects BIOCPROMISC, but CDP/LLDP arrive on multicast addresses
 /// the NIC accepts in normal mode anyway.
 fn open_capture(iface: &str) -> Result<pcap::Capture<pcap::Active>, String> {
-    let build = || {
-        pcap::Capture::from_device(iface)
-            .map_err(|e| format!("device {iface}: {e}"))
-    };
+    let build = || pcap::Capture::from_device(iface).map_err(|e| format!("device {iface}: {e}"));
 
     let try_open = |promisc: bool| -> Result<pcap::Capture<pcap::Active>, pcap::Error> {
         build()
-            .map_err(|e| pcap::Error::PcapError(e))?
+            .map_err(pcap::Error::PcapError)?
             .promisc(promisc)
             .snaplen(SNAP_LEN)
             .timeout(PCAP_TIMEOUT_MS)
