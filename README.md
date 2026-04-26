@@ -49,9 +49,9 @@ pnpm tauri:build    # produces .dmg / .deb / .rpm / .msi
 Uses [CalVer](https://calver.org/) format `YYYY.M.D-PATCH` (e.g., `2026.4.15`, `2026.4.15-1`). Version is stored in `version.txt` and propagated to `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json` by `scripts/bump.mjs`.
 
 ```bash
-pnpm bump     # new day release: 2026.4.15
-pnpm patch    # increment patch: 2026.4.15-1, 2026.4.15-2, ...
-pnpm tag      # git tag + push (triggers GitHub release)
+pnpm bump        # new day release: 2026.4.15
+pnpm bump:patch  # increment patch: 2026.4.15-1, 2026.4.15-2, ...
+pnpm tag         # git tag + push (triggers GitHub release)
 ```
 
 ## Tech Stack

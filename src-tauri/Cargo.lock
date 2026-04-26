@@ -2733,7 +2733,7 @@ dependencies = [
 
 [[package]]
 name = "portfinder"
-version = "2026.4.15"
+version = "2026.4.26"
 dependencies = [
  "nix",
  "pcap",

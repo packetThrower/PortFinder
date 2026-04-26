@@ -11,7 +11,7 @@ pnpm i              # install frontend deps (proxies to frontend/)
 pnpm tauri:dev      # tauri dev — hot reload, runs the app
 pnpm tauri:build    # tauri build — production bundles
 pnpm bump           # new day version: YYYY.M.D
-pnpm patch          # increment patch: YYYY.M.D-N
+pnpm bump:patch     # increment patch: YYYY.M.D-N
 pnpm tag            # git tag + push from version.txt (triggers release CI)
 ```
 Internal scripts (called by Tauri's beforeDevCommand / beforeBuildCommand):
@@ -31,7 +31,7 @@ frontend/src/App.css / style.css — OTEC theme with system dark/light matching
 packaging/macos/ — BPF helper installer pkg, LaunchDaemon, uninstall script
 
 ## Conventions
-CalVer versioning: YYYY.M.D-PATCH in version.txt; `pnpm bump`/`pnpm patch`
+CalVer versioning: YYYY.M.D-PATCH in version.txt; `pnpm bump`/`pnpm bump:patch`
 (scripts/bump.mjs) keep src-tauri/Cargo.toml and tauri.conf.json in sync.
 OTEC brand colors defined in CSS custom properties (style.css).
 Tauri commands use snake_case in Rust; serde rename_all = "camelCase"

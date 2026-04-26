@@ -10,7 +10,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "bump": "node scripts/bump.mjs day",
-    "patch": "node scripts/bump.mjs patch",
+    "bump:patch": "node scripts/bump.mjs patch",
     "tag": "node scripts/tag.mjs"
   },
   "devDependencies": {
