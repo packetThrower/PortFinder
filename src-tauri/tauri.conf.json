@@ -4,8 +4,8 @@
   "version": "2026.4.15",
   "identifier": "com.packetthrower.portfinder",
   "build": {
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build",
+    "beforeDevCommand": "cd ../frontend && pnpm dev",
+    "beforeBuildCommand": "cd ../frontend && pnpm build",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../frontend/dist"
   },

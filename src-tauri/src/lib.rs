@@ -1,6 +1,9 @@
+mod capture;
 mod privilege;
 
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,7 +21,7 @@ pub struct CaptureRequest {
     pub protocol: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureResult {
     pub switch_name: String,
@@ -29,6 +32,12 @@ pub struct CaptureResult {
     pub switch_model: String,
 }
 
+/// Holds the cancellation token for the currently running capture (if any).
+/// `start_capture` cancels the previous token and replaces it; `stop_capture`
+/// cancels whatever's there.
+#[derive(Default)]
+struct CaptureState(Mutex<Option<CancellationToken>>);
+
 #[tauri::command]
 fn get_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
@@ -36,17 +45,42 @@ fn get_version() -> String {
 
 #[tauri::command]
 fn get_interfaces() -> Result<Vec<InterfaceInfo>, String> {
-    Err("get_interfaces: not yet implemented (Phase 4)".into())
+    capture::list_interfaces()
 }
 
 #[tauri::command]
-fn start_capture(_request: CaptureRequest) -> Result<Option<CaptureResult>, String> {
-    Err("start_capture: not yet implemented (Phase 4)".into())
+async fn start_capture(
+    request: CaptureRequest,
+    state: tauri::State<'_, CaptureState>,
+) -> Result<CaptureResult, String> {
+    let cancel = CancellationToken::new();
+    {
+        let mut current = state.0.lock().await;
+        if let Some(prev) = current.take() {
+            prev.cancel();
+        }
+        *current = Some(cancel.clone());
+    }
+
+    let result = capture::run(request, cancel.clone()).await;
+
+    // Clear the slot if it's still our token.
+    let mut current = state.0.lock().await;
+    if let Some(ref tok) = *current {
+        if tok.is_cancelled() || std::ptr::eq(tok as *const _, &cancel as *const _) {
+            *current = None;
+        }
+    }
+    result
 }
 
 #[tauri::command]
-fn stop_capture() -> Result<(), String> {
-    Err("stop_capture: not yet implemented (Phase 4)".into())
+async fn stop_capture(state: tauri::State<'_, CaptureState>) -> Result<(), String> {
+    let mut current = state.0.lock().await;
+    if let Some(tok) = current.take() {
+        tok.cancel();
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -68,6 +102,7 @@ fn install_bpf_helper() -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(CaptureState::default())
         .invoke_handler(tauri::generate_handler![
             get_version,
             get_interfaces,
