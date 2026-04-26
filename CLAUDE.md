@@ -5,14 +5,17 @@ PortFinder — Network switch port discovery tool using CDP/LLDP.
 Rust backend (pcap crate) + Svelte 5/TypeScript frontend via Tauri 2.x.
 
 ## Build
+All scripts live in the root `package.json`. Run with `pnpm <script>`.
 ```bash
-make i          # install frontend deps (pnpm)
-make dev        # cargo tauri dev — hot reload, runs the app
-make build      # cargo tauri build — production bundles
-make bump       # new day version: YYYY.M.D
-make patch      # increment patch: YYYY.M.D-N
-make tag        # git tag + push from version.txt (triggers release CI)
+pnpm i              # install frontend deps (proxies to frontend/)
+pnpm tauri:dev      # tauri dev — hot reload, runs the app
+pnpm tauri:build    # tauri build — production bundles
+pnpm bump           # new day version: YYYY.M.D
+pnpm patch          # increment patch: YYYY.M.D-N
+pnpm tag            # git tag + push from version.txt (triggers release CI)
 ```
+Internal scripts (called by Tauri's beforeDevCommand / beforeBuildCommand):
+- `pnpm dev` / `pnpm build` — Vite dev server / Vite production build (frontend only)
 
 ## Key paths
 src-tauri/src/lib.rs — Tauri command handlers + CaptureState
@@ -28,8 +31,8 @@ frontend/src/App.css / style.css — OTEC theme with system dark/light matching
 packaging/macos/ — BPF helper installer pkg, LaunchDaemon, uninstall script
 
 ## Conventions
-CalVer versioning: YYYY.M.D-PATCH in version.txt; `make bump`/`make patch`
-keep src-tauri/Cargo.toml and tauri.conf.json in sync.
+CalVer versioning: YYYY.M.D-PATCH in version.txt; `pnpm bump`/`pnpm patch`
+(scripts/bump.mjs) keep src-tauri/Cargo.toml and tauri.conf.json in sync.
 OTEC brand colors defined in CSS custom properties (style.css).
 Tauri commands use snake_case in Rust; serde rename_all = "camelCase"
 keeps the JSON wire format consistent for the frontend.

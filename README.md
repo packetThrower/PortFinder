@@ -33,24 +33,25 @@ Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and 
 ### Setup
 
 ```bash
-make i          # install frontend dependencies
-make dev        # cargo tauri dev — hot reload
+pnpm install        # install root deps (Tauri CLI)
+pnpm i              # install frontend deps
+pnpm tauri:dev      # hot reload — opens the app
 ```
 
 ### Build
 
 ```bash
-make build      # cargo tauri build — produces .dmg / .deb / .rpm / .msi
+pnpm tauri:build    # produces .dmg / .deb / .rpm / .msi
 ```
 
 ## Versioning
 
-Uses [CalVer](https://calver.org/) format `YYYY.M.D-PATCH` (e.g., `2026.4.15`, `2026.4.15-1`). Version is stored in `version.txt` and propagated to `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json` by `make bump`/`make patch`.
+Uses [CalVer](https://calver.org/) format `YYYY.M.D-PATCH` (e.g., `2026.4.15`, `2026.4.15-1`). Version is stored in `version.txt` and propagated to `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json` by `scripts/bump.mjs`.
 
 ```bash
-make bump     # new day release: 2026.4.15
-make patch    # increment patch: 2026.4.15-1, 2026.4.15-2, ...
-make tag      # git tag + push (triggers GitHub release)
+pnpm bump     # new day release: 2026.4.15
+pnpm patch    # increment patch: 2026.4.15-1, 2026.4.15-2, ...
+pnpm tag      # git tag + push (triggers GitHub release)
 ```
 
 ## Tech Stack

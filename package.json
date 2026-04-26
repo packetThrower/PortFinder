@@ -3,8 +3,17 @@
   "private": true,
   "version": "2026.4.15",
   "scripts": {
+    "i": "pnpm --dir frontend install",
     "dev": "pnpm --dir frontend dev",
     "build": "pnpm --dir frontend build",
-    "tauri": "pnpm --dir src-tauri tauri"
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "bump": "node scripts/bump.mjs day",
+    "patch": "node scripts/bump.mjs patch",
+    "tag": "node scripts/tag.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1"
   }
 }

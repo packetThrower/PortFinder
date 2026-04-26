@@ -1,21 +1,10 @@
-# Go
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-*.test
-*.out
-vendor/
-
-# Wails build output
-build/bin/
-dist/
-
-# Frontend
-frontend/node_modules/
+# Node / Tauri
+node_modules/
 frontend/dist/
-!frontend/dist/gitkeep
+frontend/package.json.md5
+
+# Rust
+src-tauri/target/
 
 # IDE
 .vscode/
@@ -27,16 +16,6 @@ frontend/dist/
 # OS
 .DS_Store
 Thumbs.db
-
-# Python leftovers
-__pycache__/
-venv/
-*.spec
-*.log
-
-# Wails dev artifacts
-frontend/package.json.md5
-build/PortFinder/
 
 # Claude
 .claude/
