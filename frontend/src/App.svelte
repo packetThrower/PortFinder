@@ -1,39 +1,25 @@
 <script lang="ts">
     import './App.css';
-    import {
-        GetInterfaces,
-        StartCapture,
-        StopCapture,
-        GetVersion,
-        GetPrivilegeStatus,
-        InstallBPFHelper,
-    } from '../wailsjs/go/main/App';
+    import { invoke } from '@tauri-apps/api/core';
+    import type {
+        InterfaceInfo,
+        CaptureRequest,
+        CaptureResult,
+        PrivilegeStatus,
+    } from './types';
 
-    interface InterfaceInfo {
-        name: string;
-        description: string;
-        addresses: string;
-        hasIP: boolean;
-    }
-
-    interface CaptureResult {
-        switchName: string;
-        switchIP: string;
-        switchPort: string;
-        nativeVLAN: string;
-        voiceVLAN: string;
-        switchModel: string;
-    }
-
-    interface PrivilegeStatus {
-        hasAccess: boolean;
-        helperInstalled: boolean;
-        inBPFGroup: boolean;
-        canInstall: boolean;
-        platform: string;
-        npcapInstalled: boolean;
-        npcapNonAdmin: boolean;
-    }
+    const GetInterfaces = () =>
+        invoke<InterfaceInfo[]>('get_interfaces');
+    const StartCapture = (req: CaptureRequest) =>
+        invoke<CaptureResult | null>('start_capture', { request: req });
+    const StopCapture = () =>
+        invoke<void>('stop_capture');
+    const GetVersion = () =>
+        invoke<string>('get_version');
+    const GetPrivilegeStatus = () =>
+        invoke<PrivilegeStatus>('get_privilege_status');
+    const InstallBPFHelper = () =>
+        invoke<void>('install_bpf_helper');
 
     let interfaces = $state<InterfaceInfo[]>([]);
     let selectedInterface = $state('');
