@@ -1,4 +1,8 @@
-# PortFinder
+<p align="center">
+  <img src="src-tauri/icons/icon.png" alt="PortFinder" width="160">
+</p>
+
+<h1 align="center">PortFinder</h1>
 
 [![Release](https://img.shields.io/github/v/release/packetThrower/PortFinder?logo=github&color=blue)](https://github.com/packetThrower/PortFinder/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/packetThrower/PortFinder/total?logo=github&color=blue)](https://github.com/packetThrower/PortFinder/releases)

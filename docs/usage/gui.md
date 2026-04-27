@@ -1,5 +1,7 @@
 # GUI
 
+![PortFinder showing a captured LLDP packet](../assets/screenshots/macos-result.png)
+
 ## Workflow
 
 1. **Pick an interface.** The dropdown shows every NIC on your machine. Use the toggle to hide interfaces with no IP. Hit the ↻ button to re-scan after plugging or unplugging cables.
