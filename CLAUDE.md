@@ -11,8 +11,10 @@ pnpm install                # root deps (Tauri CLI)
 pnpm install --dir frontend # frontend deps (Svelte / Vite)
 pnpm tauri:dev              # hot reload, runs the app
 pnpm tauri:build            # production bundles
-pnpm bump                   # new day version: YYYY.M.D
-pnpm bump:patch             # increment patch: YYYY.M.D-N
+pnpm bump                   # SemVer patch (alias for bump:patch): 3.0.0 -> 3.0.1
+pnpm bump:patch             # patch
+pnpm bump:minor             # minor: 3.0.5 -> 3.1.0
+pnpm bump:major             # major: 3.1.4 -> 4.0.0
 pnpm tag                    # git tag + push from version.txt (triggers release CI)
 ```
 Internal scripts (called by Tauri's beforeDevCommand / beforeBuildCommand):
@@ -33,8 +35,10 @@ frontend/src/App.css / style.css — OTEC theme with system dark/light matching
 packaging/macos/ — BPF helper installer pkg, LaunchDaemon, uninstall script
 
 ## Conventions
-CalVer versioning: YYYY.M.D-PATCH in version.txt; `pnpm bump`/`pnpm bump:patch`
-(scripts/bump.mjs) keep src-tauri/Cargo.toml and tauri.conf.json in sync.
+SemVer (MAJOR.MINOR.PATCH) in version.txt; the current 3.x line is the
+Rust+Tauri rewrite (2.x = Wails+Go on `wails-version`, 1.x = Python on
+`python-legacy`). `scripts/bump.mjs` keeps version.txt, src-tauri/Cargo.toml,
+src-tauri/tauri.conf.json, and root package.json in sync.
 OTEC brand colors defined in CSS custom properties (style.css).
 Tauri commands use snake_case in Rust; serde rename_all = "camelCase"
 keeps the JSON wire format consistent for the frontend.

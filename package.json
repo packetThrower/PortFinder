@@ -1,15 +1,17 @@
 {
   "name": "portfinder",
   "private": true,
-  "version": "2026.4.26-1",
+  "version": "3.0.0",
   "scripts": {
     "dev": "pnpm --dir frontend dev",
     "build": "pnpm --dir frontend build",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "bump": "node scripts/bump.mjs day",
+    "bump": "node scripts/bump.mjs patch",
     "bump:patch": "node scripts/bump.mjs patch",
+    "bump:minor": "node scripts/bump.mjs minor",
+    "bump:major": "node scripts/bump.mjs major",
     "tag": "node scripts/tag.mjs"
   },
   "devDependencies": {

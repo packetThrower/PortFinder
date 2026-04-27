@@ -61,11 +61,13 @@ pnpm tauri:build               # produces .dmg / .deb / .rpm / .msi
 
 ## Versioning
 
-Uses [CalVer](https://calver.org/) format `YYYY.M.D-PATCH` (e.g., `2026.4.26`, `2026.4.26-1`). Version is stored in `version.txt` and propagated to `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json` by `scripts/bump.mjs`.
+[SemVer](https://semver.org/) `MAJOR.MINOR.PATCH`. The current `3.x` line is the Rust + Tauri rewrite; the previous Go + Wails line was `2.x` (see `wails-version` branch) and the original Python implementation was `1.x` (see `python-legacy`). Version lives in `version.txt` and is propagated to `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, and root `package.json` by `scripts/bump.mjs`.
 
 ```bash
-pnpm bump          # new day release: 2026.4.26
-pnpm bump:patch    # increment patch: 2026.4.26-1, 2026.4.26-2, ...
+pnpm bump          # patch (alias for bump:patch): 3.0.0 -> 3.0.1
+pnpm bump:patch    # patch:                        3.0.0 -> 3.0.1
+pnpm bump:minor    # minor:                        3.0.5 -> 3.1.0
+pnpm bump:major    # major:                        3.1.4 -> 4.0.0
 pnpm tag           # git tag + push (triggers GitHub release)
 ```
 
@@ -78,7 +80,7 @@ pnpm tag           # git tag + push (triggers GitHub release)
 
 ## Branches
 
-- `main` — current Tauri 2.x + Rust + Svelte 5 implementation
-- `wails-version` — snapshot of the previous Wails 2 + Go + Svelte 5 implementation
-- `react-frontend` — snapshot of the React frontend (pre-Svelte migration)
-- `python-legacy` — original Python implementation
+- `main` — current `3.x` line: Tauri 2 + Rust + Svelte 5
+- `wails-version` — `2.x` line: Wails 2 + Go + Svelte 5
+- `react-frontend` — snapshot of the React frontend (pre-Svelte migration on the `2.x` line)
+- `python-legacy` — `1.x` line: original Python implementation
