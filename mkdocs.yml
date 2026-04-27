@@ -57,6 +57,7 @@ nav:
       - Setup: dev/setup.md
       - Architecture: dev/architecture.md
       - Releasing: dev/releasing.md
+  - Changelog: changelog.md
 
 markdown_extensions:
   - admonition
@@ -72,7 +73,8 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      base_path: ['.', 'docs']
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true

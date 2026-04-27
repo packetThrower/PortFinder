@@ -16,7 +16,7 @@
 
 Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and LLDP (Link Layer Discovery Protocol) packets to identify what switch, port, and VLAN your device is connected to.
 
-📖 **Docs:** <https://packetthrower.github.io/PortFinder/>
+📖 **Docs:** <https://packetthrower.github.io/PortFinder/> · 📝 [**Changelog**](CHANGELOG.md)
 
 <p align="center">
   <img src="docs/assets/screenshots/macos.png" alt="PortFinder on macOS" width="420">
