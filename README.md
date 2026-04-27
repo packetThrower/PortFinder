@@ -1,6 +1,7 @@
 # PortFinder
 
 [![Release](https://img.shields.io/github/v/release/packetThrower/PortFinder?logo=github&color=blue)](https://github.com/packetThrower/PortFinder/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/packetThrower/PortFinder/total?logo=github&color=blue)](https://github.com/packetThrower/PortFinder/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/ci.yml?branch=main&label=CI&logo=github)](https://github.com/packetThrower/PortFinder/actions/workflows/ci.yml)
 [![Release workflow](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/release.yml?label=release&logo=github)](https://github.com/packetThrower/PortFinder/actions/workflows/release.yml)
 [![Docs](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/docs.yml?label=docs&logo=materialformkdocs)](https://packetthrower.github.io/PortFinder/)
