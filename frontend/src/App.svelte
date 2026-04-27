@@ -2,12 +2,20 @@
     import './App.css';
     import { invoke } from '@tauri-apps/api/core';
     import { type as osType } from '@tauri-apps/plugin-os';
+    import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
     import type {
         InterfaceInfo,
         CaptureRequest,
         CaptureResult,
         PrivilegeStatus,
     } from './types';
+
+    // Base window height matches tauri.conf.json. When a privilege warning
+    // banner is rendered we grow the window to fit it; when it goes away
+    // (e.g. the user clicks Install BPF Access and capture access becomes
+    // available) we shrink back.
+    const BASE_HEIGHT = 460;
+    const BASE_WIDTH = 400;
 
     const GetInterfaces = () =>
         invoke<InterfaceInfo[]>('get_interfaces');
@@ -77,6 +85,27 @@
         } catch {
             // Non-Tauri preview — leave unset; CSS falls back to defaults.
         }
+    });
+
+    // Resize the window to fit the privilege-warning banner when it's
+    // visible. Re-runs whenever privStatus changes (initial load, after
+    // BPF install, etc.).
+    $effect(() => {
+        // Read privStatus so Svelte tracks it as a dependency.
+        void privStatus;
+        // Wait one frame so the DOM has rendered the banner (or removed it)
+        // before measuring.
+        requestAnimationFrame(() => {
+            const banner = document.querySelector('.privilege-warning') as HTMLElement | null;
+            const extra = banner ? banner.offsetHeight + 12 : 0;
+            try {
+                getCurrentWindow().setSize(
+                    new LogicalSize(BASE_WIDTH, BASE_HEIGHT + extra),
+                );
+            } catch {
+                // Non-Tauri preview, or set_size denied — silently no-op.
+            }
+        });
     });
 
     async function handleInstallBPF() {
