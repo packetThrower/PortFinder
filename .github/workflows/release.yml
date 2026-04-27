@@ -18,22 +18,44 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
+          # macOS — single universal build that runs on Apple Silicon AND Intel
+          - runner: macos-latest
+            arch: universal
             args: '--target universal-apple-darwin'
             rust-targets: 'aarch64-apple-darwin,x86_64-apple-darwin'
-          - platform: ubuntu-22.04
-            args: ''
-            rust-targets: ''
-          - platform: windows-latest
+
+          # Linux x86_64
+          - runner: ubuntu-latest
+            arch: amd64
             args: ''
             rust-targets: ''
 
-    runs-on: ${{ matrix.platform }}
+          # Linux ARM64 — native ARM runner, no cross-compile
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            args: ''
+            rust-targets: ''
+
+          # Windows x86_64
+          - runner: windows-latest
+            arch: amd64
+            args: ''
+            rust-targets: ''
+            npcap_lib: x64
+
+          # Windows ARM64 — native ARM runner
+          - runner: windows-11-arm
+            arch: arm64
+            args: ''
+            rust-targets: ''
+            npcap_lib: ARM64
+
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Linux system deps
-        if: matrix.platform == 'ubuntu-22.04'
+        if: startsWith(matrix.runner, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -44,7 +66,7 @@ jobs:
             patchelf
 
       - name: Cache Npcap SDK
-        if: matrix.platform == 'windows-latest'
+        if: startsWith(matrix.runner, 'windows')
         id: cache-npcap
         uses: actions/cache@v4
         with:
@@ -52,16 +74,16 @@ jobs:
           key: npcap-sdk-1.13
 
       - name: Download Npcap SDK
-        if: matrix.platform == 'windows-latest' && steps.cache-npcap.outputs.cache-hit != 'true'
+        if: startsWith(matrix.runner, 'windows') && steps.cache-npcap.outputs.cache-hit != 'true'
         run: |
           Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile npcap-sdk.zip
           Expand-Archive npcap-sdk.zip -DestinationPath npcap-sdk
         shell: powershell
 
       - name: Configure Npcap link path
-        if: matrix.platform == 'windows-latest'
+        if: startsWith(matrix.runner, 'windows')
         run: |
-          echo "LIB=${{ github.workspace }}\npcap-sdk\Lib\x64;$env:LIB" >> $env:GITHUB_ENV
+          echo "LIB=${{ github.workspace }}\npcap-sdk\Lib\${{ matrix.npcap_lib }};$env:LIB" >> $env:GITHUB_ENV
         shell: powershell
 
       - name: Install Rust toolchain
@@ -73,6 +95,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          key: ${{ matrix.arch }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -101,11 +124,11 @@ jobs:
           args: ${{ matrix.args }}
 
       - name: Build BPF helper pkg (macOS)
-        if: matrix.platform == 'macos-latest'
+        if: matrix.runner == 'macos-latest'
         run: ./packaging/macos/build-pkg.sh
 
       - name: Upload BPF helper pkg
-        if: matrix.platform == 'macos-latest'
+        if: matrix.runner == 'macos-latest'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
