@@ -3,24 +3,37 @@ name: CI
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'mkdocs.yml'
-      - 'LICENSE'
-      - '.gitignore'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'mkdocs.yml'
-      - 'LICENSE'
-      - '.gitignore'
   workflow_call:
 
 jobs:
+  # Detect whether this push/PR touched any code path. Skipped when CI
+  # is invoked via workflow_call (release pipeline) so build always runs
+  # for releases.
+  changes:
+    if: github.event_name != 'workflow_call'
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'src-tauri/**'
+              - 'frontend/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/ci.yml'
+
   build:
+    needs: [changes]
+    if: |
+      always() &&
+      (needs.changes.result == 'skipped' || needs.changes.outputs.code == 'true')
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -72,3 +85,24 @@ jobs:
       - name: Cargo test
         working-directory: src-tauri
         run: cargo test --lib
+
+  # Rollup job that branch protection should require. Always runs and
+  # passes when build either succeeded or was correctly skipped (docs-
+  # only changes). Fails when build itself failed or was cancelled.
+  ci:
+    name: CI
+    needs: [build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check build status
+        run: |
+          case "${{ needs.build.result }}" in
+            success|skipped)
+              echo "build: ${{ needs.build.result }} → CI passes"
+              ;;
+            *)
+              echo "build: ${{ needs.build.result }} → CI fails"
+              exit 1
+              ;;
+          esac
