@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2e4368"/>
+      <stop offset="100%" stop-color="#162237"/>
+    </linearGradient>
+
+    <linearGradient id="bezel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8ecf0"/>
+      <stop offset="35%" stop-color="#c0c5cc"/>
+      <stop offset="55%" stop-color="#888d94"/>
+      <stop offset="80%" stop-color="#a8aeb5"/>
+      <stop offset="100%" stop-color="#d4d8dc"/>
+    </linearGradient>
+
+    <linearGradient id="cavity" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#04080e"/>
+      <stop offset="100%" stop-color="#0c1420"/>
+    </linearGradient>
+
+    <radialGradient id="pin" cx="0.35" cy="0.25" r="0.85">
+      <stop offset="0%" stop-color="#fff2c4"/>
+      <stop offset="40%" stop-color="#f0c060"/>
+      <stop offset="80%" stop-color="#a87420"/>
+      <stop offset="100%" stop-color="#5a3a10"/>
+    </radialGradient>
+
+    <filter id="drop-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
+      <feOffset dy="18"/>
+      <feFlood flood-color="#000" flood-opacity="0.55"/>
+      <feComposite in2="SourceAlpha" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Rounded-square background, macOS-style continuous corners -->
+  <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" fill="url(#bg)"/>
+
+  <!-- RJ-45 jack: front view, larger -->
+  <g filter="url(#drop-shadow)">
+    <!-- Outer metallic bezel: 904 x 560, centered, slight upward bias for visual balance -->
+    <rect x="60" y="220" width="904" height="560" rx="32" ry="32" fill="url(#bezel)"/>
+
+    <!-- Inner cavity with bottom-center keying notch (RJ-45 footprint) -->
+    <path d="
+      M 120 290
+      L 904 290
+      L 904 690
+      L 612 690
+      L 612 740
+      L 412 740
+      L 412 690
+      L 120 690
+      Z"
+      fill="url(#cavity)"/>
+  </g>
+
+  <!-- 8 gold contact pins, evenly spaced inside cavity (W=55, G=38, margin=39) -->
+  <g fill="url(#pin)">
+    <rect x="159" y="320" width="55" height="280" rx="4"/>
+    <rect x="252" y="320" width="55" height="280" rx="4"/>
+    <rect x="345" y="320" width="55" height="280" rx="4"/>
+    <rect x="438" y="320" width="55" height="280" rx="4"/>
+    <rect x="531" y="320" width="55" height="280" rx="4"/>
+    <rect x="624" y="320" width="55" height="280" rx="4"/>
+    <rect x="717" y="320" width="55" height="280" rx="4"/>
+    <rect x="810" y="320" width="55" height="280" rx="4"/>
+  </g>
+
+  <!-- Highlight along top edge of pins -->
+  <g fill="#fff5d8" opacity="0.55">
+    <rect x="159" y="320" width="55" height="9" rx="4"/>
+    <rect x="252" y="320" width="55" height="9" rx="4"/>
+    <rect x="345" y="320" width="55" height="9" rx="4"/>
+    <rect x="438" y="320" width="55" height="9" rx="4"/>
+    <rect x="531" y="320" width="55" height="9" rx="4"/>
+    <rect x="624" y="320" width="55" height="9" rx="4"/>
+    <rect x="717" y="320" width="55" height="9" rx="4"/>
+    <rect x="810" y="320" width="55" height="9" rx="4"/>
+  </g>
+
+  <!-- Faint inner shadow along the top of the cavity for depth -->
+  <rect x="120" y="290" width="784" height="6" fill="#000" opacity="0.6"/>
+</svg>
