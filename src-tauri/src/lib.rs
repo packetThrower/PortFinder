@@ -106,7 +106,28 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_os::init())
         .manage(CaptureState::default())
-        .setup(|_app| Ok(()))
+        .setup(|app| {
+            // macOS: apply NSVisualEffectView vibrancy to the window so
+            // the Tahoe / Liquid Glass material shows through any
+            // transparent regions in the WebView.
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::Manager;
+                use window_vibrancy::{
+                    apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
+                };
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = apply_vibrancy(
+                        &window,
+                        NSVisualEffectMaterial::HudWindow,
+                        Some(NSVisualEffectState::Active),
+                        None,
+                    );
+                }
+            }
+            let _ = app;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_version,
             get_interfaces,
