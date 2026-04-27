@@ -65,6 +65,22 @@ launchctl unload "$DAEMON_PLIST" 2>/dev/null || true
 launchctl load "$DAEMON_PLIST"
 
 "$INSTALL_DIR/ChmodBPF"
+
+# Drop a symlink so the CLI is callable as `portfinder` from any shell.
+# Search /Applications and the user's Downloads for the bundle.
+APP_BIN=""
+for candidate in \
+    "/Applications/PortFinder.app/Contents/MacOS/portfinder" \
+    "$HOME/Applications/PortFinder.app/Contents/MacOS/portfinder"; do
+    if [ -x "$candidate" ]; then
+        APP_BIN="$candidate"
+        break
+    fi
+done
+if [ -n "$APP_BIN" ]; then
+    mkdir -p /usr/local/bin
+    ln -sf "$APP_BIN" /usr/local/bin/portfinder
+fi
 "#;
 
 pub fn install() -> Result<(), String> {

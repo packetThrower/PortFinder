@@ -41,4 +41,19 @@ launchctl load "$DAEMON_PLIST"
 # Run immediately so it works without reboot
 "$INSTALL_DIR/ChmodBPF"
 
+# Drop a symlink so the CLI is callable as `portfinder` from any shell.
+APP_BIN=""
+for candidate in \
+    "/Applications/PortFinder.app/Contents/MacOS/portfinder" \
+    "/Users/$CONSOLE_USER/Applications/PortFinder.app/Contents/MacOS/portfinder"; do
+    if [ -x "$candidate" ]; then
+        APP_BIN="$candidate"
+        break
+    fi
+done
+if [ -n "$APP_BIN" ]; then
+    mkdir -p /usr/local/bin
+    ln -sf "$APP_BIN" /usr/local/bin/portfinder
+fi
+
 exit 0

@@ -12,6 +12,8 @@ For non-root packet capture, also install the BPF helper:
 2. Double-click to install. macOS will prompt for your password.
 3. Click **Install BPF Access** in the app the first time you run it (or re-run the `.pkg`).
 
+The BPF helper also drops a symlink at `/usr/local/bin/portfinder` so the [CLI](usage/cli.md) is callable from any shell.
+
 !!! tip "Already have Wireshark?"
     Wireshark's **ChmodBPF** helper is the same idea — if it's installed, PortFinder will use it.
 

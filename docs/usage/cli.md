@@ -46,14 +46,12 @@ portfinder privileges --json
 
 === "macOS"
 
+    Once the BPF helper has run (either via the in-app *Install BPF Access* button or by installing `PortFinder-BPF-*.pkg`), a symlink at `/usr/local/bin/portfinder` is created automatically — `portfinder` works from any shell.
+
+    Without that step, the binary lives inside the app bundle:
+
     ```bash
     /Applications/PortFinder.app/Contents/MacOS/portfinder capture ...
-    ```
-
-    Optionally symlink it to your `PATH`:
-
-    ```bash
-    ln -s /Applications/PortFinder.app/Contents/MacOS/portfinder /usr/local/bin/portfinder
     ```
 
 === "Linux"

@@ -51,6 +51,18 @@ chown root:wheel /dev/bpf* 2>/dev/null || true
 chmod 600 /dev/bpf* 2>/dev/null || true
 echo "  Restored BPF devices to root-only access"
 
+# Remove the CLI symlink if it points back at PortFinder.app
+SYMLINK="/usr/local/bin/portfinder"
+if [ -L "$SYMLINK" ]; then
+    TARGET=$(readlink "$SYMLINK")
+    case "$TARGET" in
+        */PortFinder.app/Contents/MacOS/portfinder)
+            rm -f "$SYMLINK"
+            echo "  Removed CLI symlink ($SYMLINK)"
+            ;;
+    esac
+fi
+
 # Delete the group if no members remain and Wireshark isn't using it
 if ! [ -f "/Library/LaunchDaemons/org.wireshark.ChmodBPF.plist" ]; then
     MEMBERS=$(dscl . -read /Groups/$BPF_GROUP GroupMembership 2>/dev/null | sed 's/GroupMembership: //')
