@@ -40,6 +40,18 @@
             : interfaces
     );
 
+    /**
+     * Pull the first IPv4 out of the comma-separated address string.
+     * The full address list still ships in the data — we just hide the
+     * IPv6 noise from the dropdown label so common cases stay readable.
+     */
+    function compactAddresses(addrs: string): string {
+        if (!addrs) return '';
+        const parts = addrs.split(', ');
+        const v4 = parts.find((p) => /^\d+\.\d+\.\d+\.\d+$/.test(p));
+        return v4 ?? parts[0] ?? '';
+    }
+
     function refreshPrivileges() {
         GetPrivilegeStatus().then((s) => (privStatus = s));
     }
@@ -165,121 +177,102 @@
         {/if}
     {/if}
 
-    <div class="form-group">
-        <label for="nic-select">Select a NIC:</label>
-        <div class="nic-row">
+    <!-- Controls card: configure capture -->
+    <section class="card">
+        <div class="form-group">
+            <label for="nic-select">Interface:</label>
+            <div class="nic-row">
+                <select
+                    id="nic-select"
+                    bind:value={selectedInterface}
+                    disabled={isCapturing}
+                    title={interfaces.find((i) => i.name === selectedInterface)?.addresses ?? ''}
+                >
+                    {#each filteredInterfaces as iface (iface.name || '__all__')}
+                        {@const compact = compactAddresses(iface.addresses)}
+                        <option value={iface.name} title={iface.addresses}>
+                            {iface.description || iface.name || 'Sniff all Interfaces'}{compact ? ` (${compact})` : ''}
+                        </option>
+                    {/each}
+                </select>
+                <button
+                    type="button"
+                    class="refresh-btn"
+                    onclick={refreshInterfaces}
+                    disabled={isCapturing}
+                    title="Refresh interface list"
+                    aria-label="Refresh interface list"
+                >
+                    ↻
+                </button>
+            </div>
+        </div>
+
+        <label class="switch-row">
+            <span class="switch-label">Only show interfaces with an IP</span>
+            <input
+                type="checkbox"
+                role="switch"
+                class="switch"
+                bind:checked={showOnlyWithIPs}
+                disabled={isCapturing}
+            />
+        </label>
+
+        <div class="form-group">
+            <label for="protocol-select">Protocol:</label>
             <select
-                id="nic-select"
-                bind:value={selectedInterface}
+                id="protocol-select"
+                bind:value={protocol}
                 disabled={isCapturing}
             >
-                {#each filteredInterfaces as iface (iface.name || '__all__')}
-                    <option value={iface.name}>
-                        {iface.description || iface.name || 'Sniff all Interfaces'}{iface.addresses ? ` (${iface.addresses})` : ''}
-                    </option>
-                {/each}
+                <option value="LLDP">LLDP</option>
+                <option value="CDP">CDP</option>
             </select>
+        </div>
+
+        {#if isCapturing}
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+        {/if}
+
+        <div class="button-row">
+            <!-- svelte-ignore a11y_autofocus -->
             <button
-                type="button"
-                class="refresh-btn"
-                onclick={refreshInterfaces}
+                onclick={handleStart}
                 disabled={isCapturing}
-                title="Refresh interface list"
-                aria-label="Refresh interface list"
+                autofocus
             >
-                ↻
+                Start
+            </button>
+            <button
+                onclick={handleStop}
+                disabled={!isCapturing}
+            >
+                Stop
             </button>
         </div>
-    </div>
+    </section>
 
-    <label class="checkbox-label">
-        <input
-            type="checkbox"
-            bind:checked={showOnlyWithIPs}
-            disabled={isCapturing}
-        />
-        Show only interfaces with IPs
-    </label>
-
-    <div class="form-group">
-        <label for="switch-name">Switch:</label>
-        <input id="switch-name" type="text" readonly value={result?.switchName ?? ''} />
-    </div>
-
-    <div class="form-group">
-        <label for="switch-ip">Switch IP:</label>
-        <input id="switch-ip" type="text" readonly value={result?.switchIp ?? ''} />
-    </div>
-
-    <div class="form-group">
-        <label for="switch-port">Switchport:</label>
-        <input id="switch-port" type="text" readonly value={result?.switchPort ?? ''} />
-    </div>
-
-    <div class="form-group">
-        <label for="vlan">VLAN:</label>
-        <input id="vlan" type="text" readonly value={result?.nativeVlan ?? ''} />
-    </div>
-
-    <div class="form-group">
-        <label for="voice-vlan">Voice VLAN:</label>
-        <input id="voice-vlan" type="text" readonly value={result?.voiceVlan ?? ''} />
-    </div>
-
-    <div class="form-group">
-        <label for="mtu">MTU:</label>
-        <input id="mtu" type="text" readonly value={result?.mtu ?? ''} />
-    </div>
-
-    <div class="form-group">
-        <label for="switch-model">Switch Model:</label>
-        <input id="switch-model" type="text" readonly value={result?.switchModel ?? ''} />
-    </div>
-
-    <div class="form-group">
-        <label for="protocol-group">Protocol:</label>
-        <div id="protocol-group" class="protocol-selector">
-            <label>
-                <input
-                    type="radio"
-                    name="protocol"
-                    value="CDP"
-                    bind:group={protocol}
-                    disabled={isCapturing}
-                />
-                CDP
-            </label>
-            <label>
-                <input
-                    type="radio"
-                    name="protocol"
-                    value="LLDP"
-                    bind:group={protocol}
-                    disabled={isCapturing}
-                />
-                LLDP
-            </label>
-        </div>
-    </div>
-
-    {#if isCapturing}
-        <div class="progress-bar">
-            <div class="progress-fill"></div>
-        </div>
-    {/if}
-
-    <div class="button-row">
-        <button onclick={handleStart} disabled={isCapturing}>
-            Start
-        </button>
-        <button
-            class="stop"
-            onclick={handleStop}
-            disabled={!isCapturing}
-        >
-            Stop
-        </button>
-    </div>
+    <!-- Result card: captured switch info -->
+    <section class="card">
+        {#if result}
+            <dl class="result-list">
+                <dt>Switch</dt><dd>{result.switchName || '—'}</dd>
+                <dt>IP</dt><dd>{result.switchIp || '—'}</dd>
+                <dt>Port</dt><dd>{result.switchPort || '—'}</dd>
+                <dt>VLAN</dt><dd>{result.nativeVlan || '—'}</dd>
+                <dt>Voice VLAN</dt><dd>{result.voiceVlan || '—'}</dd>
+                <dt>MTU</dt><dd>{result.mtu || '—'}</dd>
+                <dt>Model</dt><dd>{result.switchModel || '—'}</dd>
+            </dl>
+        {:else}
+            <p class="empty-state">
+                No capture yet. Choose an interface and click Start.
+            </p>
+        {/if}
+    </section>
 
     <div class="status-text" class:error-text={!!error}>
         {error || status}

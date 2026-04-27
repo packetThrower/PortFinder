@@ -1,6 +1,6 @@
-/* Native styling. Each OS gets its own font stack, accent, and spacing.
-   Goal: let WebKit render the platform's native widgets. We override only
-   layout, not widget appearance. */
+/* Native styling. Each OS gets its own font stack, accent, spacing,
+   and card chrome. Goal: let WebKit render the platform's native widgets
+   while we handle layout + the section-card depth. */
 
 :root {
     color-scheme: light dark;
@@ -8,48 +8,96 @@
     font-size: 13px;
     line-height: 1.4;
     -webkit-font-smoothing: antialiased;
+
+    /* Defaults — overridden per-OS below */
+    --gap-row: 9px;
+    --form-label-w: 110px;
+    --bg-page: Canvas;
+    --bg-card: Canvas;
+    --card-radius: 10px;
+    --card-border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+    --card-shadow: none;
+    --card-padding: 12px 14px;
 }
 
 html {
-    background: Canvas;
+    background: var(--bg-page);
 }
 
 body {
     margin: 0;
     color: CanvasText;
-    background: Canvas;
+    background: var(--bg-page);
 }
 
 * {
     box-sizing: border-box;
 }
 
-/* Default platform tokens (also act as fallback in non-tauri preview) */
-:root {
-    --muted: GrayText;
-    --gap-row: 6px;
-    --form-label-w: 110px;
-}
-
-/* macOS — SF Pro, slightly tighter rows */
+/* === macOS — Tahoe / System Settings card style ============================
+   Page is the system window background; cards sit on top in
+   secondary system fill with hairline border (barely visible in dark). */
 html[data-os="macos"] {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
         "Helvetica Neue", sans-serif;
-    --gap-row: 5px;
-    --form-label-w: 100px;
+    --gap-row: 13px;
+    --form-label-w: 70px;
+    --bg-page: #ececec;
+    --bg-card: #ffffff;
+    --card-radius: 10px;
+    --card-border: 1px solid rgba(0, 0, 0, 0.05);
+    --card-shadow: 0 1px 1px rgba(0, 0, 0, 0.03);
+    --card-padding: 14px 18px;
+}
+@media (prefers-color-scheme: dark) {
+    html[data-os="macos"] {
+        --bg-page: #1e1e1e;
+        --bg-card: #2c2c2e;
+        --card-border: 1px solid rgba(255, 255, 255, 0.04);
+        --card-shadow: none;
+    }
 }
 
-/* Windows — Segoe UI Variable, larger base */
+/* === Windows 11 — Fluent / Mica card style =================================
+   Settings-style card surface with rounded corners and subtle elevation. */
 html[data-os="windows"] {
     font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
     font-size: 14px;
-    --gap-row: 8px;
+    --gap-row: 12px;
     --form-label-w: 110px;
+    --bg-page: #f3f3f3;
+    --bg-card: #fbfbfb;
+    --card-radius: 8px;
+    --card-border: 1px solid rgba(0, 0, 0, 0.06);
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    --card-padding: 16px 18px;
+}
+@media (prefers-color-scheme: dark) {
+    html[data-os="windows"] {
+        --bg-page: #202020;
+        --bg-card: #2c2c2c;
+        --card-border: 1px solid rgba(255, 255, 255, 0.05);
+    }
 }
 
-/* Linux — Inter / Cantarell, Adwaita feel */
+/* === Linux — Adwaita boxed-list ============================================
+   GNOME Settings uses the same card pattern. Larger radius and a more
+   pronounced surface tint than Windows; matches libadwaita .boxed-list. */
 html[data-os="linux"] {
     font-family: "Inter", "Cantarell", system-ui, sans-serif;
-    --gap-row: 7px;
+    --gap-row: 12px;
     --form-label-w: 110px;
+    --bg-page: #fafafa;
+    --bg-card: #ffffff;
+    --card-radius: 12px;
+    --card-border: 1px solid rgba(0, 0, 0, 0.10);
+    --card-shadow: none;
+    --card-padding: 14px 16px;
+}
+@media (prefers-color-scheme: dark) {
+    html[data-os="linux"] {
+        --bg-page: #242424;
+        --bg-card: #303030;
+        --card-border: 1px solid rgba(255, 255, 255, 0.08);
+    }
 }
