@@ -427,4 +427,33 @@ mod tests {
         assert_eq!(result.native_vlan, "200");
         assert_eq!(result.mtu, "9000");
     }
+
+    #[test]
+    fn lldp_combines_port_id_and_description() {
+        // Same minimal LLDP frame as lldp_parser_smoke, but adds a Port
+        // ID TLV alongside the Port Description so we can assert the
+        // combined "<id> (<desc>)" formatting.
+        let mut frame = vec![0u8; 12];
+        frame.extend_from_slice(&[0x88, 0xCC]);
+
+        // TLV: Port ID (type 2). value = subtype(1) + id; subtype 5 is
+        // "interface name" but we ignore subtype, just emit the id.
+        let id = b"1/1/1";
+        let body: Vec<u8> = std::iter::once(0x05).chain(id.iter().copied()).collect();
+        let header = ((2u16) << 9) | (body.len() as u16);
+        frame.extend_from_slice(&header.to_be_bytes());
+        frame.extend_from_slice(&body);
+
+        // TLV: Port Description (type 4)
+        let val = b"Duty PC";
+        let header = ((4u16) << 9) | (val.len() as u16);
+        frame.extend_from_slice(&header.to_be_bytes());
+        frame.extend_from_slice(val);
+
+        // End TLV
+        frame.extend_from_slice(&[0, 0]);
+
+        let result = lldp::parse(&frame).expect("LLDP parse should succeed");
+        assert_eq!(result.switch_port, "1/1/1 (Duty PC)");
+    }
 }

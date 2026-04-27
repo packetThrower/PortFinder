@@ -78,10 +78,14 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
         }
     }
 
-    // Prefer Port Description if present, else Port ID.
-    result.switch_port = port_desc_text
-        .or(port_id_text)
-        .unwrap_or_else(|| "N/A".into());
+    // Combine Port ID and Port Description when both are present, e.g.
+    //   "1/1/1 (Duty PC)"
+    // Fall back to whichever single value we have, or "N/A".
+    result.switch_port = match (port_id_text, port_desc_text) {
+        (Some(id), Some(desc)) if id != desc => format!("{id} ({desc})"),
+        (Some(s), _) | (_, Some(s)) => s,
+        (None, None) => "N/A".into(),
+    };
 
     Ok(result)
 }

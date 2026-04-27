@@ -13,6 +13,14 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [3.1.3] - 2026-04-27
+
+### Changed
+- LLDP capture results now combine Port ID and Port Description when both are present (`"1/1/1 (Duty PC)"`). Previously only the description was shown when both existed, which hid the actual port number.
+
+### Fixed
+- Windows ARM64 release build failing in CI: `pnpm/action-setup@v6` writes broken `.cmd.EXE` symlinks on `windows-11-arm` runners. Pinned both workflows back to `pnpm/action-setup@v4` until the upstream regression is resolved.
+
 ## [3.1.2] - 2026-04-27
 
 ### Fixed
@@ -86,7 +94,8 @@ Detailed history and source on the [`wails-version`](https://github.com/packetTh
 
 Source on the [`python-legacy`](https://github.com/packetThrower/PortFinder/tree/python-legacy) branch.
 
-[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.1.2...HEAD
+[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.1.3...HEAD
+[3.1.3]: https://github.com/packetThrower/PortFinder/compare/v3.1.2...v3.1.3
 [3.1.2]: https://github.com/packetThrower/PortFinder/compare/v3.1.1...v3.1.2
 [3.1.1]: https://github.com/packetThrower/PortFinder/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/packetThrower/PortFinder/compare/v3.0.0...v3.1.0

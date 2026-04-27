@@ -103,8 +103,10 @@ jobs:
         with:
           node-version: '20'
 
+      # Pinned at v4 — v6 fails on windows-11-arm runners with broken
+      # `.cmd.EXE` symlinks in setup. Track upstream issue before bumping.
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@v4
         with:
           version: 9
 
