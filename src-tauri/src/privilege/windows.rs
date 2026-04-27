@@ -15,20 +15,27 @@ pub fn fill_platform_status(status: &mut PrivilegeStatus) {
 
 /// Returns true if the current process is running with administrator
 /// privileges. Uses `CheckTokenMembership` against the well-known
-/// `BUILTIN\Administrators` SID — the approach Microsoft recommends, and
-/// unlike parsing `net session` stderr it's locale-independent and avoids
-/// spawning a child process on every privilege check.
+/// `BUILTIN\Administrators` SID (S-1-5-32-544) — the approach Microsoft
+/// recommends, and unlike parsing `net session` stderr it's locale-
+/// independent and avoids spawning a child process on every privilege
+/// check.
 fn is_admin() -> bool {
     use windows_sys::Win32::Security::{
         AllocateAndInitializeSid, CheckTokenMembership, FreeSid, SID_IDENTIFIER_AUTHORITY,
     };
-    use windows_sys::Win32::System::SystemServices::{
-        DOMAIN_ALIAS_RID_ADMINS, SECURITY_BUILTIN_DOMAIN_RID, SECURITY_NT_AUTHORITY,
-    };
 
-    // SID for BUILTIN\Administrators: S-1-5-32-544
+    // Well-known SID values from the Windows ABI:
+    //   SECURITY_NT_AUTHORITY        = { 0, 0, 0, 0, 0, 5 }
+    //   SECURITY_BUILTIN_DOMAIN_RID  = 32
+    //   DOMAIN_ALIAS_RID_ADMINS      = 544
+    // Hardcoded here so we don't depend on a particular windows-sys path
+    // (these constants have moved between modules across versions).
+    const NT_AUTHORITY: [u8; 6] = [0, 0, 0, 0, 0, 5];
+    const BUILTIN_DOMAIN_RID: u32 = 32;
+    const ADMINS_RID: u32 = 544;
+
     let nt_authority = SID_IDENTIFIER_AUTHORITY {
-        Value: SECURITY_NT_AUTHORITY,
+        Value: NT_AUTHORITY,
     };
     let mut admin_group = std::ptr::null_mut();
 
@@ -36,8 +43,8 @@ fn is_admin() -> bool {
         if AllocateAndInitializeSid(
             &nt_authority,
             2,
-            SECURITY_BUILTIN_DOMAIN_RID as u32,
-            DOMAIN_ALIAS_RID_ADMINS as u32,
+            BUILTIN_DOMAIN_RID,
+            ADMINS_RID,
             0,
             0,
             0,
