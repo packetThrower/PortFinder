@@ -18,6 +18,10 @@ Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and 
 
 📖 **Docs:** <https://packetthrower.github.io/PortFinder/>
 
+<p align="center">
+  <img src="docs/assets/screenshots/macos.png" alt="PortFinder on macOS" width="420">
+</p>
+
 ## What it does
 
 1. Select a network interface (or sniff all)
