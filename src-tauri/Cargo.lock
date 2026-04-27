@@ -2952,7 +2952,7 @@ dependencies = [
 
 [[package]]
 name = "portfinder"
-version = "3.0.0"
+version = "3.1.1"
 dependencies = [
  "clap",
  "nix 0.29.0",
@@ -2966,6 +2966,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "window-vibrancy",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

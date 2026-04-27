@@ -13,11 +13,51 @@ pub fn fill_platform_status(status: &mut PrivilegeStatus) {
     status.can_install = false; // Npcap has its own installer
 }
 
+/// Returns true if the current process is running with administrator
+/// privileges. Uses `CheckTokenMembership` against the well-known
+/// `BUILTIN\Administrators` SID — the approach Microsoft recommends, and
+/// unlike parsing `net session` stderr it's locale-independent and avoids
+/// spawning a child process on every privilege check.
 fn is_admin() -> bool {
-    let Ok(output) = Command::new("net").arg("session").output() else {
-        return false;
+    use windows_sys::Win32::Security::{
+        AllocateAndInitializeSid, CheckTokenMembership, FreeSid, SID_IDENTIFIER_AUTHORITY,
     };
-    !String::from_utf8_lossy(&output.stderr).contains("Access is denied") && output.status.success()
+    use windows_sys::Win32::System::SystemServices::{
+        DOMAIN_ALIAS_RID_ADMINS, SECURITY_BUILTIN_DOMAIN_RID, SECURITY_NT_AUTHORITY,
+    };
+
+    // SID for BUILTIN\Administrators: S-1-5-32-544
+    let nt_authority = SID_IDENTIFIER_AUTHORITY {
+        Value: SECURITY_NT_AUTHORITY,
+    };
+    let mut admin_group = std::ptr::null_mut();
+
+    unsafe {
+        if AllocateAndInitializeSid(
+            &nt_authority,
+            2,
+            SECURITY_BUILTIN_DOMAIN_RID as u32,
+            DOMAIN_ALIAS_RID_ADMINS as u32,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            &mut admin_group,
+        ) == 0
+        {
+            return false;
+        }
+
+        let mut is_member = 0;
+        // Passing a null token means "use the current process's effective
+        // token" — which is what we want.
+        let ok = CheckTokenMembership(std::ptr::null_mut(), admin_group, &mut is_member);
+        FreeSid(admin_group);
+
+        ok != 0 && is_member != 0
+    }
 }
 
 fn is_npcap_installed() -> bool {
