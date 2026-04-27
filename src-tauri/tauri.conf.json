@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["app", "dmg", "deb", "rpm", "appimage", "nsis"],
     "category": "Utility",
     "shortDescription": "Network switch port discovery via CDP/LLDP",
     "longDescription": "PortFinder captures CDP and LLDP packets to identify what switch, port, and VLAN your device is connected to.",
@@ -46,11 +46,6 @@
       "rpm": {
         "depends": ["libpcap"],
         "postInstallScript": "scripts/postinstall.sh"
-      }
-    },
-    "windows": {
-      "wix": {
-        "language": "en-US"
       }
     }
   }
