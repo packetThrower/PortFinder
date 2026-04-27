@@ -1,64 +1,55 @@
-/* OTEC Dark Theme (default) */
-:root {
-    color-scheme: dark;
-    --bg-page: #001825;
-    --bg-card: #002535;
-    --bg-input: #001520;
-    --text-primary: #FFFFFF;
-    --text-secondary: #bbb;
-    --text-muted: #888;
-    --accent: #EDB426;
-    --accent-dark: #d9a422;
-    --ansel: #006A84;
-    --aqua: #76b7bd;
-    --courtyard: #718083;
-    --error: #ef5350;
-    --success: #4caf50;
-    --input-text: #FFFFFF;
-    --input-border: #718083;
-    --btn-bg: #002535;
-    --btn-text: #EDB426;
-    --btn-border: #EDB426;
-}
+/* Native styling. Each OS gets its own font stack, accent, and spacing.
+   Goal: let WebKit render the platform's native widgets. We override only
+   layout, not widget appearance. */
 
-/* OTEC Light Theme */
-@media (prefers-color-scheme: light) {
-    :root {
-        color-scheme: light;
-        --bg-page: #EDF2E5;
-        --bg-card: #FFFFFF;
-        --bg-input: #f0f0f0;
-        --text-primary: #1a1a1a;
-        --text-secondary: #555555;
-        --text-muted: #888888;
-        --accent: #EDB426;
-        --accent-dark: #d9a422;
-        --ansel: #006A84;
-        --aqua: #00838f;
-        --courtyard: #9aacaf;
-        --error: #d32f2f;
-        --success: #2e7d32;
-        --input-text: #1a1a1a;
-        --input-border: #9aacaf;
-        --btn-bg: #FFFFFF;
-        --btn-text: #001825;
-        --btn-border: #EDB426;
-    }
+:root {
+    color-scheme: light dark;
+    accent-color: AccentColor;
+    font-size: 13px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
 }
 
 html {
-    background-color: var(--bg-page);
-    color: var(--text-primary);
+    background: Canvas;
 }
 
 body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
-        "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-        sans-serif;
-    -webkit-font-smoothing: antialiased;
+    color: CanvasText;
+    background: Canvas;
 }
 
 * {
     box-sizing: border-box;
+}
+
+/* Default platform tokens (also act as fallback in non-tauri preview) */
+:root {
+    --muted: GrayText;
+    --gap-row: 6px;
+    --form-label-w: 110px;
+}
+
+/* macOS — SF Pro, slightly tighter rows */
+html[data-os="macos"] {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Helvetica Neue", sans-serif;
+    --gap-row: 5px;
+    --form-label-w: 100px;
+}
+
+/* Windows — Segoe UI Variable, larger base */
+html[data-os="windows"] {
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    --gap-row: 8px;
+    --form-label-w: 110px;
+}
+
+/* Linux — Inter / Cantarell, Adwaita feel */
+html[data-os="linux"] {
+    font-family: "Inter", "Cantarell", system-ui, sans-serif;
+    --gap-row: 7px;
+    --form-label-w: 110px;
 }

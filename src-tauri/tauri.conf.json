@@ -15,10 +15,9 @@
         "label": "main",
         "title": "PortFinder",
         "width": 480,
-        "height": 535,
+        "height": 420,
         "minWidth": 400,
-        "minHeight": 535,
-        "backgroundColor": "#001825"
+        "minHeight": 420
       }
     ],
     "security": {

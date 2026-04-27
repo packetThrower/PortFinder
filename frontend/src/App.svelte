@@ -1,6 +1,7 @@
 <script lang="ts">
     import './App.css';
     import { invoke } from '@tauri-apps/api/core';
+    import { type as osType } from '@tauri-apps/plugin-os';
     import type {
         InterfaceInfo,
         CaptureRequest,
@@ -57,6 +58,13 @@
         refreshInterfaces();
         refreshPrivileges();
         GetVersion().then((v) => (version = v));
+        // Tag the root element with the OS so per-platform CSS rules can
+        // apply native fonts, colors, and spacing.
+        try {
+            document.documentElement.dataset.os = osType();
+        } catch {
+            // Non-Tauri preview — leave unset; CSS falls back to defaults.
+        }
     });
 
     async function handleInstallBPF() {
@@ -228,25 +236,6 @@
         <input id="switch-model" type="text" readonly value={result?.switchModel ?? ''} />
     </div>
 
-    {#if isCapturing}
-        <div class="progress-bar">
-            <div class="progress-fill"></div>
-        </div>
-    {/if}
-
-    <div class="button-row">
-        <button onclick={handleStart} disabled={isCapturing}>
-            Start
-        </button>
-        <button
-            class="stop"
-            onclick={handleStop}
-            disabled={!isCapturing}
-        >
-            Stop
-        </button>
-    </div>
-
     <div class="form-group">
         <label for="protocol-group">Protocol:</label>
         <div id="protocol-group" class="protocol-selector">
@@ -271,6 +260,25 @@
                 LLDP
             </label>
         </div>
+    </div>
+
+    {#if isCapturing}
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+    {/if}
+
+    <div class="button-row">
+        <button onclick={handleStart} disabled={isCapturing}>
+            Start
+        </button>
+        <button
+            class="stop"
+            onclick={handleStop}
+            disabled={!isCapturing}
+        >
+            Stop
+        </button>
     </div>
 
     <div class="status-text" class:error-text={!!error}>

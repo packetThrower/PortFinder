@@ -20,7 +20,8 @@ Internal scripts (called by Tauri's beforeDevCommand / beforeBuildCommand):
 
 ## Key paths
 src-tauri/src/lib.rs — Tauri command handlers + CaptureState
-src-tauri/src/main.rs — binary entrypoint
+src-tauri/src/main.rs — binary entrypoint (dispatches GUI vs CLI by argv)
+src-tauri/src/cli.rs — clap-based headless CLI (capture / list / privileges)
 src-tauri/src/capture/ — pcap capture, CDP and LLDP parsers (hand-rolled)
 src-tauri/src/privilege/ — platform-specific privilege detection + macOS BPF installer
 src-tauri/tauri.conf.json — window/bundle/identifier config

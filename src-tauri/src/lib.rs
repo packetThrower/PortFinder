@@ -1,4 +1,5 @@
 mod capture;
+pub mod cli;
 mod privilege;
 
 use serde::{Deserialize, Serialize};
@@ -103,21 +104,9 @@ fn install_bpf_helper() -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_os::init())
         .manage(CaptureState::default())
-        .setup(|app| {
-            // macOS title bars are thinner than Windows/Linux chrome,
-            // so the window can be 40px shorter without clipping content.
-            #[cfg(target_os = "macos")]
-            {
-                use tauri::Manager;
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.set_size(tauri::LogicalSize::new(480.0, 495.0));
-                    let _ = window.set_min_size(Some(tauri::LogicalSize::new(400.0, 495.0)));
-                }
-            }
-            let _ = app;
-            Ok(())
-        })
+        .setup(|_app| Ok(()))
         .invoke_handler(tauri::generate_handler![
             get_version,
             get_interfaces,

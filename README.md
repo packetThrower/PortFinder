@@ -9,6 +9,20 @@ Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and 
 3. Click Start and PortFinder captures the next discovery packet
 4. Displays: Switch Name, Switch IP, Switchport, Native VLAN, Voice VLAN, MTU, Switch Model
 
+## CLI
+
+The same binary works headless. Run with no args to launch the GUI; pass a subcommand to use the CLI.
+
+```bash
+portfinder capture --interface en0 --protocol LLDP        # capture and print
+portfinder capture --json                                  # machine-readable
+portfinder list --with-ip                                  # interfaces with IPs
+portfinder privileges                                      # diagnose access
+portfinder --help                                          # see all options
+```
+
+Press Ctrl+C to interrupt a running capture. On macOS, run the binary directly: `/Applications/PortFinder.app/Contents/MacOS/portfinder capture ...`. On Windows, `PortFinder.exe` attaches to the parent console automatically when invoked from cmd / PowerShell.
+
 ## Requirements
 
 - **libpcap** (Linux: `libpcap-dev`, macOS: included, Windows: [Npcap](https://npcap.com/))
