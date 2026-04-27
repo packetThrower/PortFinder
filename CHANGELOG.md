@@ -13,7 +13,10 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
-## [3.1.1] - 2026-04-26
+## [3.1.2] - 2026-04-27
+
+### Fixed
+- Windows binary refusing to launch when Npcap isn't installed. The OS dialog `wpcap.dll was not found` appeared before the privilege-warning banner had a chance to render and direct users to the Npcap download. `wpcap.dll` is now marked as a delay-loaded import via `build.rs`, and pcap calls are gated on `npcap_installed` so the app launches cleanly and shows the Download Npcap link instead.
 
 ### Fixed
 - Linux ARM64 release build failing with `xdg-open binary not found` — `ubuntu-24.04-arm` runners ship a more minimal package set than `ubuntu-latest` and don't include `xdg-utils` by default. Added it to the apt install step.
@@ -83,7 +86,8 @@ Detailed history and source on the [`wails-version`](https://github.com/packetTh
 
 Source on the [`python-legacy`](https://github.com/packetThrower/PortFinder/tree/python-legacy) branch.
 
-[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.1.1...HEAD
+[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.1.2...HEAD
+[3.1.2]: https://github.com/packetThrower/PortFinder/compare/v3.1.1...v3.1.2
 [3.1.1]: https://github.com/packetThrower/PortFinder/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/packetThrower/PortFinder/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/packetThrower/PortFinder/releases/tag/v3.0.0
