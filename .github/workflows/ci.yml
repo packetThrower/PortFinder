@@ -29,6 +29,8 @@ jobs:
               - 'pnpm-lock.yaml'
               - '.github/workflows/ci.yml'
 
+  # Full Linux build: fmt + clippy + tests + frontend build. The
+  # canonical place where regressions get caught.
   build:
     needs: [changes]
     if: |
@@ -86,23 +88,109 @@ jobs:
         working-directory: src-tauri
         run: cargo test --lib
 
+  # Lightweight cross-platform compile check. Catches Windows-only and
+  # macOS-only typos / missing imports / wrong API names that the Linux
+  # build can't see (cfg(target_os = "...") gating). Faster than a full
+  # build — just `cargo check`, no clippy / tests / bundling.
+  cross-check:
+    needs: [changes]
+    if: |
+      always() &&
+      (needs.changes.result == 'skipped' || needs.changes.outputs.code == 'true')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            label: macos
+          - runner: windows-latest
+            label: windows-amd64
+            npcap_lib: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: check-${{ matrix.label }}
+
+      # Tauri's generate_context!() needs the frontend dist to exist.
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          pnpm install
+          pnpm run build
+
+      # Windows: Npcap SDK lib path so the `pcap` crate links.
+      - name: Cache Npcap SDK
+        if: startsWith(matrix.runner, 'windows')
+        id: cache-npcap
+        uses: actions/cache@v4
+        with:
+          path: npcap-sdk
+          key: npcap-sdk-1.13
+
+      - name: Download Npcap SDK
+        if: startsWith(matrix.runner, 'windows') && steps.cache-npcap.outputs.cache-hit != 'true'
+        run: |
+          Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile npcap-sdk.zip
+          Expand-Archive npcap-sdk.zip -DestinationPath npcap-sdk
+        shell: powershell
+
+      - name: Configure Npcap link path
+        if: startsWith(matrix.runner, 'windows')
+        run: |
+          echo "LIB=${{ github.workspace }}\npcap-sdk\Lib\${{ matrix.npcap_lib }};$env:LIB" >> $env:GITHUB_ENV
+        shell: powershell
+
+      - name: Cargo check
+        working-directory: src-tauri
+        run: cargo check --all-targets
+
+      - name: Cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
   # Rollup job that branch protection should require. Always runs and
-  # passes when build either succeeded or was correctly skipped (docs-
-  # only changes). Fails when build itself failed or was cancelled.
+  # passes when build + cross-check succeeded or were correctly skipped
+  # (docs-only changes). Fails when either failed or was cancelled.
   ci:
     name: CI
-    needs: [build]
+    needs: [build, cross-check]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Check build status
+      - name: Check job status
         run: |
-          case "${{ needs.build.result }}" in
-            success|skipped)
-              echo "build: ${{ needs.build.result }} → CI passes"
-              ;;
-            *)
-              echo "build: ${{ needs.build.result }} → CI fails"
-              exit 1
-              ;;
-          esac
+          fail=0
+          for name in build cross-check; do
+            case "${name}" in
+              build) result="${{ needs.build.result }}" ;;
+              cross-check) result="${{ needs.cross-check.result }}" ;;
+            esac
+            case "${result}" in
+              success|skipped)
+                echo "${name}: ${result} → ok"
+                ;;
+              *)
+                echo "${name}: ${result} → fail"
+                fail=1
+                ;;
+            esac
+          done
+          exit $fail
