@@ -5,6 +5,7 @@ mod lldp;
 pub use interfaces::list_interfaces;
 
 use crate::{CaptureRequest, CaptureResult};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
@@ -14,7 +15,7 @@ const LLDP_FILTER: &str = "ether proto 0x88cc";
 const SNAP_LEN: i32 = 65535;
 const PCAP_TIMEOUT_MS: i32 = 500;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Protocol {
     Cdp,
     Lldp,
@@ -44,51 +45,64 @@ impl Protocol {
     }
 }
 
+/// A blocking capture function: given an interface name and a cancellation
+/// token, returns a captured frame or an error. Production passes
+/// `capture_blocking` (which uses pcap); tests pass a synthetic function.
+type BlockingCapture =
+    Arc<dyn Fn(String, CancellationToken) -> Result<Vec<u8>, String> + Send + Sync>;
+
 pub async fn run(req: CaptureRequest, cancel: CancellationToken) -> Result<CaptureResult, String> {
     let protocol = Protocol::from_str(&req.protocol)?;
+    let capture: BlockingCapture = Arc::new(move |name, c| capture_blocking(&name, protocol, c));
 
     let frame = if req.interface_name.is_empty() {
-        capture_all_interfaces(protocol, cancel.clone()).await?
+        let names: Vec<String> = pcap::Device::list()
+            .map_err(|e| format!("failed to list interfaces: {e}"))?
+            .into_iter()
+            .filter(|d| !interfaces::is_loopback(d))
+            .map(|d| d.name)
+            .collect();
+        race_first(names, cancel.clone(), capture).await?
     } else {
-        capture_one_interface(req.interface_name.clone(), protocol, cancel.clone()).await?
+        let name = req.interface_name.clone();
+        capture_one(cancel.clone(), move || capture(name, cancel)).await?
     };
 
     protocol.parse(&frame)
 }
 
-async fn capture_one_interface(
-    iface: String,
-    protocol: Protocol,
-    cancel: CancellationToken,
-) -> Result<Vec<u8>, String> {
-    let cancel_clone = cancel.clone();
-    let blocking =
-        tokio::task::spawn_blocking(move || capture_blocking(&iface, protocol, cancel_clone));
-
+/// Single-interface orchestration. Runs `blocking` on a worker thread and
+/// races it against the cancellation token: whichever completes first wins.
+async fn capture_one<F>(cancel: CancellationToken, blocking: F) -> Result<Vec<u8>, String>
+where
+    F: FnOnce() -> Result<Vec<u8>, String> + Send + 'static,
+{
+    let bg = tokio::task::spawn_blocking(blocking);
     tokio::select! {
-        res = blocking => res.map_err(|e| format!("capture task panicked: {e}"))?,
+        res = bg => res.map_err(|e| format!("capture task panicked: {e}"))?,
         _ = cancel.cancelled() => Err("capture cancelled".into()),
     }
 }
 
-async fn capture_all_interfaces(
-    protocol: Protocol,
+/// Multi-interface orchestration. Spawns one blocking task per interface
+/// and returns the first one that yields a packet, cancelling the rest.
+/// Returns "capture cancelled" if the external token fires first, or
+/// "no packet captured from any interface" if every task finishes with
+/// an error.
+async fn race_first(
+    iface_names: Vec<String>,
     cancel: CancellationToken,
+    capture: BlockingCapture,
 ) -> Result<Vec<u8>, String> {
-    let devs = pcap::Device::list().map_err(|e| format!("failed to list interfaces: {e}"))?;
-
-    let mut set = JoinSet::new();
-    for dev in devs {
-        if interfaces::is_loopback(&dev) {
-            continue;
-        }
-        let iface = dev.name.clone();
-        let task_cancel = cancel.clone();
-        set.spawn_blocking(move || capture_blocking(&iface, protocol, task_cancel));
+    if iface_names.is_empty() {
+        return Err("no usable interfaces".into());
     }
 
-    if set.is_empty() {
-        return Err("no usable interfaces".into());
+    let mut set = JoinSet::new();
+    for name in iface_names {
+        let task_cancel = cancel.clone();
+        let f = capture.clone();
+        set.spawn_blocking(move || f(name, task_cancel));
     }
 
     loop {
@@ -173,12 +187,157 @@ fn open_capture(iface: &str) -> Result<pcap::Capture<pcap::Active>, String> {
 mod tests {
     use super::*;
 
+    // ---- Protocol ---------------------------------------------------
+
+    #[test]
+    fn protocol_from_str_accepts_canonical() {
+        assert_eq!(Protocol::from_str("CDP").unwrap(), Protocol::Cdp);
+        assert_eq!(Protocol::from_str("LLDP").unwrap(), Protocol::Lldp);
+    }
+
+    #[test]
+    fn protocol_from_str_is_case_insensitive() {
+        assert_eq!(Protocol::from_str("cdp").unwrap(), Protocol::Cdp);
+        assert_eq!(Protocol::from_str("Lldp").unwrap(), Protocol::Lldp);
+    }
+
+    #[test]
+    fn protocol_from_str_rejects_unknown() {
+        assert!(Protocol::from_str("foo").is_err());
+        assert!(Protocol::from_str("").is_err());
+    }
+
+    // ---- capture_one (single-interface orchestration) ---------------
+
+    #[tokio::test]
+    async fn capture_one_returns_packet() {
+        let cancel = CancellationToken::new();
+        let result = capture_one(cancel, || Ok(b"hello".to_vec())).await;
+        assert_eq!(result, Ok(b"hello".to_vec()));
+    }
+
+    #[tokio::test]
+    async fn capture_one_propagates_error() {
+        let cancel = CancellationToken::new();
+        let result = capture_one(cancel, || Err("read failed".into())).await;
+        assert_eq!(result, Err("read failed".into()));
+    }
+
+    #[tokio::test]
+    async fn capture_one_external_cancel_wins_over_slow_capture() {
+        let cancel = CancellationToken::new();
+        let cancel_clone = cancel.clone();
+        let task = tokio::spawn(async move {
+            capture_one(cancel_clone, || {
+                // Pretend the capture is stuck waiting. We only need this
+                // long enough to lose to the cancel; spawn_blocking can't
+                // be killed mid-sleep so anything longer just delays the
+                // test runtime's shutdown.
+                std::thread::sleep(Duration::from_millis(500));
+                Ok(b"never".to_vec())
+            })
+            .await
+        });
+        // Give the blocking task a moment to start, then cancel externally.
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        cancel.cancel();
+        let result = tokio::time::timeout(Duration::from_millis(200), task)
+            .await
+            .expect("did not respond to cancel within 200ms")
+            .unwrap();
+        assert_eq!(result, Err("capture cancelled".into()));
+    }
+
+    #[tokio::test]
+    async fn capture_one_panic_is_caught() {
+        let cancel = CancellationToken::new();
+        let result: Result<Vec<u8>, String> = capture_one(cancel, || panic!("boom")).await;
+        assert!(matches!(result, Err(msg) if msg.contains("panicked")));
+    }
+
+    // ---- race_first (multi-interface orchestration) -----------------
+
+    #[tokio::test]
+    async fn race_first_returns_winner() {
+        let cancel = CancellationToken::new();
+        let capture: BlockingCapture = Arc::new(|name, c| {
+            // "a" loses, "b" wins with a fast result, "c" is the slow
+            // sibling that observes the cancel and exits cleanly.
+            match name.as_str() {
+                "a" => {
+                    std::thread::sleep(Duration::from_millis(20));
+                    Err("a fail".into())
+                }
+                "b" => {
+                    std::thread::sleep(Duration::from_millis(50));
+                    Ok(b"from b".to_vec())
+                }
+                "c" => {
+                    while !c.is_cancelled() {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    Err("c cancelled".into())
+                }
+                _ => unreachable!(),
+            }
+        });
+
+        let result = race_first(
+            vec!["a".into(), "b".into(), "c".into()],
+            cancel.clone(),
+            capture,
+        )
+        .await;
+        assert_eq!(result, Ok(b"from b".to_vec()));
+        assert!(cancel.is_cancelled(), "race winner should cancel siblings");
+    }
+
+    #[tokio::test]
+    async fn race_first_returns_no_packet_when_all_fail() {
+        let cancel = CancellationToken::new();
+        let capture: BlockingCapture = Arc::new(|_name, _cancel| Err("read failed".into()));
+        let result = race_first(vec!["a".into(), "b".into()], cancel, capture).await;
+        assert_eq!(result, Err("no packet captured from any interface".into()));
+    }
+
+    #[tokio::test]
+    async fn race_first_external_cancel() {
+        let cancel = CancellationToken::new();
+        let cancel_clone = cancel.clone();
+        let capture: BlockingCapture = Arc::new(|_name, c| {
+            // Spin until the per-task cancel fires.
+            while !c.is_cancelled() {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err("cancelled".into())
+        });
+        let task = tokio::spawn(async move {
+            race_first(vec!["a".into(), "b".into()], cancel_clone, capture).await
+        });
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        cancel.cancel();
+        let result = tokio::time::timeout(Duration::from_secs(2), task)
+            .await
+            .expect("did not respond to cancel within 2s")
+            .unwrap();
+        assert_eq!(result, Err("capture cancelled".into()));
+    }
+
+    #[tokio::test]
+    async fn race_first_empty_list() {
+        let cancel = CancellationToken::new();
+        let capture: BlockingCapture = Arc::new(|_, _| unreachable!());
+        let result = race_first(vec![], cancel, capture).await;
+        assert_eq!(result, Err("no usable interfaces".into()));
+    }
+
+    // ---- Existing parser smoke tests --------------------------------
+
     #[test]
     fn smoke_list_interfaces() {
         let ifaces = list_interfaces().expect("list_interfaces should succeed");
         assert!(!ifaces.is_empty());
         assert_eq!(ifaces[0].name, "", "first entry must be 'Sniff all'");
-        // Print so `cargo test -- --nocapture` shows the live result.
         for i in &ifaces {
             println!("  {:<20} hasIP={} addrs={}", i.name, i.has_ip, i.addresses);
         }
