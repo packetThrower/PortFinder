@@ -2,14 +2,22 @@ use crate::InterfaceInfo;
 use std::net::IpAddr;
 
 pub fn list_interfaces() -> Result<Vec<InterfaceInfo>, String> {
-    let devs = pcap::Device::list().map_err(|e| format!("failed to list interfaces: {e}"))?;
-
     let mut interfaces = vec![InterfaceInfo {
         name: String::new(),
         description: "Sniff all Interfaces".into(),
         addresses: String::new(),
         has_ip: false,
     }];
+
+    // On Windows without Npcap installed, calling pcap::Device::list would
+    // load wpcap.dll and crash the process. Skip enumeration in that case
+    // and return just the placeholder; the privilege-warning banner in the
+    // UI explains the situation and links to the Npcap installer.
+    if !super::pcap_available() {
+        return Ok(interfaces);
+    }
+
+    let devs = pcap::Device::list().map_err(|e| format!("failed to list interfaces: {e}"))?;
 
     for dev in devs {
         if is_loopback(&dev) {

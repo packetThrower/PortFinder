@@ -51,7 +51,29 @@ impl Protocol {
 type BlockingCapture =
     Arc<dyn Fn(String, CancellationToken) -> Result<Vec<u8>, String> + Send + Sync>;
 
+/// Returns true when calling into libpcap / Npcap is safe on the current
+/// system. On Windows, calling `pcap::*` functions when Npcap isn't
+/// installed crashes the process at the moment `wpcap.dll` resolves —
+/// even with delay-loading. Other platforms always have libpcap available
+/// (Linux: package dep, macOS: in the base system).
+pub(crate) fn pcap_available() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        crate::privilege::get_privilege_status().npcap_installed
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        true
+    }
+}
+
 pub async fn run(req: CaptureRequest, cancel: CancellationToken) -> Result<CaptureResult, String> {
+    if !pcap_available() {
+        return Err(
+            "Npcap is not installed. Download it from https://npcap.com/#download and re-run."
+                .into(),
+        );
+    }
     let protocol = Protocol::from_str(&req.protocol)?;
     let capture: BlockingCapture = Arc::new(move |name, c| capture_blocking(&name, protocol, c));
 

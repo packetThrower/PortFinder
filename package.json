@@ -1,7 +1,7 @@
 {
   "name": "portfinder",
   "private": true,
-  "version": "3.1.1",
+  "version": "3.1.2",
   "scripts": {
     "dev": "pnpm --dir frontend dev",
     "build": "pnpm --dir frontend build",
