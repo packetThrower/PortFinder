@@ -1,5 +1,14 @@
 # PortFinder
 
+[![Release](https://img.shields.io/github/v/release/packetThrower/PortFinder?logo=github&color=blue)](https://github.com/packetThrower/PortFinder/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/ci.yml?branch=main&label=CI&logo=github)](https://github.com/packetThrower/PortFinder/actions/workflows/ci.yml)
+[![Release workflow](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/release.yml?label=release&logo=github)](https://github.com/packetThrower/PortFinder/actions/workflows/release.yml)
+[![Docs](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/docs.yml?label=docs&logo=materialformkdocs)](https://packetthrower.github.io/PortFinder/)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?logo=apple)](https://github.com/packetThrower/PortFinder/releases/latest)
+[![Tauri](https://img.shields.io/badge/Tauri-2.x-FFC131?logo=tauri&logoColor=white)](https://tauri.app/)
+[![Rust](https://img.shields.io/badge/Rust-stable-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev/)
+
 Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and LLDP (Link Layer Discovery Protocol) packets to identify what switch, port, and VLAN your device is connected to.
 
 📖 **Docs:** <https://packetthrower.github.io/PortFinder/>
