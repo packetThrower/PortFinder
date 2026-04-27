@@ -17,6 +17,22 @@ The BPF helper also drops a symlink at `/usr/local/bin/portfinder` so the [CLI](
 !!! tip "Already have Wireshark?"
     Wireshark's **ChmodBPF** helper is the same idea — if it's installed, PortFinder will use it.
 
+### Just the CLI symlink
+
+If you don't need the BPF helper (e.g. you already have Wireshark's, or you're fine running with `sudo`) but you do want `portfinder` on your `PATH`, use the standalone scripts in the repo root:
+
+```bash
+# Install the symlink (no BPF, no group changes)
+curl -fsSLO https://raw.githubusercontent.com/packetThrower/PortFinder/main/install-cli.sh
+sudo sh install-cli.sh
+
+# Remove it later
+curl -fsSLO https://raw.githubusercontent.com/packetThrower/PortFinder/main/uninstall-cli.sh
+sudo sh uninstall-cli.sh
+```
+
+`install-cli.sh` looks for `PortFinder.app` in `/Applications` or `~/Applications` and links the bundle's `portfinder` binary at `/usr/local/bin/portfinder`. `uninstall-cli.sh` removes it again, refusing to touch the symlink unless it actually points back into a `PortFinder.app` bundle.
+
 ## Linux
 
 Pick the package that matches your distro:
@@ -47,3 +63,6 @@ The `.deb` and `.rpm` packages run a postinstall hook that grants `CAP_NET_RAW` 
 1. Install [Npcap](https://npcap.com/#download) — be sure to tick **"Allow non-administrators to capture"** during install.
 2. Download `PortFinder_<version>_x64-setup.exe` from the release.
 3. Run the installer.
+
+!!! tip "Already have Wireshark?"
+    Wireshark on Windows ships with Npcap, so you may already have it. Open *Programs and Features* and check for **Npcap** — if it's there, you're set.

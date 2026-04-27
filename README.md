@@ -39,6 +39,15 @@ portfinder --help                                          # see all options
 
 Press Ctrl+C to interrupt a running capture. On macOS, run the binary directly: `/Applications/PortFinder.app/Contents/MacOS/portfinder capture ...`. On Windows, `PortFinder.exe` attaches to the parent console automatically when invoked from cmd / PowerShell.
 
+To get `portfinder` on your `PATH` on macOS without installing the BPF helper:
+
+```bash
+sudo ./install-cli.sh      # symlinks /usr/local/bin/portfinder → app bundle
+sudo ./uninstall-cli.sh    # removes the symlink
+```
+
+The BPF helper installer (in-app *Install BPF Access* button or `PortFinder-BPF-*.pkg`) creates the same symlink for you, so you only need these scripts if you're keeping things minimal.
+
 ## Requirements
 
 - **libpcap** (Linux: `libpcap-dev`, macOS: included, Windows: [Npcap](https://npcap.com/))
