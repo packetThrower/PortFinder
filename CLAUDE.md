@@ -20,6 +20,15 @@ pnpm tag                    # git tag + push from version.txt (triggers release 
 Internal scripts (called by Tauri's beforeDevCommand / beforeBuildCommand):
 - `pnpm dev` / `pnpm build` — Vite dev server / Vite production build (frontend only)
 
+## Docs
+MkDocs (Material theme) deployed to GitHub Pages on every push to main.
+- `mkdocs.yml` — site config
+- `docs/` — markdown content (index, install, usage, dev)
+- `docs/requirements.txt` — pinned mkdocs/material/pymdownx versions
+- `.github/workflows/docs.yml` — Pages build + deploy
+- Live at https://packetthrower.github.io/PortFinder/
+- Preview locally: `pip install -r docs/requirements.txt && mkdocs serve`
+
 ## Key paths
 src-tauri/src/lib.rs — Tauri command handlers + CaptureState
 src-tauri/src/main.rs — binary entrypoint (dispatches GUI vs CLI by argv)

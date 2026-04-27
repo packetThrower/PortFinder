@@ -6,6 +6,9 @@ frontend/package.json.md5
 # Rust
 src-tauri/target/
 
+# MkDocs build output
+site/
+
 # IDE
 .vscode/
 .idea/

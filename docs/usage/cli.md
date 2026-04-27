@@ -1,0 +1,79 @@
+# CLI
+
+The same binary works headless — pass a subcommand to use the CLI, run with no args to launch the GUI.
+
+```bash
+portfinder --help
+```
+
+## Subcommands
+
+### `capture`
+
+Capture one CDP/LLDP packet and print the switch info.
+
+```bash
+portfinder capture --interface en0 --protocol LLDP
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-i`, `--interface` | empty (sniff all) | NIC name |
+| `-p`, `--protocol` | `LLDP` | `CDP` or `LLDP` |
+| `--json` | off | machine-readable output |
+
+Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to interrupt a running capture.
+
+### `list`
+
+List network interfaces visible to libpcap.
+
+```bash
+portfinder list --with-ip
+portfinder list --json
+```
+
+### `privileges`
+
+Show whether packet capture is currently allowed (root / `CAP_NET_RAW` / BPF group / Npcap install state).
+
+```bash
+portfinder privileges
+portfinder privileges --json
+```
+
+## Where the binary lives
+
+=== "macOS"
+
+    ```bash
+    /Applications/PortFinder.app/Contents/MacOS/portfinder capture ...
+    ```
+
+    Optionally symlink it to your `PATH`:
+
+    ```bash
+    ln -s /Applications/PortFinder.app/Contents/MacOS/portfinder /usr/local/bin/portfinder
+    ```
+
+=== "Linux"
+
+    Installed to `/usr/bin/portfinder` by the `.deb` / `.rpm` package. Already on your `PATH`.
+
+=== "Windows"
+
+    Installed to `C:\Program Files\PortFinder\PortFinder.exe`. The NSIS installer adds it to `PATH`.
+
+## Scripting examples
+
+Pipe the JSON output into `jq`:
+
+```bash
+portfinder capture --json | jq -r .switchName
+```
+
+List all interfaces with IPs:
+
+```bash
+portfinder list --with-ip --json | jq -r '.[].name'
+```

@@ -1,0 +1,20 @@
+# GUI
+
+## Workflow
+
+1. **Pick an interface.** The dropdown shows every NIC on your machine. Use the toggle to hide interfaces with no IP. Hit the ↻ button to re-scan after plugging or unplugging cables.
+2. **Pick the protocol.** **LLDP** is the universal choice (Aruba, HP, Juniper, Extreme, Mikrotik, Cisco). **CDP** is Cisco-only.
+3. **Click Start.** Most switches send a discovery packet every 30–60 seconds, so it usually takes a few seconds for the first frame to arrive.
+4. **Read the result.** Switch name, IP, port, VLAN, voice VLAN, MTU, and model populate the result card.
+
+## Privilege warnings
+
+PortFinder shows a banner if it can't capture packets:
+
+- **macOS** — click *Install BPF Access* once. The app installs a `LaunchDaemon` that makes `/dev/bpf*` readable for members of the `access_bpf` group, which Wireshark also uses.
+- **Linux** — install the `.deb` or `.rpm` package. The postinstall sets `CAP_NET_RAW` on the binary so it doesn't need `sudo`.
+- **Windows** — install Npcap with "Allow non-administrators to capture" enabled.
+
+## Sniff all interfaces
+
+Selecting **Sniff all Interfaces** runs a capture on every non-loopback NIC in parallel and returns the first matching packet. Useful when you don't know which physical port is patched into the switch.

@@ -2,6 +2,8 @@
 
 Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and LLDP (Link Layer Discovery Protocol) packets to identify what switch, port, and VLAN your device is connected to.
 
+📖 **Docs:** <https://packetthrower.github.io/PortFinder/>
+
 ## What it does
 
 1. Select a network interface (or sniff all)
