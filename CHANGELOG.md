@@ -13,6 +13,9 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+### Fixed
+- Windows CLI printing two stray `System error 1376 has occurred. / The specified local group does not exist.` blocks before the capture result. The `net localgroup Npcap` probe used to detect non-admin Npcap installs now silences its stdout/stderr (and uses `CREATE_NO_WINDOW` so the GUI build doesn't flash a console window).
+
 ## [3.1.3] - 2026-04-27
 
 ### Changed

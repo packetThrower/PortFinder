@@ -1,6 +1,6 @@
 use super::PrivilegeStatus;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 pub fn has_platform_privilege() -> bool {
     is_npcap_non_admin() || is_admin()
@@ -80,9 +80,20 @@ fn is_npcap_non_admin() -> bool {
     if !is_npcap_installed() {
         return false;
     }
-    // Non-admin Npcap install creates an "Npcap" local group.
+    // Non-admin Npcap install creates an "Npcap" local group. Silence the
+    // child's stdout/stderr so the CLI doesn't print
+    //   System error 1376 has occurred.
+    //   The specified local group does not exist.
+    // when Npcap was installed in the (default) admin-only mode, and pass
+    // CREATE_NO_WINDOW so the GUI build doesn't flash a console window.
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
     Command::new("net")
         .args(["localgroup", "Npcap"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(CREATE_NO_WINDOW)
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
