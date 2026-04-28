@@ -13,6 +13,8 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [3.1.4] - 2026-04-27
+
 ### Fixed
 - Windows CLI printing two stray `System error 1376 has occurred. / The specified local group does not exist.` blocks before the capture result. The `net localgroup Npcap` probe used to detect non-admin Npcap installs now silences its stdout/stderr (and uses `CREATE_NO_WINDOW` so the GUI build doesn't flash a console window).
 
@@ -97,7 +99,8 @@ Detailed history and source on the [`wails-version`](https://github.com/packetTh
 
 Source on the [`python-legacy`](https://github.com/packetThrower/PortFinder/tree/python-legacy) branch.
 
-[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.1.3...HEAD
+[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.1.4...HEAD
+[3.1.4]: https://github.com/packetThrower/PortFinder/compare/v3.1.3...v3.1.4
 [3.1.3]: https://github.com/packetThrower/PortFinder/compare/v3.1.2...v3.1.3
 [3.1.2]: https://github.com/packetThrower/PortFinder/compare/v3.1.1...v3.1.2
 [3.1.1]: https://github.com/packetThrower/PortFinder/compare/v3.1.0...v3.1.1
