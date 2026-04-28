@@ -429,6 +429,54 @@ mod tests {
     }
 
     #[test]
+    fn lldp_parses_med_voice_vlan() {
+        // Minimal frame: ethernet + ethertype + LLDP-MED Network Policy TLV
+        // for Voice on VLAN 200, tagged, priority 5, DSCP 46 (EF).
+        let mut frame = vec![0u8; 12];
+        frame.extend_from_slice(&[0x88, 0xCC]);
+
+        // org-specific: OUI 00:12:BB, subtype 2 (Network Policy), then
+        // application type Voice (1) + packed flags/VLAN/prio/DSCP.
+        // VLAN 200 = 0x0C8. T=1, U=0, X=0. L2 Prio = 5, DSCP = 46.
+        // packed bits:
+        //   byte 0: 0x40  (U=0 T=1 X=0 V11..V8 = 0000)
+        //   byte 1: 0xC8  (V7..V0 = 1100 1000) wait that's V7..V1 + Prio0
+        //   actually let me just compute:
+        //   value (24 bits) =
+        //     0b0_1_0_0000_0000_1100_1000_101_101110
+        // Hmm safer to encode the policy fields and compute bit-by-bit.
+        let app_type = 0x01u8;
+        let u_bit: u32 = 0;
+        let t_bit: u32 = 1;
+        let x_bit: u32 = 0;
+        let vlan: u32 = 200;
+        let prio: u32 = 5;
+        let dscp: u32 = 46;
+        let packed: u32 = (u_bit << 23)
+            | (t_bit << 22)
+            | (x_bit << 21)
+            | ((vlan & 0x0FFF) << 9)
+            | ((prio & 0x07) << 6)
+            | (dscp & 0x3F);
+        let policy = [
+            ((packed >> 16) & 0xFF) as u8,
+            ((packed >> 8) & 0xFF) as u8,
+            (packed & 0xFF) as u8,
+        ];
+
+        let mut body = vec![0x00, 0x12, 0xBB, 0x02, app_type];
+        body.extend_from_slice(&policy);
+        let header = ((127u16) << 9) | (body.len() as u16);
+        frame.extend_from_slice(&header.to_be_bytes());
+        frame.extend_from_slice(&body);
+        // End TLV
+        frame.extend_from_slice(&[0, 0]);
+
+        let result = lldp::parse(&frame).expect("LLDP parse should succeed");
+        assert_eq!(result.voice_vlan, "200");
+    }
+
+    #[test]
     fn lldp_combines_port_id_and_description() {
         // Same minimal LLDP frame as lldp_parser_smoke, but adds a Port
         // ID TLV alongside the Port Description so we can assert the

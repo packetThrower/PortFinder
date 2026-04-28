@@ -17,6 +17,12 @@ const SUBTYPE_PORT_VLAN_ID: u8 = 1;
 const IEEE_8023_OUI: [u8; 3] = [0x00, 0x12, 0x0F];
 const SUBTYPE_MAX_FRAME_SIZE: u8 = 4;
 
+// TIA / LLDP-MED OUI (TIA-1057). Used by Cisco / Aruba / Avaya / Polycom
+// switches and IP phones to advertise voice VLAN, location, and inventory.
+const TIA_OUI: [u8; 3] = [0x00, 0x12, 0xBB];
+const SUBTYPE_NETWORK_POLICY: u8 = 2;
+const APPLICATION_TYPE_VOICE: u8 = 1;
+
 pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
     let payload = strip_ethernet_8021q(frame, 0x88CC)?;
 
@@ -72,6 +78,10 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
                 {
                     let mtu = u16::from_be_bytes([info[0], info[1]]);
                     result.mtu = mtu.to_string();
+                } else if oui == TIA_OUI && subtype == SUBTYPE_NETWORK_POLICY {
+                    if let Some(vlan) = parse_med_voice_vlan(info) {
+                        result.voice_vlan = vlan.to_string();
+                    }
                 }
             }
             _ => {}
@@ -137,6 +147,33 @@ fn parse_mgmt_address(value: &[u8]) -> Option<String> {
         }
         _ => None,
     }
+}
+
+/// Parse the LLDP-MED Network Policy TLV value (TIA-1057). Returns the
+/// 12-bit VLAN ID when the policy describes the **Voice** application;
+/// other application types (Voice Signaling, Streaming Video, Guest Voice,
+/// etc.) are ignored. Layout:
+///
+///   byte 0       : Application Type
+///   bytes 1..4   : packed { U(1) | T(1) | X(1) | VLAN(12) | L2 Prio(3) | DSCP(6) }
+///
+/// Returns None when the policy is marked Unknown (U bit set), the app
+/// type isn't Voice, or the VLAN ID is the reserved 0.
+fn parse_med_voice_vlan(info: &[u8]) -> Option<u16> {
+    if info.len() < 4 || info[0] != APPLICATION_TYPE_VOICE {
+        return None;
+    }
+    let upper = u16::from_be_bytes([info[1], info[2]]);
+    if upper & 0x8000 != 0 {
+        // U bit set: the device is signalling "I don't know the policy".
+        return None;
+    }
+    let vlan = (upper >> 1) & 0x0FFF;
+    if vlan == 0 {
+        // VLAN 0 is reserved; treat as unset.
+        return None;
+    }
+    Some(vlan)
 }
 
 /// Iterator over (type, value) pairs in an LLDP TLV stream.
