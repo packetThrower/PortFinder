@@ -69,6 +69,20 @@ sudo ./uninstall-cli.sh    # removes the symlink
 
 The BPF helper installer (in-app *Install BPF Access* button or `PortFinder-BPF-*.pkg`) creates the same symlink for you, so you only need these scripts if you're keeping things minimal.
 
+## Install
+
+### macOS — Homebrew
+
+```sh
+brew install --cask packetThrower/portfinder/portfinder
+```
+
+This pulls the universal `.dmg` from the latest release, drops `PortFinder.app` into `/Applications`, and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder`. See the [tap README](https://github.com/packetThrower/homebrew-portfinder) for upgrade and uninstall details. Click **Install BPF Access** in the app once for non-sudo capture.
+
+### All platforms — release artifacts
+
+`.dmg` (macOS), `.deb` / `.rpm` / `.AppImage` (Linux amd64 + arm64), and `-setup.exe` (Windows x64 + ARM64) on every [release](https://github.com/packetThrower/PortFinder/releases/latest).
+
 ## Requirements
 
 - **libpcap** (Linux: `libpcap-dev`, macOS: included, Windows: [Npcap](https://npcap.com/))
