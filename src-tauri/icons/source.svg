@@ -26,7 +26,7 @@
       <stop offset="100%" stop-color="#5a3a10"/>
     </radialGradient>
 
-    <filter id="drop-shadow" x="-10%" y="-10%" width="120%" height="120%">
+    <filter id="drop-shadow" x="-15%" y="-15%" width="130%" height="140%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
       <feOffset dy="18"/>
       <feFlood flood-color="#000" flood-opacity="0.55"/>
@@ -41,49 +41,52 @@
   <!-- Rounded-square background, macOS-style continuous corners -->
   <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" fill="url(#bg)"/>
 
-  <!-- RJ-45 jack: front view, larger -->
+  <!--
+    RJ-45 jack sized to match the padding on Baudrun's serial port:
+    bezel bounding box 610 x 392, ~207 px padding L/R, ~320 / ~312 T/B.
+  -->
   <g filter="url(#drop-shadow)">
-    <!-- Outer metallic bezel: 904 x 560, centered, slight upward bias for visual balance -->
-    <rect x="60" y="220" width="904" height="560" rx="32" ry="32" fill="url(#bezel)"/>
+    <!-- Outer metallic bezel: 610 x 392 -->
+    <rect x="207" y="320" width="610" height="392" rx="22" ry="22" fill="url(#bezel)"/>
 
     <!-- Inner cavity with bottom-center keying notch (RJ-45 footprint) -->
     <path d="
-      M 120 290
-      L 904 290
-      L 904 690
-      L 612 690
-      L 612 740
-      L 412 740
-      L 412 690
-      L 120 690
+      M 247 370
+      L 777 370
+      L 777 652
+      L 579 652
+      L 579 687
+      L 445 687
+      L 445 652
+      L 247 652
       Z"
       fill="url(#cavity)"/>
   </g>
 
-  <!-- 8 gold contact pins, evenly spaced inside cavity (W=55, G=38, margin=39) -->
+  <!-- 8 gold contact pins, evenly spaced inside cavity (W=37, G=26, margin=26) -->
   <g fill="url(#pin)">
-    <rect x="159" y="320" width="55" height="280" rx="4"/>
-    <rect x="252" y="320" width="55" height="280" rx="4"/>
-    <rect x="345" y="320" width="55" height="280" rx="4"/>
-    <rect x="438" y="320" width="55" height="280" rx="4"/>
-    <rect x="531" y="320" width="55" height="280" rx="4"/>
-    <rect x="624" y="320" width="55" height="280" rx="4"/>
-    <rect x="717" y="320" width="55" height="280" rx="4"/>
-    <rect x="810" y="320" width="55" height="280" rx="4"/>
+    <rect x="273" y="390" width="37" height="200" rx="3"/>
+    <rect x="336" y="390" width="37" height="200" rx="3"/>
+    <rect x="399" y="390" width="37" height="200" rx="3"/>
+    <rect x="462" y="390" width="37" height="200" rx="3"/>
+    <rect x="525" y="390" width="37" height="200" rx="3"/>
+    <rect x="588" y="390" width="37" height="200" rx="3"/>
+    <rect x="651" y="390" width="37" height="200" rx="3"/>
+    <rect x="714" y="390" width="37" height="200" rx="3"/>
   </g>
 
   <!-- Highlight along top edge of pins -->
   <g fill="#fff5d8" opacity="0.55">
-    <rect x="159" y="320" width="55" height="9" rx="4"/>
-    <rect x="252" y="320" width="55" height="9" rx="4"/>
-    <rect x="345" y="320" width="55" height="9" rx="4"/>
-    <rect x="438" y="320" width="55" height="9" rx="4"/>
-    <rect x="531" y="320" width="55" height="9" rx="4"/>
-    <rect x="624" y="320" width="55" height="9" rx="4"/>
-    <rect x="717" y="320" width="55" height="9" rx="4"/>
-    <rect x="810" y="320" width="55" height="9" rx="4"/>
+    <rect x="273" y="390" width="37" height="6" rx="3"/>
+    <rect x="336" y="390" width="37" height="6" rx="3"/>
+    <rect x="399" y="390" width="37" height="6" rx="3"/>
+    <rect x="462" y="390" width="37" height="6" rx="3"/>
+    <rect x="525" y="390" width="37" height="6" rx="3"/>
+    <rect x="588" y="390" width="37" height="6" rx="3"/>
+    <rect x="651" y="390" width="37" height="6" rx="3"/>
+    <rect x="714" y="390" width="37" height="6" rx="3"/>
   </g>
 
   <!-- Faint inner shadow along the top of the cavity for depth -->
-  <rect x="120" y="290" width="784" height="6" fill="#000" opacity="0.6"/>
+  <rect x="247" y="370" width="530" height="4" fill="#000" opacity="0.6"/>
 </svg>
