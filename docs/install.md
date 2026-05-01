@@ -4,9 +4,26 @@ Pre-built binaries for every release are on the [Releases page](https://github.c
 
 ## macOS
 
-Download `PortFinder_<version>_universal.dmg`, mount it, and drag PortFinder into `/Applications`.
+### Homebrew (recommended)
 
-For non-root packet capture, also install the BPF helper:
+```sh
+brew install --cask packetThrower/portfinder/portfinder
+```
+
+This installs `PortFinder.app` to `/Applications` and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder` so [`portfinder`](usage/cli.md) works from any shell. Update with `brew upgrade --cask portfinder`; remove with `brew uninstall --cask portfinder` (add `--zap` to also clear `~/Library/Application Support/PortFinder` and the WebKit cache).
+
+The tap source lives at [packetThrower/homebrew-portfinder](https://github.com/packetThrower/homebrew-portfinder).
+
+For non-root packet capture, click **Install BPF Access** in the app once after install. Until you do, capture works only via `sudo portfinder capture …`.
+
+!!! tip "Already have Wireshark?"
+    Wireshark's **ChmodBPF** helper is the same idea — if it's installed, PortFinder will use it and the in-app *Install BPF Access* button isn't needed.
+
+### Manual DMG
+
+Prefer not to use Homebrew? Download `PortFinder_<version>_universal.dmg` from the [Releases page](https://github.com/packetThrower/PortFinder/releases), mount it, and drag PortFinder into `/Applications`.
+
+For non-root capture and a `portfinder` CLI on your `PATH`, also install the BPF helper:
 
 1. Download `PortFinder-BPF-<version>.pkg` from the same release.
 2. Double-click to install. macOS will prompt for your password.
@@ -14,10 +31,7 @@ For non-root packet capture, also install the BPF helper:
 
 The BPF helper also drops a symlink at `/usr/local/bin/portfinder` so the [CLI](usage/cli.md) is callable from any shell.
 
-!!! tip "Already have Wireshark?"
-    Wireshark's **ChmodBPF** helper is the same idea — if it's installed, PortFinder will use it.
-
-### Just the CLI symlink
+#### Just the CLI symlink
 
 If you don't need the BPF helper (e.g. you already have Wireshark's, or you're fine running with `sudo`) but you do want `portfinder` on your `PATH`, use the standalone scripts in the repo root:
 
