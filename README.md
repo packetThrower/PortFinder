@@ -4,15 +4,32 @@
 
 <h1 align="center">PortFinder</h1>
 
-[![Release](https://img.shields.io/github/v/release/packetThrower/PortFinder?logo=github&color=blue)](https://github.com/packetThrower/PortFinder/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/packetThrower/PortFinder/total?logo=github&color=blue)](https://github.com/packetThrower/PortFinder/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/ci.yml?branch=main&label=CI&logo=github)](https://github.com/packetThrower/PortFinder/actions/workflows/ci.yml)
-[![Release workflow](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/release.yml?label=release&logo=github)](https://github.com/packetThrower/PortFinder/actions/workflows/release.yml)
-[![Docs](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/docs.yml?label=docs&logo=materialformkdocs)](https://packetthrower.github.io/PortFinder/)
-[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?logo=apple)](https://github.com/packetThrower/PortFinder/releases/latest)
-[![Tauri](https://img.shields.io/badge/Tauri-2.x-FFC131?logo=tauri&logoColor=white)](https://tauri.app/)
-[![Rust](https://img.shields.io/badge/Rust-stable-orange?logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev/)
+[![CI](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/ci.yml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/packetThrower/PortFinder/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/packetThrower/PortFinder?style=flat-square&logo=github&label=release&include_prereleases)](https://github.com/packetThrower/PortFinder/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/packetThrower/PortFinder/total?style=flat-square&logo=github&label=downloads)](https://github.com/packetThrower/PortFinder/releases)
+[![Rust](https://img.shields.io/badge/Rust-stable-CE422B?style=flat-square&logo=rust&logoColor=white)](src-tauri/Cargo.toml)
+[![Tauri](https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black)](https://tauri.app)
+[![Svelte](https://img.shields.io/github/package-json/dependency-version/packetThrower/PortFinder/dev/svelte?filename=frontend%2Fpackage.json&style=flat-square&logo=svelte&logoColor=white&label=Svelte&color=FF3E00)](https://svelte.dev)
+
+## Minimum OS Versions
+
+**macOS** (Apple Silicon and Intel)  
+[![macOS 11+](https://img.shields.io/badge/macOS-11%2B-333?style=flat-square&logo=apple&logoColor=white)](#requirements)
+[![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-333?style=flat-square&logo=apple&logoColor=white)](#requirements)
+[![Intel](https://img.shields.io/badge/Intel-x86__64-333?style=flat-square&logo=apple&logoColor=white)](#requirements)
+
+**Windows** (x64 and ARM64)  
+[![Windows 10 21H2+ x64](https://img.shields.io/badge/Windows%2010%2021H2%2B-x64-0078D4?style=flat-square&logo=windows&logoColor=white)](#requirements)
+[![Windows 11 x64](https://img.shields.io/badge/Windows%2011-x64-0078D4?style=flat-square&logo=windows11&logoColor=white)](#requirements)
+[![Windows 11 ARM64](https://img.shields.io/badge/Windows%2011-ARM64-0078D4?style=flat-square&logo=windows11&logoColor=white)](#requirements)
+
+**Linux** (amd64 and arm64)  
+[![Ubuntu 24.04+](https://img.shields.io/badge/Ubuntu-24.04%2B-E95420?style=flat-square&logo=ubuntu&logoColor=white)](#requirements)
+[![Debian 13+](https://img.shields.io/badge/Debian-13%2B-A81D33?style=flat-square&logo=debian&logoColor=white)](#requirements)
+[![Fedora 40+](https://img.shields.io/badge/Fedora-40%2B-294172?style=flat-square&logo=fedora&logoColor=white)](#requirements)
+[![Arch](https://img.shields.io/badge/Arch-1793D1?style=flat-square&logo=archlinux&logoColor=white)](#requirements)
+[![openSUSE Tumbleweed](https://img.shields.io/badge/openSUSE-Tumbleweed-73BA25?style=flat-square&logo=opensuse&logoColor=white)](#requirements)
+[![AppImage: libwebkit2gtk-4.1 + FUSE](https://img.shields.io/badge/AppImage-libwebkit2gtk--4.1%20%2B%20FUSE-2166B7?style=flat-square&logo=appimage&logoColor=white)](#requirements)
 
 Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and LLDP (Link Layer Discovery Protocol) packets to identify what switch, port, and VLAN your device is connected to.
 
