@@ -5,7 +5,7 @@
 ## Workflow
 
 1. **Pick an interface.** The dropdown shows every NIC on your machine. Use the toggle to hide interfaces with no IP. Hit the ↻ button to re-scan after plugging or unplugging cables.
-2. **Pick the protocol.** **LLDP** is the universal choice (Aruba, HP, Juniper, Extreme, Mikrotik, Cisco). **CDP** is Cisco-only.
+2. **Pick the protocol.** **LLDP** is the universal choice (Aruba, HP, Juniper, Extreme, Cisco, and MikroTik when you've enabled it). **CDP** is Cisco-only. **MNDP** is the MikroTik-only fallback for RouterOS devices that ship with `discovery-protocol = mndp` and never speak LLDP.
 3. **Click Start.** Most switches send a discovery packet every 30–60 seconds, so it usually takes a few seconds for the first frame to arrive.
 4. **Read the result.** Switch name, IP, port, VLAN, voice VLAN, MTU, and model populate the result card.
 

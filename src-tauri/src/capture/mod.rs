@@ -1,6 +1,7 @@
 mod cdp;
 mod interfaces;
 mod lldp;
+mod mndp;
 
 pub use interfaces::list_interfaces;
 
@@ -12,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 
 const CDP_FILTER: &str = "ether[12:2] <= 1500 && ether[14:2] == 0xAAAA && ether[16:1] == 0x03 && ether[17:2] == 0x0000 && ether[19:1] == 0x0C && ether[20:2] == 0x2000";
 const LLDP_FILTER: &str = "ether proto 0x88cc";
+const MNDP_FILTER: &str = "udp port 5678";
 const SNAP_LEN: i32 = 65535;
 const PCAP_TIMEOUT_MS: i32 = 500;
 
@@ -19,6 +21,7 @@ const PCAP_TIMEOUT_MS: i32 = 500;
 enum Protocol {
     Cdp,
     Lldp,
+    Mndp,
 }
 
 impl Protocol {
@@ -26,6 +29,7 @@ impl Protocol {
         match s.to_uppercase().as_str() {
             "CDP" => Ok(Self::Cdp),
             "LLDP" => Ok(Self::Lldp),
+            "MNDP" => Ok(Self::Mndp),
             other => Err(format!("unsupported protocol: {other}")),
         }
     }
@@ -34,6 +38,7 @@ impl Protocol {
         match self {
             Self::Cdp => CDP_FILTER,
             Self::Lldp => LLDP_FILTER,
+            Self::Mndp => MNDP_FILTER,
         }
     }
 
@@ -41,6 +46,7 @@ impl Protocol {
         match self {
             Self::Cdp => cdp::parse(frame),
             Self::Lldp => lldp::parse(frame),
+            Self::Mndp => mndp::parse(frame),
         }
     }
 }
@@ -215,12 +221,14 @@ mod tests {
     fn protocol_from_str_accepts_canonical() {
         assert_eq!(Protocol::from_str("CDP").unwrap(), Protocol::Cdp);
         assert_eq!(Protocol::from_str("LLDP").unwrap(), Protocol::Lldp);
+        assert_eq!(Protocol::from_str("MNDP").unwrap(), Protocol::Mndp);
     }
 
     #[test]
     fn protocol_from_str_is_case_insensitive() {
         assert_eq!(Protocol::from_str("cdp").unwrap(), Protocol::Cdp);
         assert_eq!(Protocol::from_str("Lldp").unwrap(), Protocol::Lldp);
+        assert_eq!(Protocol::from_str("mndp").unwrap(), Protocol::Mndp);
     }
 
     #[test]
@@ -474,6 +482,58 @@ mod tests {
 
         let result = lldp::parse(&frame).expect("LLDP parse should succeed");
         assert_eq!(result.voice_vlan, "200");
+    }
+
+    #[test]
+    fn mndp_parser_smoke() {
+        // Minimal MNDP frame: ethernet + IPv4 + UDP/5678 + 4-byte MNDP
+        // header + a handful of TLVs (Identity, Platform, Board, Interface,
+        // IPv4 address). Header values are all zeros — we just skip past.
+        let mut frame = vec![0u8; 12]; // dst+src
+        frame.extend_from_slice(&[0x08, 0x00]); // ethertype IPv4
+
+        // IPv4: ver/IHL=0x45 (no options), DSCP=0, total length filled in
+        // below, id=0, flags/frag=0, TTL=255, proto=17 (UDP), checksum=0
+        // (we don't validate it), src=10.0.0.1, dst=255.255.255.255.
+        let mut ipv4 = vec![0x45u8, 0x00, 0x00, 0x00, 0, 0, 0, 0, 0xFF, 17, 0, 0];
+        ipv4.extend_from_slice(&[10, 0, 0, 1]);
+        ipv4.extend_from_slice(&[255, 255, 255, 255]);
+        // UDP: sport=5678, dport=5678, length filled below, checksum=0
+        let mut udp = vec![0x16, 0x2E, 0x16, 0x2E, 0, 0, 0, 0];
+
+        // MNDP body: 4-byte header + TLVs
+        let mut body = vec![0x00, 0x00, 0x00, 0x01]; // header (type+seq)
+        let push_tlv = |body: &mut Vec<u8>, typ: u16, value: &[u8]| {
+            body.extend_from_slice(&typ.to_be_bytes());
+            body.extend_from_slice(&(value.len() as u16).to_be_bytes());
+            body.extend_from_slice(value);
+        };
+        push_tlv(&mut body, 5, b"core-rb");
+        push_tlv(&mut body, 8, b"MikroTik");
+        push_tlv(&mut body, 12, b"RB951G-2HnD");
+        push_tlv(&mut body, 16, b"ether1");
+        push_tlv(&mut body, 17, &[192, 168, 88, 1]);
+
+        // Backfill UDP length (header + payload).
+        let udp_len = (udp.len() + body.len()) as u16;
+        udp[4..6].copy_from_slice(&udp_len.to_be_bytes());
+        // Backfill IPv4 total length (header + UDP).
+        let ipv4_len = (ipv4.len() + udp.len() + body.len()) as u16;
+        ipv4[2..4].copy_from_slice(&ipv4_len.to_be_bytes());
+
+        frame.extend_from_slice(&ipv4);
+        frame.extend_from_slice(&udp);
+        frame.extend_from_slice(&body);
+
+        let result = mndp::parse(&frame).expect("MNDP parse should succeed");
+        assert_eq!(result.switch_name, "core-rb");
+        assert_eq!(result.switch_port, "ether1");
+        assert_eq!(result.switch_ip, "192.168.88.1");
+        assert_eq!(result.switch_model, "MikroTik RB951G-2HnD");
+        // VLAN / MTU fields stay unset — MNDP doesn't carry them.
+        assert_eq!(result.native_vlan, "N/A");
+        assert_eq!(result.voice_vlan, "N/A");
+        assert_eq!(result.mtu, "N/A");
     }
 
     #[test]

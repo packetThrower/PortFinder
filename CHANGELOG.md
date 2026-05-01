@@ -13,6 +13,9 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+### Added
+- **MNDP** (MikroTik Neighbor Discovery Protocol) as a third capture protocol alongside CDP and LLDP. RouterOS devices that ship with `discovery-protocol = mndp` and never speak LLDP now show up with switch name, sender-side interface, board model, and IP populated. UDP/5678 broadcast; TLV parser handles Identity / Platform / Board / Interface / IPv4 / IPv6 ([#26](https://github.com/packetThrower/PortFinder/issues/26)).
+
 ## [3.1.4] - 2026-04-27
 
 ### Fixed

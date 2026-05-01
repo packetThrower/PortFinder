@@ -32,7 +32,7 @@
 
     let interfaces = $state<InterfaceInfo[]>([]);
     let selectedInterface = $state('');
-    let protocol = $state<'CDP' | 'LLDP'>('LLDP');
+    let protocol = $state<'CDP' | 'LLDP' | 'MNDP'>('LLDP');
     let isCapturing = $state(false);
     let result = $state<CaptureResult | null>(null);
     let status = $state('Ready');
@@ -257,6 +257,7 @@
             >
                 <option value="LLDP">LLDP</option>
                 <option value="CDP">CDP</option>
+                <option value="MNDP">MNDP</option>
             </select>
         </div>
 

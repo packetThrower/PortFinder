@@ -10,7 +10,7 @@ portfinder --help
 
 ### `capture`
 
-Capture one CDP/LLDP packet and print the switch info.
+Capture one CDP, LLDP, or MNDP packet and print the switch info.
 
 ```bash
 portfinder capture --interface en0 --protocol LLDP
@@ -19,7 +19,7 @@ portfinder capture --interface en0 --protocol LLDP
 | Flag | Default | Description |
 |---|---|---|
 | `-i`, `--interface` | empty (sniff all) | NIC name |
-| `-p`, `--protocol` | `LLDP` | `CDP` or `LLDP` |
+| `-p`, `--protocol` | `LLDP` | `CDP`, `LLDP`, or `MNDP` |
 | `--json` | off | machine-readable output |
 
 Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to interrupt a running capture.

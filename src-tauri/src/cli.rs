@@ -22,14 +22,19 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
-    /// Capture one CDP or LLDP packet and print the switch info.
+    /// Capture one CDP, LLDP, or MNDP packet and print the switch info.
     Capture {
         /// Network interface name (omit to sniff all interfaces).
         #[arg(short, long, default_value = "")]
         interface: String,
 
         /// Discovery protocol to look for.
-        #[arg(short, long, value_parser = ["CDP", "cdp", "LLDP", "lldp"], default_value = "LLDP")]
+        #[arg(
+            short,
+            long,
+            value_parser = ["CDP", "cdp", "LLDP", "lldp", "MNDP", "mndp"],
+            default_value = "LLDP",
+        )]
         protocol: String,
 
         /// Output JSON instead of human-readable key/value.

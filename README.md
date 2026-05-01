@@ -31,7 +31,7 @@
 [![openSUSE Tumbleweed](https://img.shields.io/badge/openSUSE-Tumbleweed-73BA25?style=flat-square&logo=opensuse&logoColor=white)](#requirements)
 [![AppImage: libwebkit2gtk-4.1 + FUSE](https://img.shields.io/badge/AppImage-libwebkit2gtk--4.1%20%2B%20FUSE-2166B7?style=flat-square&logo=appimage&logoColor=white)](#requirements)
 
-Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and LLDP (Link Layer Discovery Protocol) packets to identify what switch, port, and VLAN your device is connected to.
+Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol), LLDP (Link Layer Discovery Protocol), and MNDP (MikroTik Neighbor Discovery Protocol) packets to identify what switch, port, and VLAN your device is connected to.
 
 📖 **Docs:** <https://packetthrower.github.io/PortFinder/> · 📝 [**Changelog**](CHANGELOG.md)
 
@@ -42,7 +42,7 @@ Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol) and 
 ## What it does
 
 1. Select a network interface (or sniff all)
-2. Choose protocol: CDP (Cisco) or LLDP (Aruba, HP, etc.)
+2. Choose protocol: CDP (Cisco), LLDP (Aruba, HP, etc.), or MNDP (MikroTik)
 3. Click Start and PortFinder captures the next discovery packet
 4. Displays: Switch Name, Switch IP, Switchport, Native VLAN, Voice VLAN, MTU, Switch Model
 
