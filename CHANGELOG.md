@@ -13,8 +13,13 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-05-01
+
 ### Added
 - **MNDP** (MikroTik Neighbor Discovery Protocol) as a third capture protocol alongside CDP and LLDP. RouterOS devices that ship with `discovery-protocol = mndp` and never speak LLDP now show up with switch name, sender-side interface, board model, and IP populated. UDP/5678 broadcast; TLV parser handles Identity / Platform / Board / Interface / IPv4 / IPv6 ([#26](https://github.com/packetThrower/PortFinder/issues/26)).
+
+### Changed
+- Resized the RJ-45 jack on the app icon to match the padding on Baudrun's serial-port icon (610×392 box, ~207 px L/R padding instead of filling the canvas). Side-by-side the two apps now read as siblings on the dock / launcher / app grid.
 
 ## [3.1.4] - 2026-04-27
 
@@ -102,7 +107,8 @@ Detailed history and source on the [`wails-version`](https://github.com/packetTh
 
 Source on the [`python-legacy`](https://github.com/packetThrower/PortFinder/tree/python-legacy) branch.
 
-[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.1.4...HEAD
+[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/packetThrower/PortFinder/compare/v3.1.4...v3.2.0
 [3.1.4]: https://github.com/packetThrower/PortFinder/compare/v3.1.3...v3.1.4
 [3.1.3]: https://github.com/packetThrower/PortFinder/compare/v3.1.2...v3.1.3
 [3.1.2]: https://github.com/packetThrower/PortFinder/compare/v3.1.1...v3.1.2
