@@ -30,9 +30,11 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
 
     for (typ, value) in TlvIter::new(tlvs) {
         match typ {
-            TLV_DEVICE_ID => result.switch_name = lossy(value),
-            TLV_PORT_ID => result.switch_port = lossy(value),
-            TLV_PLATFORM => result.switch_model = lossy(value),
+            TLV_DEVICE_ID => {
+                result.switch_name = super::decode_string("cdp/device-id", value)
+            }
+            TLV_PORT_ID => result.switch_port = super::decode_string("cdp/port-id", value),
+            TLV_PLATFORM => result.switch_model = super::decode_string("cdp/platform", value),
             TLV_NATIVE_VLAN if value.len() >= 2 => {
                 result.native_vlan = u16::from_be_bytes([value[0], value[1]]).to_string();
             }
@@ -122,10 +124,6 @@ fn format_ip(bytes: &[u8]) -> String {
         }
         _ => bytes.iter().map(|b| format!("{:02x}", b)).collect(),
     }
-}
-
-fn lossy(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).into_owned()
 }
 
 /// Iterator over (type, value) pairs in a CDP TLV stream.

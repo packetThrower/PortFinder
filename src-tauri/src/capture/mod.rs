@@ -17,6 +17,25 @@ const MNDP_FILTER: &str = "udp port 5678";
 const SNAP_LEN: i32 = 65535;
 const PCAP_TIMEOUT_MS: i32 = 500;
 
+/// Decode a TLV byte string with `from_utf8_lossy`. When the input
+/// contained non-UTF-8 bytes (i.e. lossy substitution actually
+/// happened), log a one-line warning to stderr with the raw bytes so
+/// flaky firmware can be diagnosed. The returned `String` is identical
+/// to what `from_utf8_lossy(...).into_owned()` would have produced —
+/// the displayed result is unchanged, the helper just leaves a
+/// breadcrumb on the way through.
+pub(crate) fn decode_string(label: &str, bytes: &[u8]) -> String {
+    let cow = String::from_utf8_lossy(bytes);
+    if matches!(cow, std::borrow::Cow::Owned(_)) {
+        let hex: Vec<String> = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        eprintln!(
+            "warning: {label} contained non-UTF-8 bytes (raw: {}); decoded with substitutions",
+            hex.join(" ")
+        );
+    }
+    cow.into_owned()
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Protocol {
     Cdp,
@@ -359,6 +378,26 @@ mod tests {
         let capture: BlockingCapture = Arc::new(|_, _| unreachable!());
         let result = race_first(vec![], cancel, capture).await;
         assert_eq!(result, Err("no usable interfaces".into()));
+    }
+
+    // ---- decode_string ----------------------------------------------
+
+    #[test]
+    fn decode_string_passes_clean_utf8_through() {
+        // Byte-identical to from_utf8_lossy on valid input — no
+        // substitutions, no warning emitted.
+        assert_eq!(decode_string("test/clean", b"switch1.example.com"), "switch1.example.com");
+    }
+
+    #[test]
+    fn decode_string_substitutes_invalid_utf8() {
+        // 0xFF is never valid UTF-8; from_utf8_lossy substitutes U+FFFD.
+        // We can't easily assert the eprintln output without capturing
+        // stderr, but we can at least verify the return value matches
+        // what a naked from_utf8_lossy would have produced.
+        let bytes = b"hello\xFFworld";
+        let want = String::from_utf8_lossy(bytes).into_owned();
+        assert_eq!(decode_string("test/dirty", bytes), want);
     }
 
     // ---- Existing parser smoke tests --------------------------------

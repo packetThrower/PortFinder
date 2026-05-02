@@ -35,16 +35,16 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
     for (typ, value) in TlvIter::new(body) {
         match typ {
             TLV_IDENTITY => {
-                result.switch_name = String::from_utf8_lossy(value).into_owned();
+                result.switch_name = super::decode_string("mndp/identity", value);
             }
             TLV_INTERFACE => {
-                result.switch_port = String::from_utf8_lossy(value).into_owned();
+                result.switch_port = super::decode_string("mndp/interface", value);
             }
             TLV_PLATFORM => {
-                platform = Some(String::from_utf8_lossy(value).into_owned());
+                platform = Some(super::decode_string("mndp/platform", value));
             }
             TLV_BOARD => {
-                board = Some(String::from_utf8_lossy(value).into_owned());
+                board = Some(super::decode_string("mndp/board", value));
             }
             TLV_IPV4 if value.len() == 4 && result.switch_ip == "N/A" => {
                 result.switch_ip =

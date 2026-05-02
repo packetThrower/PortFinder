@@ -47,16 +47,16 @@ pub fn parse(frame: &[u8]) -> Result<CaptureResult, String> {
             TLV_PORT_ID
                 // value: subtype(1) + id(N). Show id as text.
                 if value.len() > 1 => {
-                    port_id_text = Some(String::from_utf8_lossy(&value[1..]).into_owned());
+                    port_id_text = Some(super::decode_string("lldp/port-id", &value[1..]));
                 }
             TLV_PORT_DESCRIPTION => {
-                port_desc_text = Some(String::from_utf8_lossy(value).into_owned());
+                port_desc_text = Some(super::decode_string("lldp/port-description", value));
             }
             TLV_SYSTEM_NAME => {
-                result.switch_name = String::from_utf8_lossy(value).into_owned();
+                result.switch_name = super::decode_string("lldp/system-name", value);
             }
             TLV_SYSTEM_DESCRIPTION => {
-                result.switch_model = String::from_utf8_lossy(value).into_owned();
+                result.switch_model = super::decode_string("lldp/system-description", value);
             }
             TLV_MGMT_ADDRESS => {
                 if let Some(ip) = parse_mgmt_address(value) {
