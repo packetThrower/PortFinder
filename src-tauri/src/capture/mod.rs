@@ -15,7 +15,14 @@ const CDP_FILTER: &str = "ether[12:2] <= 1500 && ether[14:2] == 0xAAAA && ether[
 const LLDP_FILTER: &str = "ether proto 0x88cc";
 const MNDP_FILTER: &str = "udp port 5678";
 const SNAP_LEN: i32 = 65535;
-const PCAP_TIMEOUT_MS: i32 = 500;
+// Bound on how long `pcap::next_packet` blocks before returning
+// `TimeoutExpired`. The capture loop checks the cancellation token
+// between blocking calls, so this is also the worst-case Stop-button
+// latency. 50 ms keeps cancellation feeling instant (well under the
+// ~100 ms threshold the eye picks up as "snappy") while idle CPU stays
+// negligible — at most one wake every 50 ms per interface, which is
+// what `race_first` is doing in sniff-all mode anyway.
+const PCAP_TIMEOUT_MS: i32 = 50;
 
 /// Decode a TLV byte string with `from_utf8_lossy`. When the input
 /// contained non-UTF-8 bytes (i.e. lossy substitution actually

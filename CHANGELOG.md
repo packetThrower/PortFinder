@@ -16,6 +16,7 @@ Each major version line is a different implementation:
 ### Changed
 - CDP / LLDP / MNDP TLV decoding now logs a one-line warning to stderr when a string TLV (system name, port description, board name, etc.) contains non-UTF-8 bytes that have to be substituted. The displayed result is unchanged — flaky-firmware diagnosis used to be silent ([#24](https://github.com/packetThrower/PortFinder/issues/24)).
 - `list_interfaces()` (the `get_interfaces` Tauri command and `portfinder list`) now caches results for 5 seconds. Tabs-away-and-back / fast double-clicks on the refresh button no longer re-scan via libpcap, which on slow hosts saves a few hundred milliseconds per call ([#23](https://github.com/packetThrower/PortFinder/issues/23)).
+- Stop button now responds within ~60 ms instead of up to ~510 ms. The pcap blocking timeout dropped from 500 ms to 50 ms, so the capture loop checks the cancellation token an order of magnitude more often. Sniff-all mode also tears down the losing interface tasks 10× faster after a winner is found ([#18](https://github.com/packetThrower/PortFinder/issues/18)).
 
 ## [3.2.0] - 2026-05-01
 
