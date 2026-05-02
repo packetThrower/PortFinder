@@ -74,8 +74,21 @@ The `.deb` and `.rpm` packages run a postinstall hook that grants `CAP_NET_RAW` 
 
 ## Windows
 
+### Scoop (recommended)
+
+```powershell
+scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket
+scoop install portfinder
+```
+
+This installs `PortFinder.exe`, drops a Start menu shortcut, and exposes the headless CLI on your `PATH` so [`portfinder`](usage/cli.md) works from any shell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. The bucket source lives at [packetThrower/scoop-bucket](https://github.com/packetThrower/scoop-bucket).
+
+You still need [Npcap](https://npcap.com/#download) for packet capture (see below) — Scoop can't bundle the kernel driver.
+
+### Manual installer
+
 1. Install [Npcap](https://npcap.com/#download) — be sure to tick **"Allow non-administrators to capture"** during install.
-2. Download `PortFinder_<version>_x64-setup.exe` from the release.
+2. Download `PortFinder_<version>_x64-setup.exe` (or `_arm64-setup.exe`) from the release.
 3. Run the installer.
 
 !!! tip "Already have Wireshark?"

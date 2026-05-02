@@ -79,6 +79,15 @@ brew install --cask packetThrower/portfinder/portfinder
 
 This pulls the universal `.dmg` from the latest release, drops `PortFinder.app` into `/Applications`, and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder`. See the [tap README](https://github.com/packetThrower/homebrew-portfinder) for upgrade and uninstall details. Click **Install BPF Access** in the app once for non-sudo capture.
 
+### Windows — Scoop
+
+```powershell
+scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket
+scoop install portfinder
+```
+
+Installs `PortFinder.exe` and exposes `portfinder` on your `PATH`. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. See the [bucket README](https://github.com/packetThrower/scoop-bucket) for details. You'll still need [Npcap](https://npcap.com/#download) installed for packet capture.
+
 ### All platforms — release artifacts
 
 `.dmg` (macOS), `.deb` / `.rpm` / `.AppImage` (Linux amd64 + arm64), and `-setup.exe` (Windows x64 + ARM64) on every [release](https://github.com/packetThrower/PortFinder/releases/latest).
