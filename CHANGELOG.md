@@ -13,6 +13,20 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [3.3.0-alpha.2] - 2026-05-02
+
+Second alpha for the 3.3.0 cycle. Adds two field-tech UX moves to the
+result card; design system context (`PRODUCT.md`, `DESIGN.md`,
+`DESIGN.json`) lands in the repo for the first time.
+
+### Added
+- **Click-to-copy on every captured value.** Switch name, IP, port, VLAN, voice VLAN, MTU, and model each render as a chromeless inline button. Click once and the value is on your clipboard with a transient `✓` checkmark for confirmation; nothing to highlight, nothing to right-click. Saves the cmd-c step when pasting switch IPs into tickets, Slack, or a notebook. Hover and focus-visible affordances tint subtly using `color-mix(CanvasText, …)` so the styling reads correctly against any of the three per-OS card surfaces.
+- **"Honest about absence" treatment.** Result fields the parsers couldn't find in the packet (voice VLAN on most non-Cisco gear, MTU on switches with LLDP-MED disabled, etc.) now render as italic-faded *not advertised* text instead of a bare em-dash. Translated in all four locales (en / es / fr / de).
+- `PRODUCT.md` + `DESIGN.md` + `DESIGN.json` at the repo root, capturing the strategic + visual design system. Future agents and contributors get a consistent baseline; the impeccable tooling reads them automatically.
+
+### Changed
+- The design system documents `Settings on Every Machine` as the explicit visual North Star. Per-OS native chrome (macOS Tahoe / Windows Fluent / Linux Adwaita) is now a documented design choice, not an artifact.
+
 ## [3.3.0-alpha.1] - 2026-05-01
 
 Pre-release for cross-platform smoke testing of the i18n work and the
@@ -122,7 +136,8 @@ Detailed history and source on the [`wails-version`](https://github.com/packetTh
 
 Source on the [`python-legacy`](https://github.com/packetThrower/PortFinder/tree/python-legacy) branch.
 
-[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.3.0-alpha.1...HEAD
+[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.3.0-alpha.2...HEAD
+[3.3.0-alpha.2]: https://github.com/packetThrower/PortFinder/compare/v3.3.0-alpha.1...v3.3.0-alpha.2
 [3.3.0-alpha.1]: https://github.com/packetThrower/PortFinder/compare/v3.2.0...v3.3.0-alpha.1
 [3.2.0]: https://github.com/packetThrower/PortFinder/compare/v3.1.4...v3.2.0
 [3.1.4]: https://github.com/packetThrower/PortFinder/compare/v3.1.3...v3.1.4
