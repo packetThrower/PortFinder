@@ -244,7 +244,9 @@
                     {#each filteredInterfaces as iface (iface.name || '__all__')}
                         {@const compact = compactAddresses(iface.addresses)}
                         <option value={iface.name} title={iface.addresses}>
-                            {iface.description || iface.name || $_('controls.sniffAll')}{compact ? ` (${compact})` : ''}
+                            {iface.name === ''
+                                ? $_('controls.sniffAll')
+                                : (iface.description || iface.name)}{compact ? ` (${compact})` : ''}
                         </option>
                     {/each}
                 </select>
