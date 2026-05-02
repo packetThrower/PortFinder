@@ -13,6 +13,9 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+### Added
+- `frontend/src/bindings.ts` is now auto-generated from the Rust IPC layer via [`tauri-specta`](https://github.com/oscartbeaumont/tauri-specta). Every `#[tauri::command]` in `src-tauri/src/lib.rs` and every `#[derive(Type)]` data struct flows through to a matching TypeScript declaration. Regenerated on every `cargo test`; a CI step fails if a contributor changed an IPC signature without committing the regenerated TS. Closes the class of bugs where `hasIp` / `switchIp` / `nativeVlan` casing drifted between Rust and TypeScript ([#16](https://github.com/packetThrower/PortFinder/issues/16)).
+
 ### Changed
 - CDP / LLDP / MNDP TLV decoding now logs a one-line warning to stderr when a string TLV (system name, port description, board name, etc.) contains non-UTF-8 bytes that have to be substituted. The displayed result is unchanged — flaky-firmware diagnosis used to be silent ([#24](https://github.com/packetThrower/PortFinder/issues/24)).
 - `list_interfaces()` (the `get_interfaces` Tauri command and `portfinder list`) now caches results for 5 seconds. Tabs-away-and-back / fast double-clicks on the refresh button no longer re-scan via libpcap, which on slow hosts saves a few hundred milliseconds per call ([#23](https://github.com/packetThrower/PortFinder/issues/23)).

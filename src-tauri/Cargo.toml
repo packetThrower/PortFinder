@@ -22,6 +22,9 @@ tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros", 
 tokio-util = "0.7"
 pcap = "2"
 clap = { version = "4", features = ["derive"] }
+specta = { version = "2.0.0-rc.24", features = ["derive"] }
+tauri-specta = { version = "2.0.0-rc.24", features = ["derive", "typescript"] }
+specta-typescript = "0.0.11"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.30", features = ["user"] }

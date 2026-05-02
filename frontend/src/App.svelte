@@ -8,7 +8,7 @@
         CaptureRequest,
         CaptureResult,
         PrivilegeStatus,
-    } from './types';
+    } from './bindings';
 
     // Base window height matches tauri.conf.json. When a privilege warning
     // banner is rendered we grow the window to fit it; when it goes away

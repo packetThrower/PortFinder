@@ -88,6 +88,14 @@ jobs:
         working-directory: src-tauri
         run: cargo test --lib
 
+      # `cargo test --lib` regenerates frontend/src/bindings.ts from
+      # the current command + type set via tauri-specta. If anyone
+      # changed an IPC signature without committing the matching TS,
+      # this diff fails and the contributor knows to run `cargo test`
+      # locally and stage the result.
+      - name: Bindings up to date
+        run: git diff --exit-code frontend/src/bindings.ts
+
   # Lightweight cross-platform compile check. Catches Windows-only and
   # macOS-only typos / missing imports / wrong API names that the Linux
   # build can't see (cfg(target_os = "...") gating). Faster than a full

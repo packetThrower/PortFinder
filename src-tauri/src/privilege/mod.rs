@@ -1,4 +1,5 @@
 use serde::Serialize;
+use specta::Type;
 
 #[cfg(target_os = "macos")]
 mod darwin;
@@ -16,7 +17,7 @@ use linux as platform;
 #[cfg(target_os = "windows")]
 use windows as platform;
 
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PrivilegeStatus {
     pub has_access: bool,
