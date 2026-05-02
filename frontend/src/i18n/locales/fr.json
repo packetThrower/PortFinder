@@ -1,0 +1,45 @@
+{
+    "status": {
+        "ready": "Prêt",
+        "capturing": "Capture des paquets {protocol}...",
+        "complete": "Capture terminée",
+        "stopped": "Capture arrêtée",
+        "stopping": "Arrêt en cours...",
+        "error": "Erreur",
+        "captureFailed": "Échec de la capture",
+        "installFailed": "Échec de l'installation",
+        "installing": "Installation...",
+        "bpfInstalled": "Accès BPF installé. Vous devrez peut-être redémarrer l'application.",
+        "loadInterfacesFailed": "Échec du chargement des interfaces : {detail}"
+    },
+    "controls": {
+        "interface": "Interface :",
+        "sniffAll": "Toutes les interfaces",
+        "refresh": "Actualiser la liste des interfaces",
+        "onlyWithIp": "Afficher uniquement les interfaces avec une IP",
+        "protocol": "Protocole :",
+        "start": "Démarrer",
+        "stop": "Arrêter"
+    },
+    "result": {
+        "switch": "Switch",
+        "ip": "IP",
+        "port": "Port",
+        "vlan": "VLAN",
+        "voiceVlan": "VLAN voix",
+        "mtu": "MTU",
+        "model": "Modèle",
+        "empty": "Aucune capture pour l'instant. Choisissez une interface et cliquez sur Démarrer."
+    },
+    "privilege": {
+        "macosBpf": "La capture de paquets nécessite l'accès au périphérique BPF.",
+        "installBpf": "Installer l'accès BPF",
+        "linuxSudo": "Exécuter avec sudo ou installer le paquet .deb/.rpm (définit CAP_NET_RAW).",
+        "windowsNpcap": "Npcap est requis pour la capture de paquets.",
+        "downloadNpcap": "Télécharger Npcap",
+        "windowsNpcapHint": "Activez \"Allow non-administrators to capture\" lors de l'installation.",
+        "windowsNpcapAdmin": "Npcap est installé mais nécessite des privilèges administrateur.",
+        "windowsNpcapAdminHint": "Réinstallez Npcap avec \"Allow non-administrators to capture\" activé, ou exécutez en tant qu'administrateur.",
+        "elevated": "Des privilèges élevés sont requis pour la capture de paquets."
+    }
+}

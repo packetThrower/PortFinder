@@ -240,3 +240,32 @@
     opacity: 0.5;
     font-size: 0.8em;
 }
+
+.footer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 4px;
+}
+
+.footer-row .version-text {
+    text-align: left;
+    flex: 1;
+}
+
+.locale-picker {
+    background: transparent;
+    border: 1px solid CanvasText;
+    border-color: color-mix(in srgb, CanvasText 25%, transparent);
+    border-radius: 4px;
+    color: CanvasText;
+    font-size: 0.78em;
+    opacity: 0.7;
+    padding: 1px 4px;
+}
+
+.locale-picker:hover,
+.locale-picker:focus {
+    opacity: 1;
+}

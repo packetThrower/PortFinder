@@ -3,6 +3,8 @@
     import { invoke } from '@tauri-apps/api/core';
     import { type as osType } from '@tauri-apps/plugin-os';
     import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+    import { _, locale } from 'svelte-i18n';
+    import { LOCALES, setLocale, type LocaleCode } from './i18n';
     import type {
         InterfaceInfo,
         CaptureRequest,
@@ -35,7 +37,11 @@
     let protocol = $state<'CDP' | 'LLDP' | 'MNDP'>('LLDP');
     let isCapturing = $state(false);
     let result = $state<CaptureResult | null>(null);
-    let status = $state('Ready');
+    // Reactive status: store the i18n key (+ optional values) instead of
+    // the resolved string, so the visible status text re-renders when the
+    // user changes language mid-session.
+    let statusKey = $state('status.ready');
+    let statusValues = $state<Record<string, string>>({});
     let error = $state('');
     let privStatus = $state<PrivilegeStatus | null>(null);
     let isInstalling = $state(false);
@@ -70,7 +76,9 @@
                 interfaces = ifaces || [];
             })
             .catch((err) => {
-                error = 'Failed to load interfaces: ' + err;
+                error = $_('status.loadInterfacesFailed', {
+                    values: { detail: String(err) },
+                });
             });
     }
 
@@ -113,12 +121,13 @@
         error = '';
         try {
             await InstallBPFHelper();
-            status = 'BPF access installed. You may need to restart the app.';
+            statusKey = 'status.bpfInstalled';
+            statusValues = {};
             refreshPrivileges();
         } catch (err: unknown) {
             error = typeof err === 'string'
                 ? err
-                : err instanceof Error ? err.message : 'Installation failed';
+                : err instanceof Error ? err.message : $_('status.installFailed');
         } finally {
             isInstalling = false;
         }
@@ -128,7 +137,8 @@
         isCapturing = true;
         error = '';
         result = null;
-        status = 'Capturing ' + protocol + ' packets...';
+        statusKey = 'status.capturing';
+        statusValues = { protocol };
 
         try {
             const res = await StartCapture({
@@ -137,17 +147,20 @@
             });
             if (res) {
                 result = res;
-                status = 'Capture complete';
+                statusKey = 'status.complete';
+                statusValues = {};
             }
         } catch (err: unknown) {
             const msg = typeof err === 'string'
                 ? err
-                : err instanceof Error ? err.message : 'Capture failed';
+                : err instanceof Error ? err.message : $_('status.captureFailed');
             if (msg.includes('cancelled')) {
-                status = 'Capture stopped';
+                statusKey = 'status.stopped';
+                statusValues = {};
             } else {
                 error = msg;
-                status = 'Error';
+                statusKey = 'status.error';
+                statusValues = {};
             }
         } finally {
             isCapturing = false;
@@ -156,52 +169,63 @@
 
     function handleStop() {
         StopCapture();
-        status = 'Stopping...';
+        statusKey = 'status.stopping';
+        statusValues = {};
     }
+
+    // Labels for the language picker. Native names so each entry is
+    // recognizable to a speaker of that language regardless of the
+    // currently active locale.
+    const LOCALE_LABELS: Record<LocaleCode, string> = {
+        en: 'English',
+        es: 'Español',
+        fr: 'Français',
+        de: 'Deutsch',
+    };
 </script>
 
 <div class="app">
     {#if privStatus && !privStatus.hasAccess}
         {#if privStatus.platform === 'darwin' && privStatus.canInstall}
             <div class="privilege-warning">
-                <div>Packet capture requires BPF device access.</div>
+                <div>{$_('privilege.macosBpf')}</div>
                 <button
                     class="install-btn"
                     onclick={handleInstallBPF}
                     disabled={isInstalling}
                 >
-                    {isInstalling ? 'Installing...' : 'Install BPF Access'}
+                    {isInstalling ? $_('status.installing') : $_('privilege.installBpf')}
                 </button>
             </div>
         {:else if privStatus.platform === 'linux'}
             <div class="privilege-warning">
-                Run with sudo or install the .deb/.rpm package (sets CAP_NET_RAW).
+                {$_('privilege.linuxSudo')}
             </div>
         {:else if privStatus.platform === 'windows' && !privStatus.npcapInstalled}
             <div class="privilege-warning">
-                <div>Npcap is required for packet capture.</div>
+                <div>{$_('privilege.windowsNpcap')}</div>
                 <a
                     class="install-btn"
                     href="https://npcap.com/#download"
                     target="_blank"
                     rel="noopener noreferrer"
                 >
-                    Download Npcap
+                    {$_('privilege.downloadNpcap')}
                 </a>
                 <div style="margin-top: 6px; font-size: 12px; opacity: 0.8;">
-                    Enable "Allow non-administrators to capture" during install.
+                    {$_('privilege.windowsNpcapHint')}
                 </div>
             </div>
         {:else if privStatus.platform === 'windows' && !privStatus.npcapNonAdmin}
             <div class="privilege-warning">
-                <div>Npcap is installed but requires admin privileges.</div>
+                <div>{$_('privilege.windowsNpcapAdmin')}</div>
                 <div style="margin-top: 6px; font-size: 12px; opacity: 0.8;">
-                    Reinstall Npcap with "Allow non-administrators to capture" enabled, or run as Administrator.
+                    {$_('privilege.windowsNpcapAdminHint')}
                 </div>
             </div>
         {:else}
             <div class="privilege-warning">
-                Elevated privileges required for packet capture.
+                {$_('privilege.elevated')}
             </div>
         {/if}
     {/if}
@@ -209,7 +233,7 @@
     <!-- Controls card: configure capture -->
     <section class="card">
         <div class="form-group">
-            <label for="nic-select">Interface:</label>
+            <label for="nic-select">{$_('controls.interface')}</label>
             <div class="nic-row">
                 <select
                     id="nic-select"
@@ -220,7 +244,7 @@
                     {#each filteredInterfaces as iface (iface.name || '__all__')}
                         {@const compact = compactAddresses(iface.addresses)}
                         <option value={iface.name} title={iface.addresses}>
-                            {iface.description || iface.name || 'Sniff all Interfaces'}{compact ? ` (${compact})` : ''}
+                            {iface.description || iface.name || $_('controls.sniffAll')}{compact ? ` (${compact})` : ''}
                         </option>
                     {/each}
                 </select>
@@ -229,8 +253,8 @@
                     class="refresh-btn"
                     onclick={refreshInterfaces}
                     disabled={isCapturing}
-                    title="Refresh interface list"
-                    aria-label="Refresh interface list"
+                    title={$_('controls.refresh')}
+                    aria-label={$_('controls.refresh')}
                 >
                     ↻
                 </button>
@@ -238,7 +262,7 @@
         </div>
 
         <label class="switch-row">
-            <span class="switch-label">Only show interfaces with an IP</span>
+            <span class="switch-label">{$_('controls.onlyWithIp')}</span>
             <input
                 type="checkbox"
                 role="switch"
@@ -249,7 +273,7 @@
         </label>
 
         <div class="form-group">
-            <label for="protocol-select">Protocol:</label>
+            <label for="protocol-select">{$_('controls.protocol')}</label>
             <select
                 id="protocol-select"
                 bind:value={protocol}
@@ -274,13 +298,13 @@
                 disabled={isCapturing}
                 autofocus
             >
-                Start
+                {$_('controls.start')}
             </button>
             <button
                 onclick={handleStop}
                 disabled={!isCapturing}
             >
-                Stop
+                {$_('controls.stop')}
             </button>
         </div>
     </section>
@@ -289,26 +313,38 @@
     <section class="card">
         {#if result}
             <dl class="result-list">
-                <dt>Switch</dt><dd>{result.switchName || '—'}</dd>
-                <dt>IP</dt><dd>{result.switchIp || '—'}</dd>
-                <dt>Port</dt><dd>{result.switchPort || '—'}</dd>
-                <dt>VLAN</dt><dd>{result.nativeVlan || '—'}</dd>
-                <dt>Voice VLAN</dt><dd>{result.voiceVlan || '—'}</dd>
-                <dt>MTU</dt><dd>{result.mtu || '—'}</dd>
-                <dt>Model</dt><dd>{result.switchModel || '—'}</dd>
+                <dt>{$_('result.switch')}</dt><dd>{result.switchName || '—'}</dd>
+                <dt>{$_('result.ip')}</dt><dd>{result.switchIp || '—'}</dd>
+                <dt>{$_('result.port')}</dt><dd>{result.switchPort || '—'}</dd>
+                <dt>{$_('result.vlan')}</dt><dd>{result.nativeVlan || '—'}</dd>
+                <dt>{$_('result.voiceVlan')}</dt><dd>{result.voiceVlan || '—'}</dd>
+                <dt>{$_('result.mtu')}</dt><dd>{result.mtu || '—'}</dd>
+                <dt>{$_('result.model')}</dt><dd>{result.switchModel || '—'}</dd>
             </dl>
         {:else}
             <p class="empty-state">
-                No capture yet. Choose an interface and click Start.
+                {$_('result.empty')}
             </p>
         {/if}
     </section>
 
     <div class="status-text" class:error-text={!!error}>
-        {error || status}
+        {error || $_(statusKey, { values: statusValues })}
     </div>
 
-    {#if version}
-        <div class="version-text">v{version}</div>
-    {/if}
+    <div class="footer-row">
+        {#if version}
+            <span class="version-text">v{version}</span>
+        {/if}
+        <select
+            class="locale-picker"
+            value={$locale ?? 'en'}
+            onchange={(e) => setLocale((e.currentTarget as HTMLSelectElement).value as LocaleCode)}
+            aria-label="Language"
+        >
+            {#each LOCALES as code}
+                <option value={code}>{LOCALE_LABELS[code]}</option>
+            {/each}
+        </select>
+    </div>
 </div>

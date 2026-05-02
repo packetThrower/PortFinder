@@ -1,0 +1,45 @@
+{
+    "status": {
+        "ready": "Listo",
+        "capturing": "Capturando paquetes {protocol}...",
+        "complete": "Captura completada",
+        "stopped": "Captura detenida",
+        "stopping": "Deteniendo...",
+        "error": "Error",
+        "captureFailed": "Captura fallida",
+        "installFailed": "Instalación fallida",
+        "installing": "Instalando...",
+        "bpfInstalled": "Acceso BPF instalado. Puede que necesites reiniciar la aplicación.",
+        "loadInterfacesFailed": "Error al cargar interfaces: {detail}"
+    },
+    "controls": {
+        "interface": "Interfaz:",
+        "sniffAll": "Capturar todas las interfaces",
+        "refresh": "Actualizar lista de interfaces",
+        "onlyWithIp": "Solo mostrar interfaces con IP",
+        "protocol": "Protocolo:",
+        "start": "Iniciar",
+        "stop": "Detener"
+    },
+    "result": {
+        "switch": "Switch",
+        "ip": "IP",
+        "port": "Puerto",
+        "vlan": "VLAN",
+        "voiceVlan": "VLAN de voz",
+        "mtu": "MTU",
+        "model": "Modelo",
+        "empty": "Sin captura aún. Elige una interfaz y haz clic en Iniciar."
+    },
+    "privilege": {
+        "macosBpf": "La captura de paquetes requiere acceso al dispositivo BPF.",
+        "installBpf": "Instalar acceso BPF",
+        "linuxSudo": "Ejecuta con sudo o instala el paquete .deb/.rpm (configura CAP_NET_RAW).",
+        "windowsNpcap": "Se requiere Npcap para la captura de paquetes.",
+        "downloadNpcap": "Descargar Npcap",
+        "windowsNpcapHint": "Activa \"Allow non-administrators to capture\" durante la instalación.",
+        "windowsNpcapAdmin": "Npcap está instalado pero requiere privilegios de administrador.",
+        "windowsNpcapAdminHint": "Reinstala Npcap con \"Allow non-administrators to capture\" activado, o ejecuta como Administrador.",
+        "elevated": "Se requieren privilegios elevados para la captura de paquetes."
+    }
+}

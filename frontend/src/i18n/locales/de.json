@@ -1,0 +1,45 @@
+{
+    "status": {
+        "ready": "Bereit",
+        "capturing": "Erfasse {protocol}-Pakete...",
+        "complete": "Aufzeichnung abgeschlossen",
+        "stopped": "Aufzeichnung gestoppt",
+        "stopping": "Wird gestoppt...",
+        "error": "Fehler",
+        "captureFailed": "Aufzeichnung fehlgeschlagen",
+        "installFailed": "Installation fehlgeschlagen",
+        "installing": "Wird installiert...",
+        "bpfInstalled": "BPF-Zugriff installiert. Möglicherweise muss die App neu gestartet werden.",
+        "loadInterfacesFailed": "Schnittstellen konnten nicht geladen werden: {detail}"
+    },
+    "controls": {
+        "interface": "Schnittstelle:",
+        "sniffAll": "Alle Schnittstellen",
+        "refresh": "Schnittstellenliste aktualisieren",
+        "onlyWithIp": "Nur Schnittstellen mit IP anzeigen",
+        "protocol": "Protokoll:",
+        "start": "Start",
+        "stop": "Stopp"
+    },
+    "result": {
+        "switch": "Switch",
+        "ip": "IP",
+        "port": "Port",
+        "vlan": "VLAN",
+        "voiceVlan": "Voice-VLAN",
+        "mtu": "MTU",
+        "model": "Modell",
+        "empty": "Noch keine Aufzeichnung. Schnittstelle wählen und auf Start klicken."
+    },
+    "privilege": {
+        "macosBpf": "Für die Paketerfassung wird BPF-Gerätezugriff benötigt.",
+        "installBpf": "BPF-Zugriff installieren",
+        "linuxSudo": "Mit sudo ausführen oder das .deb/.rpm-Paket installieren (setzt CAP_NET_RAW).",
+        "windowsNpcap": "Für die Paketerfassung wird Npcap benötigt.",
+        "downloadNpcap": "Npcap herunterladen",
+        "windowsNpcapHint": "Aktivieren Sie \"Allow non-administrators to capture\" während der Installation.",
+        "windowsNpcapAdmin": "Npcap ist installiert, benötigt aber Administratorrechte.",
+        "windowsNpcapAdminHint": "Installieren Sie Npcap mit aktiviertem \"Allow non-administrators to capture\" neu oder führen Sie als Administrator aus.",
+        "elevated": "Für die Paketerfassung sind erhöhte Rechte erforderlich."
+    }
+}
