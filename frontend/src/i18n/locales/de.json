@@ -29,7 +29,9 @@
         "voiceVlan": "Voice-VLAN",
         "mtu": "MTU",
         "model": "Modell",
-        "empty": "Noch keine Aufzeichnung. Schnittstelle wählen und auf Start klicken."
+        "empty": "Noch keine Aufzeichnung. Schnittstelle wählen und auf Start klicken.",
+        "notAdvertised": "nicht gemeldet",
+        "copyTitle": "Klicken zum Kopieren {value}"
     },
     "privilege": {
         "macosBpf": "Für die Paketerfassung wird BPF-Gerätezugriff benötigt.",

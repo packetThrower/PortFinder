@@ -29,7 +29,9 @@
         "voiceVlan": "VLAN de voz",
         "mtu": "MTU",
         "model": "Modelo",
-        "empty": "Sin captura aún. Elige una interfaz y haz clic en Iniciar."
+        "empty": "Sin captura aún. Elige una interfaz y haz clic en Iniciar.",
+        "notAdvertised": "no anunciado",
+        "copyTitle": "Haz clic para copiar {value}"
     },
     "privilege": {
         "macosBpf": "La captura de paquetes requiere acceso al dispositivo BPF.",

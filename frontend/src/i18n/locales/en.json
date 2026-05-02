@@ -29,7 +29,9 @@
         "voiceVlan": "Voice VLAN",
         "mtu": "MTU",
         "model": "Model",
-        "empty": "No capture yet. Choose an interface and click Start."
+        "empty": "No capture yet. Choose an interface and click Start.",
+        "notAdvertised": "not advertised",
+        "copyTitle": "Click to copy {value}"
     },
     "privilege": {
         "macosBpf": "Packet capture requires BPF device access.",

@@ -43,6 +43,13 @@
     let statusKey = $state('status.ready');
     let statusValues = $state<Record<string, string>>({});
     let error = $state('');
+
+    // Click-to-copy state for result values. Borrowed from Direction B
+    // of the design comparison: clicking a value writes it to the
+    // clipboard and shows a transient checkmark. Saves the
+    // highlight-and-cmd-c step for users pasting into tickets / Slack.
+    let copiedKey = $state<string | null>(null);
+    let copyTimer: ReturnType<typeof setTimeout> | null = null;
     let privStatus = $state<PrivilegeStatus | null>(null);
     let isInstalling = $state(false);
     let version = $state('');
@@ -64,6 +71,34 @@
         const parts = addrs.split(', ');
         const v4 = parts.find((p) => /^\d+\.\d+\.\d+\.\d+$/.test(p));
         return v4 ?? parts[0] ?? '';
+    }
+
+    /**
+     * Decide how a captured value renders. The Rust parsers populate
+     * any field that wasn't in the packet with the literal "N/A"
+     * sentinel; the GUI re-interprets that as "not advertised" italic
+     * faded text so absence reads as honest information rather than
+     * a shrug. Empty string is treated the same way.
+     */
+    function valueOrAbsent(v: string): { text: string; absent: boolean } {
+        if (!v || v === 'N/A') {
+            return { text: $_('result.notAdvertised'), absent: true };
+        }
+        return { text: v, absent: false };
+    }
+
+    async function copyValue(key: string, text: string) {
+        if (!text) return;
+        try {
+            await navigator.clipboard.writeText(text);
+            copiedKey = key;
+            if (copyTimer) clearTimeout(copyTimer);
+            copyTimer = setTimeout(() => (copiedKey = null), 1200);
+        } catch {
+            // Some platform / focus combinations (e.g. WebView before
+            // initial focus) can fail clipboard writes silently. The
+            // value is already on screen so a no-op is fine.
+        }
     }
 
     function refreshPrivileges() {
@@ -314,14 +349,38 @@
     <!-- Result card: captured switch info -->
     <section class="card">
         {#if result}
+            {@const fields: [string, string, string][] = [
+                ['switch', $_('result.switch'), result.switchName],
+                ['ip', $_('result.ip'), result.switchIp],
+                ['port', $_('result.port'), result.switchPort],
+                ['vlan', $_('result.vlan'), result.nativeVlan],
+                ['voiceVlan', $_('result.voiceVlan'), result.voiceVlan],
+                ['mtu', $_('result.mtu'), result.mtu],
+                ['model', $_('result.model'), result.switchModel],
+            ]}
             <dl class="result-list">
-                <dt>{$_('result.switch')}</dt><dd>{result.switchName || '—'}</dd>
-                <dt>{$_('result.ip')}</dt><dd>{result.switchIp || '—'}</dd>
-                <dt>{$_('result.port')}</dt><dd>{result.switchPort || '—'}</dd>
-                <dt>{$_('result.vlan')}</dt><dd>{result.nativeVlan || '—'}</dd>
-                <dt>{$_('result.voiceVlan')}</dt><dd>{result.voiceVlan || '—'}</dd>
-                <dt>{$_('result.mtu')}</dt><dd>{result.mtu || '—'}</dd>
-                <dt>{$_('result.model')}</dt><dd>{result.switchModel || '—'}</dd>
+                {#each fields as [key, label, raw]}
+                    {@const v = valueOrAbsent(raw)}
+                    <dt>{label}</dt>
+                    <dd>
+                        {#if v.absent}
+                            <span class="value absent">{v.text}</span>
+                        {:else}
+                            <button
+                                type="button"
+                                class="value value-copy"
+                                class:copied={copiedKey === key}
+                                onclick={() => copyValue(key, v.text)}
+                                title={$_('result.copyTitle', { values: { value: v.text } })}
+                            >
+                                <span class="value-text">{v.text}</span>
+                                {#if copiedKey === key}
+                                    <span class="copied-mark" aria-hidden="true">✓</span>
+                                {/if}
+                            </button>
+                        {/if}
+                    </dd>
+                {/each}
             </dl>
         {:else}
             <p class="empty-state">

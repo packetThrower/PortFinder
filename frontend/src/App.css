@@ -209,8 +209,78 @@
     margin: 0;
     color: CanvasText;
     font-weight: 500;
+    min-width: 0;
+}
+
+/* Click-to-copy on captured values. The button strips its native
+   chrome to render as inline text by default, then picks up a subtle
+   tint on hover that reads correctly against any of the per-OS card
+   surfaces. Focus-visible uses the system AccentColor so the
+   keyboard-only path inherits the OS focus convention. */
+.result-list .value {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    font: inherit;
+    font-weight: 500;
+    color: inherit;
+    font-variant-numeric: tabular-nums;
+}
+
+.result-list .value-copy {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 0 5px;
+    margin-left: -5px;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.result-list .value-copy:hover {
+    background: color-mix(in srgb, CanvasText 7%, transparent);
+}
+
+.result-list .value-copy:focus-visible {
+    outline: none;
+    border-color: AccentColor;
+    background: color-mix(in srgb, CanvasText 5%, transparent);
+}
+
+/* `color-mix()` doesn't interpolate the AccentColor system keyword
+   reliably (it resolves to a contextual value, not a literal color),
+   so the tinted-success background is computed from CanvasText and
+   the accent shows up as a solid border instead. */
+.result-list .value-copy.copied {
+    background: color-mix(in srgb, CanvasText 9%, transparent);
+    border-color: AccentColor;
+}
+
+.result-list .value-text {
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.result-list .copied-mark {
+    color: AccentColor;
+    font-weight: 600;
+    font-size: 0.9em;
+    flex-shrink: 0;
+}
+
+.result-list .value.absent {
+    font-weight: 400;
+    font-style: italic;
+    color: color-mix(in srgb, CanvasText 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .result-list .value-copy {
+        transition: none;
+    }
 }
 
 .empty-state {
