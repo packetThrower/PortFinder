@@ -74,15 +74,15 @@ The BPF helper installer (in-app *Install BPF Access* button or `PortFinder-BPF-
 ### macOS — Homebrew
 
 ```bash
-brew install --cask packetThrower/portfinder/portfinder
+brew install --cask packetThrower/tap/portfinder
 ```
 
-This pulls the universal `.dmg` from the latest release, drops `PortFinder.app` into `/Applications`, and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder`. See the [tap README](https://github.com/packetThrower/homebrew-portfinder) for upgrade and uninstall details. Click **Install BPF Access** in the app once for non-sudo capture.
+This pulls the universal `.dmg` from the latest release, drops `PortFinder.app` into `/Applications`, and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder`. See the [tap README](https://github.com/packetThrower/homebrew-tap) for upgrade and uninstall details. Click **Install BPF Access** in the app once for non-sudo capture.
 
 For early access to alpha / beta / rc builds, install the parallel `@alpha` cask alongside stable:
 
 ```bash
-brew install --cask packetThrower/portfinder/portfinder@alpha
+brew install --cask packetThrower/tap/portfinder@alpha
 ```
 
 `PortFinder Alpha.app` and `portfinder-alpha` coexist with the stable install.

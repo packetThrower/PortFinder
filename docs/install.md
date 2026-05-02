@@ -7,19 +7,19 @@ Pre-built binaries for every release are on the [Releases page](https://github.c
 ### Homebrew (recommended)
 
 ```bash
-brew install --cask packetThrower/portfinder/portfinder
+brew install --cask packetThrower/tap/portfinder
 ```
 
 This installs `PortFinder.app` to `/Applications` and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder` so [`portfinder`](usage/cli.md) works from any shell. Update with `brew upgrade --cask portfinder`; remove with `brew uninstall --cask portfinder` (add `--zap` to also clear `~/Library/Application Support/PortFinder` and the WebKit cache).
 
-The tap source lives at [packetThrower/homebrew-portfinder](https://github.com/packetThrower/homebrew-portfinder).
+The tap source lives at [packetThrower/homebrew-tap](https://github.com/packetThrower/homebrew-tap), shared with [Baudrun](https://github.com/packetThrower/Baudrun) and other packetThrower projects.
 
 #### Pre-release channel
 
 For early access to alpha / beta / RC builds, install the `@alpha` cask alongside the stable one:
 
 ```bash
-brew install --cask packetThrower/portfinder/portfinder@alpha
+brew install --cask packetThrower/tap/portfinder@alpha
 ```
 
 This drops `PortFinder Alpha.app` into `/Applications` and exposes the CLI as `portfinder-alpha`, so the two channels coexist. State (preferences, saved window position) is shared between them. File regressions on the [issue tracker](https://github.com/packetThrower/PortFinder/issues).
