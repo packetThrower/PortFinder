@@ -6,13 +6,23 @@ Pre-built binaries for every release are on the [Releases page](https://github.c
 
 ### Homebrew (recommended)
 
-```sh
+```bash
 brew install --cask packetThrower/portfinder/portfinder
 ```
 
 This installs `PortFinder.app` to `/Applications` and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder` so [`portfinder`](usage/cli.md) works from any shell. Update with `brew upgrade --cask portfinder`; remove with `brew uninstall --cask portfinder` (add `--zap` to also clear `~/Library/Application Support/PortFinder` and the WebKit cache).
 
 The tap source lives at [packetThrower/homebrew-portfinder](https://github.com/packetThrower/homebrew-portfinder).
+
+#### Pre-release channel
+
+For early access to alpha / beta / RC builds, install the `@alpha` cask alongside the stable one:
+
+```bash
+brew install --cask packetThrower/portfinder/portfinder@alpha
+```
+
+This drops `PortFinder Alpha.app` into `/Applications` and exposes the CLI as `portfinder-alpha`, so the two channels coexist. State (preferences, saved window position) is shared between them. File regressions on the [issue tracker](https://github.com/packetThrower/PortFinder/issues).
 
 For non-root packet capture, click **Install BPF Access** in the app once after install. Until you do, capture works only via `sudo portfinder capture …`.
 
@@ -82,6 +92,16 @@ scoop install portfinder
 ```
 
 This installs `PortFinder.exe`, drops a Start menu shortcut, and exposes the headless CLI on your `PATH` so [`portfinder`](usage/cli.md) works from any shell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. The bucket source lives at [packetThrower/scoop-bucket](https://github.com/packetThrower/scoop-bucket).
+
+#### Pre-release channel
+
+The bucket also ships a parallel manifest tracking pre-release tags (alpha / beta / rc). It coexists with the stable install:
+
+```powershell
+scoop install portfinder-prerelease
+```
+
+The pre-release CLI shim is `portfinder-alpha` and the Start menu shortcut is `PortFinder Alpha`, so the two never collide.
 
 You still need [Npcap](https://npcap.com/#download) for packet capture (see below) — Scoop can't bundle the kernel driver.
 

@@ -73,11 +73,19 @@ The BPF helper installer (in-app *Install BPF Access* button or `PortFinder-BPF-
 
 ### macOS — Homebrew
 
-```sh
+```bash
 brew install --cask packetThrower/portfinder/portfinder
 ```
 
 This pulls the universal `.dmg` from the latest release, drops `PortFinder.app` into `/Applications`, and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder`. See the [tap README](https://github.com/packetThrower/homebrew-portfinder) for upgrade and uninstall details. Click **Install BPF Access** in the app once for non-sudo capture.
+
+For early access to alpha / beta / rc builds, install the parallel `@alpha` cask alongside stable:
+
+```bash
+brew install --cask packetThrower/portfinder/portfinder@alpha
+```
+
+`PortFinder Alpha.app` and `portfinder-alpha` coexist with the stable install.
 
 ### Windows — Scoop
 
@@ -87,6 +95,14 @@ scoop install portfinder
 ```
 
 Installs `PortFinder.exe` and exposes `portfinder` on your `PATH`. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. See the [bucket README](https://github.com/packetThrower/scoop-bucket) for details. You'll still need [Npcap](https://npcap.com/#download) installed for packet capture.
+
+For pre-release builds:
+
+```powershell
+scoop install portfinder-prerelease
+```
+
+CLI shim is `portfinder-alpha` and the Start menu shortcut is `PortFinder Alpha`. Coexists with the stable install.
 
 ### All platforms — release artifacts
 
