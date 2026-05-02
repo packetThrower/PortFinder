@@ -1,7 +1,34 @@
 use crate::InterfaceInfo;
 use std::net::IpAddr;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+/// How long a successful `list_interfaces` result is reused before we
+/// re-scan via libpcap. Short enough that plugging / unplugging a cable
+/// shows up on the next refresh-button click after a brief pause; long
+/// enough that a focus / blur / focus storm doesn't repeatedly hit
+/// `pcap::Device::list` (a few hundred ms on slow hosts).
+const CACHE_TTL: Duration = Duration::from_secs(5);
+
+static CACHE: Mutex<Option<(Instant, Vec<InterfaceInfo>)>> = Mutex::new(None);
 
 pub fn list_interfaces() -> Result<Vec<InterfaceInfo>, String> {
+    if let Ok(cache) = CACHE.lock() {
+        if let Some((stored_at, value)) = cache.as_ref() {
+            if stored_at.elapsed() < CACHE_TTL {
+                return Ok(value.clone());
+            }
+        }
+    }
+
+    let fresh = list_interfaces_uncached()?;
+    if let Ok(mut cache) = CACHE.lock() {
+        *cache = Some((Instant::now(), fresh.clone()));
+    }
+    Ok(fresh)
+}
+
+fn list_interfaces_uncached() -> Result<Vec<InterfaceInfo>, String> {
     let mut interfaces = vec![InterfaceInfo {
         name: String::new(),
         description: "Sniff all Interfaces".into(),
