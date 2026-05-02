@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-02T00:00:00.000Z",
+  "title": "Design System: PortFinder",
+  "extensions": {
+    "colorMeta": {
+      "error": {
+        "role": "state",
+        "displayName": "Status Error Red",
+        "canonical": "#c0392b",
+        "tonalRamp": [
+          "oklch(28% 0.10 25)",
+          "oklch(36% 0.13 25)",
+          "oklch(44% 0.16 25)",
+          "oklch(50% 0.18 25)",
+          "oklch(57% 0.18 25)",
+          "oklch(67% 0.15 25)",
+          "oklch(78% 0.10 25)",
+          "oklch(92% 0.04 25)"
+        ]
+      },
+      "card-bg-light": {
+        "role": "neutral",
+        "displayName": "Card Surface (Light)",
+        "canonical": "#f7f7f7",
+        "tonalRamp": [
+          "oklch(20% 0 0)",
+          "oklch(30% 0 0)",
+          "oklch(45% 0 0)",
+          "oklch(60% 0 0)",
+          "oklch(75% 0 0)",
+          "oklch(85% 0 0)",
+          "oklch(92% 0 0)",
+          "oklch(97% 0 0)"
+        ]
+      },
+      "card-bg-dark": {
+        "role": "neutral",
+        "displayName": "Card Surface (Dark)",
+        "canonical": "#2c2c2c",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(22% 0 0)",
+          "oklch(30% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(50% 0 0)",
+          "oklch(65% 0 0)",
+          "oklch(80% 0 0)",
+          "oklch(94% 0 0)"
+        ]
+      },
+      "page-bg-light": {
+        "role": "neutral",
+        "displayName": "Page Background (Light)",
+        "canonical": "#ffffff"
+      },
+      "page-bg-dark": {
+        "role": "neutral",
+        "displayName": "Page Background (Dark)",
+        "canonical": "#202020"
+      },
+      "thumb-on-pill": {
+        "role": "neutral",
+        "displayName": "Switch Thumb",
+        "canonical": "#ffffff"
+      }
+    },
+    "typographyMeta": {
+      "body": {
+        "displayName": "Body — macOS canonical",
+        "purpose": "Every label, dropdown, and form text. macOS uses SF; Windows substitutes Segoe UI Variable at 14px; Linux substitutes Inter."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Form-group labels and result-list `dt` headings. Lighter via 70% opacity, not by hue."
+      },
+      "value": {
+        "displayName": "Result Value",
+        "purpose": "The right column of the result list — the actual switch / port / VLAN strings the user came to read. Weight 500 differentiates them from labels at a glance."
+      },
+      "status": {
+        "displayName": "Status",
+        "purpose": "The bottom-row status line. Carries 'Ready', 'Capturing LLDP packets…', 'Capture stopped', error messages."
+      },
+      "footer": {
+        "displayName": "Footer / Version",
+        "purpose": "Quiet bookkeeping at the bottom — version string, locale picker label."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-windows",
+        "value": "0 1px 3px rgba(0, 0, 0, 0.04)",
+        "purpose": "Subtle Mica-style hint at the card edge on Windows light mode. Set to `none` in dark mode and on macOS / Linux."
+      },
+      {
+        "name": "card-macos-light",
+        "value": "0 1px 1px rgba(0, 0, 0, 0.03)",
+        "purpose": "Almost-invisible hint that disambiguates the card edge from the vibrancy material behind it on macOS light. None in dark."
+      },
+      {
+        "name": "switch-thumb",
+        "value": "0 1px 2px rgba(0, 0, 0, 0.25)",
+        "purpose": "The only meaningful shadow in the surface. Gives the iOS-style toggle thumb its physical-object feel."
+      }
+    ],
+    "motion": [
+      {
+        "name": "switch-state",
+        "value": "background 0.2s ease, transform 0.2s ease",
+        "purpose": "Toggle pill recolor and thumb slide. Both 200ms ease — short enough to feel responsive, long enough to read as movement."
+      },
+      {
+        "name": "progress-loop",
+        "value": "progress-slide 1.2s ease-in-out infinite",
+        "purpose": "Indeterminate capture progress. Fill slides from -100% to +300% of its container. Only animation in the system."
+      },
+      {
+        "name": "reduced-motion-fallback",
+        "value": "(planned) static fill or opacity transition",
+        "purpose": "When `prefers-reduced-motion` is set, the progress loop should be replaced with a non-animated indicator. Currently respected at the platform level via `prefers-reduced-motion` media query — explicit fallback styling is a follow-up."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "fixed",
+        "value": "400×460 (macOS) / 400×500 (Windows / Linux)",
+        "purpose": "PortFinder is a fixed-size desktop window. There is no responsive mobile layout — the window grows only when the privilege banner is present, via `setSize` from the Tauri window API."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Card (Controls / Result)",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The two main sections of the app. Per-OS card chrome — values shown here are the macOS-light canonical.",
+      "html": "<section class=\"ds-card\"><div class=\"ds-card-row\"><span class=\"ds-card-label\">Interface:</span><span class=\"ds-card-value\">en0 (10.12.20.24)</span></div><div class=\"ds-card-row\"><span class=\"ds-card-label\">Protocol:</span><span class=\"ds-card-value\">LLDP</span></div></section>",
+      "css": ".ds-card { background: #f7f7f7; border: 1px solid rgba(0, 0, 0, 0.05); border-radius: 10px; box-shadow: 0 1px 1px rgba(0, 0, 0, 0.03); padding: 14px 18px; display: flex; flex-direction: column; gap: 13px; min-width: 280px; max-width: 360px; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 13px; line-height: 1.4; color: #1d1d1f; } .ds-card-row { display: grid; grid-template-columns: 70px 1fr; column-gap: 10px; align-items: baseline; } .ds-card-label { text-align: right; opacity: 0.7; font-size: 0.95em; } .ds-card-value { font-weight: 500; }"
+    },
+    {
+      "name": "Switch (Off)",
+      "kind": "input",
+      "refersTo": "switch-track",
+      "description": "iOS-style toggle pill in the off state. Used for the 'Only show interfaces with an IP' control. Hand-built from a hidden checkbox.",
+      "html": "<label class=\"ds-switch-row\"><span class=\"ds-switch-label\">Only show interfaces with an IP</span><span class=\"ds-switch-pill\"><span class=\"ds-switch-thumb\"></span></span></label>",
+      "css": ".ds-switch-row { display: flex; align-items: center; gap: 48px; cursor: pointer; user-select: none; font-family: -apple-system, sans-serif; font-size: 0.92em; color: #1d1d1f; } .ds-switch-label { flex: 1; } .ds-switch-pill { position: relative; width: 40px; height: 18px; border-radius: 9px; background: rgba(29, 29, 31, 0.25); transition: background 0.2s ease; flex-shrink: 0; } .ds-switch-thumb { position: absolute; top: 2px; left: 2px; width: 22px; height: 14px; border-radius: 7px; background: #ffffff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform 0.2s ease; }"
+    },
+    {
+      "name": "Switch (On)",
+      "kind": "input",
+      "refersTo": "switch-track-checked",
+      "description": "Same component, on state. Track recolors to the system accent (shown as #007aff macOS blue here for the panel; in the live app it's `AccentColor` and follows the user's OS accent setting). Thumb translates 14px right.",
+      "html": "<label class=\"ds-switch-row\"><span class=\"ds-switch-label\">Only show interfaces with an IP</span><span class=\"ds-switch-pill ds-switch-pill--on\"><span class=\"ds-switch-thumb ds-switch-thumb--on\"></span></span></label>",
+      "css": ".ds-switch-row { display: flex; align-items: center; gap: 48px; cursor: pointer; user-select: none; font-family: -apple-system, sans-serif; font-size: 0.92em; color: #1d1d1f; } .ds-switch-label { flex: 1; } .ds-switch-pill { position: relative; width: 40px; height: 18px; border-radius: 9px; background: #007aff; transition: background 0.2s ease; flex-shrink: 0; } .ds-switch-thumb { position: absolute; top: 2px; left: 2px; width: 22px; height: 14px; border-radius: 7px; background: #ffffff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transform: translateX(14px); transition: transform 0.2s ease; }"
+    },
+    {
+      "name": "Progress Bar",
+      "kind": "custom",
+      "refersTo": "progress-fill",
+      "description": "Indeterminate capture indicator. Thin track with a fill that slides across, looping. The only animation in the system.",
+      "html": "<div class=\"ds-progress-bar\"><div class=\"ds-progress-fill\"></div></div>",
+      "css": ".ds-progress-bar { width: 100%; height: 3px; border-radius: 2px; background: rgba(0, 0, 0, 0.12); overflow: hidden; } .ds-progress-fill { width: 35%; height: 100%; background: #007aff; border-radius: 2px; animation: ds-progress-slide 1.2s ease-in-out infinite; } @keyframes ds-progress-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } } @media (prefers-reduced-motion: reduce) { .ds-progress-fill { animation: none; width: 100%; opacity: 0.6; } }"
+    },
+    {
+      "name": "Privilege Warning Banner",
+      "kind": "card",
+      "refersTo": "privilege-warning",
+      "description": "Sits above the Controls card when the app cannot capture (no BPF helper, no Npcap, no setcap). Uses Highlight / HighlightText system colors so it adopts whatever banner styling each OS prefers.",
+      "html": "<div class=\"ds-priv-warning\"><div class=\"ds-priv-warning-msg\">Packet capture requires BPF device access.</div><button class=\"ds-priv-warning-btn\">Install BPF Access</button></div>",
+      "css": ".ds-priv-warning { background: #cfe6ff; color: #0a4a82; border-radius: 6px; padding: 8px 12px; font-family: -apple-system, sans-serif; font-size: 0.92em; display: flex; flex-direction: column; gap: 6px; max-width: 340px; } .ds-priv-warning-msg { line-height: 1.4; } .ds-priv-warning-btn { align-self: flex-start; padding: 4px 12px; background: rgba(255, 255, 255, 0.6); color: inherit; border: 1px solid rgba(10, 74, 130, 0.25); border-radius: 4px; font: inherit; cursor: pointer; }"
+    },
+    {
+      "name": "Locale Picker",
+      "kind": "input",
+      "refersTo": "locale-picker",
+      "description": "Footer language picker. Native select with restrained chrome — transparent background, hairline border, low opacity, brightens on hover/focus.",
+      "html": "<select class=\"ds-locale-picker\"><option>English</option><option>Español</option><option>Français</option><option>Deutsch</option></select>",
+      "css": ".ds-locale-picker { background: transparent; border: 1px solid rgba(29, 29, 31, 0.25); border-radius: 4px; color: #1d1d1f; font-family: -apple-system, sans-serif; font-size: 0.78em; opacity: 0.7; padding: 1px 4px; cursor: pointer; transition: opacity 0.15s ease; } .ds-locale-picker:hover, .ds-locale-picker:focus-visible { opacity: 1; outline: none; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Settings on Every Machine",
+    "overview": "PortFinder's in-app surface is, today, deliberately not a brand. It defers to whichever operating system you're running it under — the macOS build looks like Tahoe System Settings, the Windows build looks like Windows 11 Settings, the Linux build looks like a libadwaita boxed-list. Brand identity asserts itself at exactly one point: the dock icon. From the moment the window opens, the surface is whatever the OS provides — the system text color, the system accent color, the system focus ring, the platform's native widget rendering for `<select>`, `<button>`, `<input>`. The custom code is a thin layer of layout and chrome (cards, the iOS-style toggle, the capture progress bar) that sits on top of that native foundation.\n\nThis is a real design philosophy, not an unfinished one. The strategic case is that a small utility used in <30-second bursts under stress benefits from feeling like a built-in part of the machine — no cognitive cost of \"what app's conventions are these,\" no mismatch between Settings-app focus styles and PortFinder focus styles. The trade-off is that PRODUCT.md's stated personality — *polished, branded, distinctive* — has nowhere to manifest in the current surface. The icon carries the entire identity load alone. Future iteration may move the surface in a more branded direction; this DESIGN.md captures what's actually rendered today, not what's wished for.",
+    "keyCharacteristics": [
+      "System colors as the primary palette — no hex brand color appears in the rendered surface.",
+      "Per-OS font stack (SF, Segoe UI Variable, Inter) loaded by `data-os` attribute on `<html>`.",
+      "Per-OS card chrome: radius, padding, border, shadow all vary to match each platform's Settings-app idiom.",
+      "Light and dark via `color-scheme: light dark` plus `prefers-color-scheme` overrides per OS.",
+      "Two-card layout (Controls / Result) plus an optional Privilege Warning banner above.",
+      "One genuinely custom component: the iOS-style toggle switch, hand-built from `<input type=\"checkbox\">` because no native checkbox renders the way the surrounding macOS surface needs."
+    ],
+    "rules": [
+      {
+        "name": "The System-First Rule",
+        "body": "Colors come from system CSS keywords (Canvas, CanvasText, AccentColor, Highlight, HighlightText, ButtonBorder) before they come from hex. If a value can be expressed as a system keyword, it is. Break it and the app starts feeling like a generic Electron utility instead of part of the OS.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tint-Through-Function Rule",
+        "body": "Per-OS dividers and borders are computed from CanvasText via color-mix(in srgb, CanvasText X%, transparent), not hardcoded greys. Same in light mode, automatically inverts in dark mode, automatically respects per-OS subtlety differences.",
+        "section": "colors"
+      },
+      {
+        "name": "The No-Display-Tier Rule",
+        "body": "PortFinder's window is 400×460. There is no real estate for a 32px headline and there is no marketing voice that wants one. Type tops out at body weight; emphasis comes from weight contrast (500 vs 400) and opacity differentiation, not size.",
+        "section": "typography"
+      },
+      {
+        "name": "The Platform-Font Rule",
+        "body": "Body and value type both inherit from the per-OS family. Custom typeface choices are explicitly forbidden in the current system — picking 'Inter on every platform' would break Settings-on-Every-Machine for the marginal gain of consistency.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tonal-Layer Rule",
+        "body": "Card depth = page-color one step + a hairline border. Don't reach for box-shadow to communicate 'this is a card' — that's what the Bootstrap-shadow-on-everything aesthetic does, and it's the generic Electron trap.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do rely on system colors first. Canvas, CanvasText, AccentColor, Highlight, HighlightText, ButtonBorder carry the bulk of the surface. If a value can be expressed as one, express it that way.",
+      "Do respect the user's system accent color. Don't hardcode blue. AccentColor is the contract.",
+      "Do vary per-OS chrome via html[data-os=\"...\"] — radius, padding, font stack, surface color all change deliberately. The variation is the point.",
+      "Do use color-mix(in srgb, CanvasText X%, transparent) for borders, dividers, and tints. This auto-inverts in dark mode and respects per-OS subtlety.",
+      "Do carry state via text and icon, not color alone. Capture state ('Ready' / 'Capturing LLDP packets…' / 'Capture stopped') is a textual status, not a colored dot. Error state is a red status text and the word 'Error' — not red text alone. Color-blind safety is a hard constraint, not a polish item.",
+      "Do keep type one tier deep. There is no Display, no Headline. Body and label, weight contrast and opacity contrast carry hierarchy.",
+      "Do keep motion to one place. The capture progress bar is the only animation in the system. Add more only when motion makes a state change clearer, never decoratively. Respect prefers-reduced-motion as a calm fallback."
+    ],
+    "donts": [
+      "Don't ship a generic Electron aesthetic. PRODUCT.md names this directly: same Bootstrap-ish components as fifty other utilities, every widget rounded the same way, no rooting in any visual tradition. The current design exists in opposition to that — preserve the 'this looks like Settings' reading, don't drift into 'looks like a cross-platform tool that picked a Material theme.'",
+      "Don't add decorative gradients, gradient text, or background-clip: text. PRODUCT.md rejects flashy SaaS-dashboard chrome by name.",
+      "Don't add side-stripe borders (border-left: 4px solid color) on the privilege warning, the result rows, or anything else. Use full borders, background tints, leading icons, or nothing.",
+      "Don't add a hero metric / hero number. There's no marketing surface inside the app.",
+      "Don't glassmorphism the cards. The macOS vibrancy is a system feature delivered by NSVisualEffectView, applied once at the window level — that's the only 'glass' in the system. Don't paint additional backdrop-filter: blur() on cards, banners, or the locale picker.",
+      "Don't override native widget chrome with custom CSS. button, select, input keep their platform appearance. The toggle switch is the only exception, and it's hand-built specifically to read correctly inside an opaque card.",
+      "Don't introduce a brand color into the surface unless the design direction explicitly changes. Today the brand color (icon navy / amber) lives only in the icon. Adding it to a button or accent in the app would break Settings-on-Every-Machine without replacing it with an articulated alternative.",
+      "Don't use modals. The privilege warning is a banner, not a dialog. Inline > modal in this app.",
+      "Don't stack the Controls and Result cards with extra padding between them. The 8px gap on .app is the single source of vertical rhythm — adding margin-top on a card breaks it.",
+      "Don't introduce em dashes in copy. Commas, colons, periods, parentheses do the work."
+    ]
+  }
+}
