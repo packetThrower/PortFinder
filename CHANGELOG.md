@@ -13,7 +13,14 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [3.3.0-alpha.1] - 2026-05-01
+
+Pre-release for cross-platform smoke testing of the i18n work and the
+batched backend / frontend infrastructure changes since 3.2.0. Not
+recommended for daily use — feedback welcome before the 3.3.0 GA.
+
 ### Added
+- **Localization scaffold** — every user-facing string in the GUI now flows through `svelte-i18n`. Bundles ship for English (authoritative), Spanish, French, and German; native-speaker review wanted before GA. Locale resolution: user override (footer picker, persisted in `localStorage`) → system locale via `tauri-plugin-os` → `en` fallback. Backend errors and CLI output stay English for now.
 - `frontend/src/bindings.ts` is now auto-generated from the Rust IPC layer via [`tauri-specta`](https://github.com/oscartbeaumont/tauri-specta). Every `#[tauri::command]` in `src-tauri/src/lib.rs` and every `#[derive(Type)]` data struct flows through to a matching TypeScript declaration. Regenerated on every `cargo test`; a CI step fails if a contributor changed an IPC signature without committing the regenerated TS. Closes the class of bugs where `hasIp` / `switchIp` / `nativeVlan` casing drifted between Rust and TypeScript ([#16](https://github.com/packetThrower/PortFinder/issues/16)).
 
 ### Changed
@@ -115,7 +122,8 @@ Detailed history and source on the [`wails-version`](https://github.com/packetTh
 
 Source on the [`python-legacy`](https://github.com/packetThrower/PortFinder/tree/python-legacy) branch.
 
-[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/packetThrower/PortFinder/compare/v3.3.0-alpha.1...HEAD
+[3.3.0-alpha.1]: https://github.com/packetThrower/PortFinder/compare/v3.2.0...v3.3.0-alpha.1
 [3.2.0]: https://github.com/packetThrower/PortFinder/compare/v3.1.4...v3.2.0
 [3.1.4]: https://github.com/packetThrower/PortFinder/compare/v3.1.3...v3.1.4
 [3.1.3]: https://github.com/packetThrower/PortFinder/compare/v3.1.2...v3.1.3

@@ -20,9 +20,12 @@ const TAURI_CONF = 'src-tauri/tauri.conf.json';
 const ROOT_PKG = 'package.json';
 
 const current = readFileSync(VERSION_FILE, 'utf8').trim();
-const m = current.match(/^(\d+)\.(\d+)\.(\d+)$/);
+// Accept full SemVer 2 (MAJOR.MINOR.PATCH with optional -prerelease).
+// The pre-release suffix is dropped on bump — bumping a pre-release
+// always graduates to the next stable, not the next pre-release.
+const m = current.match(/^(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$/);
 if (!m) {
-    console.error(`unrecognized version: ${current} (expected MAJOR.MINOR.PATCH)`);
+    console.error(`unrecognized version: ${current} (expected MAJOR.MINOR.PATCH[-prerelease])`);
     process.exit(1);
 }
 
@@ -30,10 +33,14 @@ const [, majorStr, minorStr, patchStr] = m;
 const major = Number(majorStr);
 const minor = Number(minorStr);
 const patch = Number(patchStr);
+const isPrerelease = current.includes('-');
 
 let next;
 if (mode === 'major') next = `${major + 1}.0.0`;
 else if (mode === 'minor') next = `${major}.${minor + 1}.0`;
+// Patch bump from a pre-release graduates to the same X.Y.Z, not Z+1
+// (e.g. 3.3.0-alpha.1 -> patch -> 3.3.0).
+else if (isPrerelease) next = `${major}.${minor}.${patch}`;
 else next = `${major}.${minor}.${patch + 1}`;
 
 writeFileSync(VERSION_FILE, next + '\n');

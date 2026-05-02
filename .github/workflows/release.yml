@@ -123,7 +123,10 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'PortFinder ${{ github.ref_name }}'
           releaseDraft: false
-          prerelease: false
+          # Mark releases as pre-release when the tag includes a SemVer
+          # pre-release suffix (e.g. v3.3.0-alpha.1, v4.0.0-rc.2). Plain
+          # vX.Y.Z tags ship as full releases.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           args: ${{ matrix.args }}
 
       - name: Build BPF helper pkg (macOS)
