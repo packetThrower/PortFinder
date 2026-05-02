@@ -386,7 +386,10 @@ mod tests {
     fn decode_string_passes_clean_utf8_through() {
         // Byte-identical to from_utf8_lossy on valid input — no
         // substitutions, no warning emitted.
-        assert_eq!(decode_string("test/clean", b"switch1.example.com"), "switch1.example.com");
+        assert_eq!(
+            decode_string("test/clean", b"switch1.example.com"),
+            "switch1.example.com"
+        );
     }
 
     #[test]
