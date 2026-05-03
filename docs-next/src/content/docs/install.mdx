@@ -1,0 +1,148 @@
+---
+title: Install
+description: One command per platform, plus manual fallbacks for everything else.
+---
+
+import { Tabs, TabItem, Aside, Code } from '@astrojs/starlight/components';
+
+The fastest path on each platform, in one row:
+
+| Platform | Command |
+|---|---|
+| macOS | `brew install --cask packetThrower/tap/portfinder` |
+| Windows | `scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket && scoop install portfinder` |
+| Linux (Debian/Ubuntu) | `sudo apt install ./PortFinder_<version>_amd64.deb` |
+| Linux (Fedora/RHEL) | `sudo dnf install ./PortFinder-<version>-1.x86_64.rpm` |
+| Linux (any) | `chmod +x PortFinder_<version>_amd64.AppImage && ./PortFinder_<version>_amd64.AppImage` |
+
+Pre-built binaries for every release live on the [Releases page](https://github.com/packetThrower/PortFinder/releases).
+
+## macOS
+
+### Homebrew (recommended)
+
+```bash
+brew install --cask packetThrower/tap/portfinder
+```
+
+This installs `PortFinder.app` to `/Applications` and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder` so [`portfinder`](/usage/cli/) works from any shell. Update with `brew upgrade --cask portfinder`; remove with `brew uninstall --cask portfinder` (add `--zap` to also clear `~/Library/Application Support/PortFinder` and the WebKit cache).
+
+The tap source lives at [packetThrower/homebrew-tap](https://github.com/packetThrower/homebrew-tap), shared with [Baudrun](https://github.com/packetThrower/Baudrun) and other packetThrower projects.
+
+For non-root packet capture, click **Install BPF Access** in the app once after install. Until you do, capture works only via `sudo portfinder capture …`.
+
+<Aside type="tip" title="Already have Wireshark?">
+Wireshark's **ChmodBPF** helper is the same idea — if it's installed, PortFinder will use it and the in-app *Install BPF Access* button isn't needed.
+</Aside>
+
+<details>
+<summary>Pre-release channel (alpha / beta / RC)</summary>
+
+For early access, install the `@alpha` cask alongside the stable one:
+
+```bash
+brew install --cask packetThrower/tap/portfinder@alpha
+```
+
+This drops `PortFinder Alpha.app` into `/Applications` and exposes the CLI as `portfinder-alpha`, so the two channels coexist. State (preferences, saved window position) is shared between them. File regressions on the [issue tracker](https://github.com/packetThrower/PortFinder/issues).
+</details>
+
+<details>
+<summary>Manual DMG (no Homebrew)</summary>
+
+Download `PortFinder_<version>_universal.dmg` from the [Releases page](https://github.com/packetThrower/PortFinder/releases), mount it, and drag PortFinder into `/Applications`.
+
+For non-root capture and a `portfinder` CLI on your `PATH`, also install the BPF helper:
+
+1. Download `PortFinder-BPF-<version>.pkg` from the same release.
+2. Double-click to install. macOS will prompt for your password.
+3. Click **Install BPF Access** in the app the first time you run it (or re-run the `.pkg`).
+
+The BPF helper drops a symlink at `/usr/local/bin/portfinder` so the [CLI](/usage/cli/) is callable from any shell.
+</details>
+
+<details>
+<summary>Just the CLI symlink (no BPF)</summary>
+
+If you don't need the BPF helper (e.g. you already have Wireshark's, or you're fine running with `sudo`) but you do want `portfinder` on your `PATH`, use the standalone scripts in the repo root:
+
+```bash
+# Install the symlink (no BPF, no group changes)
+curl -fsSLO https://raw.githubusercontent.com/packetThrower/PortFinder/main/install-cli.sh
+sudo sh install-cli.sh
+
+# Remove it later
+curl -fsSLO https://raw.githubusercontent.com/packetThrower/PortFinder/main/uninstall-cli.sh
+sudo sh uninstall-cli.sh
+```
+
+`install-cli.sh` looks for `PortFinder.app` in `/Applications` or `~/Applications` and links the bundle's `portfinder` binary at `/usr/local/bin/portfinder`. `uninstall-cli.sh` removes it again, refusing to touch the symlink unless it actually points back into a `PortFinder.app` bundle.
+</details>
+
+## Windows
+
+### Scoop (recommended)
+
+```powershell
+scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket
+scoop install portfinder
+```
+
+This installs `PortFinder.exe`, drops a Start menu shortcut, and exposes the headless CLI on your `PATH` so [`portfinder`](/usage/cli/) works from any shell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. The bucket source lives at [packetThrower/scoop-bucket](https://github.com/packetThrower/scoop-bucket).
+
+You still need [Npcap](https://npcap.com/#download) for packet capture — Scoop can't bundle the kernel driver.
+
+<Aside type="tip" title="Already have Wireshark?">
+Wireshark on Windows ships with Npcap, so you may already have it. Open *Programs and Features* and check for **Npcap** — if it's there, you're set.
+</Aside>
+
+<details>
+<summary>Pre-release channel</summary>
+
+The bucket also ships a parallel manifest tracking pre-release tags (alpha / beta / rc). It coexists with the stable install:
+
+```powershell
+scoop install portfinder-prerelease
+```
+
+The pre-release CLI shim is `portfinder-alpha` and the Start menu shortcut is `PortFinder Alpha`, so the two never collide.
+</details>
+
+<details>
+<summary>Manual installer</summary>
+
+1. Install [Npcap](https://npcap.com/#download) — be sure to tick **"Allow non-administrators to capture"** during install.
+2. Download `PortFinder_<version>_x64-setup.exe` (or `_arm64-setup.exe`) from the release.
+3. Run the installer.
+</details>
+
+## Linux
+
+Pick the package that matches your distro:
+
+<Tabs>
+<TabItem label=".deb (Debian / Ubuntu)">
+
+```bash
+sudo apt install ./PortFinder_<version>_amd64.deb
+```
+
+</TabItem>
+<TabItem label=".rpm (Fedora / RHEL)">
+
+```bash
+sudo dnf install ./PortFinder-<version>-1.x86_64.rpm
+```
+
+</TabItem>
+<TabItem label=".AppImage (any distro)">
+
+```bash
+chmod +x PortFinder_<version>_amd64.AppImage
+./PortFinder_<version>_amd64.AppImage
+```
+
+</TabItem>
+</Tabs>
+
+The `.deb` and `.rpm` packages run a postinstall hook that grants `CAP_NET_RAW` to the binary, so packet capture works without `sudo`.

@@ -1,4 +1,7 @@
-# Architecture
+---
+title: Architecture
+description: How the Rust shell, the Svelte UI, and libpcap fit together.
+---
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -54,7 +57,7 @@ Rust commands use `snake_case`; `serde rename_all = "camelCase"` keeps the JSON 
 
 1. `start_capture` creates a fresh `CancellationToken`, replacing any prior one (which gets cancelled).
 2. The token + `CaptureRequest` go into `capture::run`, which dispatches to either:
-    - **Single interface**: `tokio::spawn_blocking` opens a `pcap::Capture`, sets the BPF filter, and polls `next_packet()` with a 500ms timeout. The token is checked between reads.
+    - **Single interface**: `tokio::spawn_blocking` opens a `pcap::Capture`, sets the BPF filter, and polls `next_packet()` with a 50ms timeout. The token is checked between reads.
     - **Sniff-all**: `JoinSet` spawns one task per non-loopback interface. `tokio::select!` returns the first frame and cancels the rest.
 3. The raw frame is parsed by `cdp::parse` or `lldp::parse` (hand-rolled TLV iterators) into a `CaptureResult`.
 4. `stop_capture` cancels the token; the in-flight blocking task exits on its next loop tick.
@@ -65,4 +68,4 @@ Rust commands use `snake_case`; `serde rename_all = "camelCase"` keeps the JSON 
 |---|---|---|
 | `.github/workflows/ci.yml` | push / PR to `main` | `cargo fmt` / `cargo clippy -D warnings` / `cargo test` / frontend build |
 | `.github/workflows/release.yml` | push of `v*` tag | matrix build (Linux / macOS universal / Windows) → GitHub Release |
-| `.github/workflows/docs.yml` | push to `main` | MkDocs build → GitHub Pages |
+| `.github/workflows/docs.yml` | push to `main` | Astro Starlight build → GitHub Pages |
