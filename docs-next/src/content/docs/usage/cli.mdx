@@ -1,4 +1,9 @@
-# CLI
+---
+title: CLI
+description: The same binary works headless. Capture, list, or diagnose privileges.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 The same binary works headless — pass a subcommand to use the CLI, run with no args to launch the GUI.
 
@@ -44,23 +49,29 @@ portfinder privileges --json
 
 ## Where the binary lives
 
-=== "macOS"
+<Tabs>
+<TabItem label="macOS">
 
-    Once the BPF helper has run (either via the in-app *Install BPF Access* button or by installing `PortFinder-BPF-*.pkg`), a symlink at `/usr/local/bin/portfinder` is created automatically — `portfinder` works from any shell.
+Once the BPF helper has run (either via the in-app *Install BPF Access* button or by installing `PortFinder-BPF-*.pkg`), a symlink at `/usr/local/bin/portfinder` is created automatically — `portfinder` works from any shell.
 
-    Without that step, the binary lives inside the app bundle:
+Without that step, the binary lives inside the app bundle:
 
-    ```bash
-    /Applications/PortFinder.app/Contents/MacOS/portfinder capture ...
-    ```
+```bash
+/Applications/PortFinder.app/Contents/MacOS/portfinder capture ...
+```
 
-=== "Linux"
+</TabItem>
+<TabItem label="Linux">
 
-    Installed to `/usr/bin/portfinder` by the `.deb` / `.rpm` package. Already on your `PATH`.
+Installed to `/usr/bin/portfinder` by the `.deb` / `.rpm` package. Already on your `PATH`.
 
-=== "Windows"
+</TabItem>
+<TabItem label="Windows">
 
-    Installed to `C:\Program Files\PortFinder\PortFinder.exe`. The NSIS installer adds it to `PATH`.
+Installed to `C:\Program Files\PortFinder\PortFinder.exe`. The NSIS installer adds it to `PATH`.
+
+</TabItem>
+</Tabs>
 
 ## Scripting examples
 

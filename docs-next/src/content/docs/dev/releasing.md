@@ -1,4 +1,7 @@
-# Releasing
+---
+title: Releasing
+description: SemVer, the bump scripts, and what the release workflow does.
+---
 
 Versioning follows [SemVer](https://semver.org/) `MAJOR.MINOR.PATCH`. Each major version line is a different implementation:
 

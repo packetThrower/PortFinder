@@ -1,4 +1,7 @@
-# Setup
+---
+title: Setup
+description: Get a working dev environment in five commands.
+---
 
 ## Prerequisites
 

@@ -21,13 +21,17 @@ Internal scripts (called by Tauri's beforeDevCommand / beforeBuildCommand):
 - `pnpm dev` / `pnpm build` — Vite dev server / Vite production build (frontend only)
 
 ## Docs
-MkDocs (Material theme) deployed to GitHub Pages on every push to main.
-- `mkdocs.yml` — site config
-- `docs/` — markdown content (index, install, usage, dev)
-- `docs/requirements.txt` — pinned mkdocs/material/pymdownx versions
+Astro Starlight deployed to GitHub Pages on every push to main.
+- `docs-next/` — Starlight site (its own pnpm project)
+- `docs-next/astro.config.mjs` — site config (title, sidebar, custom Hero override)
+- `docs-next/src/content/docs/` — page content (index, install, usage, dev, 404)
+- `docs-next/src/components/Hero.astro` — drenched-navy landing hero
+- `docs-next/src/styles/theme.css` — palette + typography (Fraunces / IBM Plex)
+- `docs-next/scripts/sync-changelog.mjs` — copies repo-root CHANGELOG.md into the site on predev/prebuild
+- `docs/assets/` — screenshots referenced by README.md (kept for README only)
 - `.github/workflows/docs.yml` — Pages build + deploy
 - Live at https://packetthrower.github.io/PortFinder/
-- Preview locally: `pip install -r docs/requirements.txt && mkdocs serve`
+- Preview locally: `pnpm --dir docs-next install && pnpm --dir docs-next dev`
 
 ## Key paths
 src-tauri/src/lib.rs — Tauri command handlers + CaptureState

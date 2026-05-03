@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2e4368"/>
+      <stop offset="100%" stop-color="#162237"/>
+    </linearGradient>
+
+    <linearGradient id="bezel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8ecf0"/>
+      <stop offset="35%" stop-color="#c0c5cc"/>
+      <stop offset="55%" stop-color="#888d94"/>
+      <stop offset="80%" stop-color="#a8aeb5"/>
+      <stop offset="100%" stop-color="#d4d8dc"/>
+    </linearGradient>
+
+    <linearGradient id="cavity" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#04080e"/>
+      <stop offset="100%" stop-color="#0c1420"/>
+    </linearGradient>
+
+    <radialGradient id="pin" cx="0.35" cy="0.25" r="0.85">
+      <stop offset="0%" stop-color="#fff2c4"/>
+      <stop offset="40%" stop-color="#f0c060"/>
+      <stop offset="80%" stop-color="#a87420"/>
+      <stop offset="100%" stop-color="#5a3a10"/>
+    </radialGradient>
+
+    <filter id="drop-shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/>
+      <feOffset dy="18"/>
+      <feFlood flood-color="#000" flood-opacity="0.55"/>
+      <feComposite in2="SourceAlpha" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Rounded-square background, macOS-style continuous corners -->
+  <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225" fill="url(#bg)"/>
+
+  <!--
+    RJ-45 jack sized to match the padding on Baudrun's serial port:
+    bezel bounding box 610 x 392, ~207 px padding L/R, ~320 / ~312 T/B.
+  -->
+  <g filter="url(#drop-shadow)">
+    <!-- Outer metallic bezel: 610 x 392 -->
+    <rect x="207" y="320" width="610" height="392" rx="22" ry="22" fill="url(#bezel)"/>
+
+    <!-- Inner cavity with bottom-center keying notch (RJ-45 footprint) -->
+    <path d="
+      M 247 370
+      L 777 370
+      L 777 652
+      L 579 652
+      L 579 687
+      L 445 687
+      L 445 652
+      L 247 652
+      Z"
+      fill="url(#cavity)"/>
+  </g>
+
+  <!-- 8 gold contact pins, evenly spaced inside cavity (W=37, G=26, margin=26) -->
+  <g fill="url(#pin)">
+    <rect x="273" y="390" width="37" height="200" rx="3"/>
+    <rect x="336" y="390" width="37" height="200" rx="3"/>
+    <rect x="399" y="390" width="37" height="200" rx="3"/>
+    <rect x="462" y="390" width="37" height="200" rx="3"/>
+    <rect x="525" y="390" width="37" height="200" rx="3"/>
+    <rect x="588" y="390" width="37" height="200" rx="3"/>
+    <rect x="651" y="390" width="37" height="200" rx="3"/>
+    <rect x="714" y="390" width="37" height="200" rx="3"/>
+  </g>
+
+  <!-- Highlight along top edge of pins -->
+  <g fill="#fff5d8" opacity="0.55">
+    <rect x="273" y="390" width="37" height="6" rx="3"/>
+    <rect x="336" y="390" width="37" height="6" rx="3"/>
+    <rect x="399" y="390" width="37" height="6" rx="3"/>
+    <rect x="462" y="390" width="37" height="6" rx="3"/>
+    <rect x="525" y="390" width="37" height="6" rx="3"/>
+    <rect x="588" y="390" width="37" height="6" rx="3"/>
+    <rect x="651" y="390" width="37" height="6" rx="3"/>
+    <rect x="714" y="390" width="37" height="6" rx="3"/>
+  </g>
+
+  <!-- Faint inner shadow along the top of the cavity for depth -->
+  <rect x="247" y="370" width="530" height="4" fill="#000" opacity="0.6"/>
+</svg>

@@ -1,0 +1,47 @@
+---
+title: PortFinder
+description: Plug a laptop into a switch, see what port you're on, in under thirty seconds.
+template: splash
+hero:
+  tagline: Plug a laptop into a switch, see what port you're on, in under thirty seconds.
+  actions:
+    - text: Install for your platform
+      link: /install/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/packetThrower/PortFinder
+      icon: external
+      variant: secondary
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What it captures
+
+PortFinder listens for the discovery packets switches are already broadcasting and reads the seven values you actually need: switch name, IP, port, native VLAN, voice VLAN, MTU, and model. No scanning. No login. No agent on the switch.
+
+<CardGrid>
+  <Card title="CDP" icon="seti:default">
+    Cisco Discovery Protocol — the Cisco-only one, but still everywhere in enterprise networks.
+  </Card>
+  <Card title="LLDP" icon="seti:default">
+    Link Layer Discovery Protocol — Aruba, HP, Juniper, Extreme, Cisco, MikroTik. The universal pick.
+  </Card>
+  <Card title="MNDP" icon="seti:default">
+    MikroTik Neighbor Discovery Protocol — the RouterOS fallback when LLDP isn't on the wire.
+  </Card>
+</CardGrid>
+
+## Two surfaces, one binary
+
+The same release ships a desktop app and a headless CLI. Pick the one that fits your workflow — they read the same packets, expose the same fields, and respect the same privileges.
+
+<CardGrid>
+  <Card title="Desktop GUI" icon="laptop">
+    Native widgets per platform: macOS, Windows, Linux. [GUI usage →](/usage/gui/)
+  </Card>
+  <Card title="Headless CLI" icon="seti:powershell">
+    `portfinder capture --interface en0 --protocol LLDP --json`. [CLI usage →](/usage/cli/)
+  </Card>
+</CardGrid>
