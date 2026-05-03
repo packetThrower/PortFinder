@@ -27,7 +27,7 @@ tauri-specta = { version = "2.0.0-rc.24", features = ["derive", "typescript"] }
 specta-typescript = "0.0.11"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.30", features = ["user"] }
+nix = { version = "0.31", features = ["user"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 window-vibrancy = "0.6"
