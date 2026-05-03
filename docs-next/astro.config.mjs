@@ -28,7 +28,7 @@ export default defineConfig({
 				},
 			],
 			editLink: {
-				baseUrl: 'https://github.com/packetThrower/PortFinder/edit/main/docs-next/src/content/docs/',
+				baseUrl: 'https://github.com/packetThrower/PortFinder/edit/main/docs-next/',
 			},
 			sidebar: [
 				{ label: 'Install', slug: 'install' },

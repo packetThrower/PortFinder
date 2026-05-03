@@ -25,7 +25,7 @@ Pre-built binaries for every release live on the [Releases page](https://github.
 brew install --cask packetThrower/tap/portfinder
 ```
 
-This installs `PortFinder.app` to `/Applications` and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder` so [`portfinder`](/usage/cli/) works from any shell. Update with `brew upgrade --cask portfinder`; remove with `brew uninstall --cask portfinder` (add `--zap` to also clear `~/Library/Application Support/PortFinder` and the WebKit cache).
+This installs `PortFinder.app` to `/Applications` and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder` so [`portfinder`](/PortFinder/usage/cli/) works from any shell. Update with `brew upgrade --cask portfinder`; remove with `brew uninstall --cask portfinder` (add `--zap` to also clear `~/Library/Application Support/PortFinder` and the WebKit cache).
 
 The tap source lives at [packetThrower/homebrew-tap](https://github.com/packetThrower/homebrew-tap), shared with [Baudrun](https://github.com/packetThrower/Baudrun) and other packetThrower projects.
 
@@ -58,7 +58,7 @@ For non-root capture and a `portfinder` CLI on your `PATH`, also install the BPF
 2. Double-click to install. macOS will prompt for your password.
 3. Click **Install BPF Access** in the app the first time you run it (or re-run the `.pkg`).
 
-The BPF helper drops a symlink at `/usr/local/bin/portfinder` so the [CLI](/usage/cli/) is callable from any shell.
+The BPF helper drops a symlink at `/usr/local/bin/portfinder` so the [CLI](/PortFinder/usage/cli/) is callable from any shell.
 </details>
 
 <details>
@@ -88,7 +88,7 @@ scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket
 scoop install portfinder
 ```
 
-This installs `PortFinder.exe`, drops a Start menu shortcut, and exposes the headless CLI on your `PATH` so [`portfinder`](/usage/cli/) works from any shell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. The bucket source lives at [packetThrower/scoop-bucket](https://github.com/packetThrower/scoop-bucket).
+This installs `PortFinder.exe`, drops a Start menu shortcut, and exposes the headless CLI on your `PATH` so [`portfinder`](/PortFinder/usage/cli/) works from any shell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. The bucket source lives at [packetThrower/scoop-bucket](https://github.com/packetThrower/scoop-bucket).
 
 You still need [Npcap](https://npcap.com/#download) for packet capture — Scoop can't bundle the kernel driver.
 
