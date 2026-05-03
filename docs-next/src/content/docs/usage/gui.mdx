@@ -3,6 +3,8 @@ title: GUI
 description: Pick an interface, pick a protocol, click Start. Read the result.
 ---
 
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
 ![PortFinder showing a captured LLDP packet](/PortFinder/screenshots/macos-result.png)
 
 ## Workflow
@@ -11,6 +13,28 @@ description: Pick an interface, pick a protocol, click Start. Read the result.
 2. **Pick the protocol.** **LLDP** is the universal choice (Aruba, HP, Juniper, Extreme, Cisco, and MikroTik when you've enabled it). **CDP** is Cisco-only. **MNDP** is the MikroTik-only fallback for RouterOS devices that ship with `discovery-protocol = mndp` and never speak LLDP.
 3. **Click Start.** Most switches send a discovery packet every 30–60 seconds, so it usually takes a few seconds for the first frame to arrive.
 4. **Read the result.** Switch name, IP, port, VLAN, voice VLAN, MTU, and model populate the result card.
+
+## On each platform
+
+Native widgets per platform — same workflow, different chrome.
+
+<Tabs>
+<TabItem label="macOS">
+
+![PortFinder on macOS](/PortFinder/screenshots/macos.png)
+
+</TabItem>
+<TabItem label="Windows">
+
+![PortFinder on Windows](/PortFinder/screenshots/windows.png)
+
+</TabItem>
+<TabItem label="Linux">
+
+![PortFinder on Linux](/PortFinder/screenshots/linux.png)
+
+</TabItem>
+</Tabs>
 
 ## Privilege warnings
 
