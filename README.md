@@ -169,3 +169,9 @@ pnpm tag           # git tag + push (triggers GitHub release)
 - `wails-version` — `2.x` line: Wails 2 + Go + Svelte 5
 - `react-frontend` — snapshot of the React frontend (pre-Svelte migration on the `2.x` line)
 - `python-legacy` — `1.x` line: original Python implementation
+
+## License
+
+[GNU General Public License v3.0 or later](LICENSE). Forks are
+welcome; derivative works must stay open under the same license.
+Commercial use is permitted but can't close the source.
