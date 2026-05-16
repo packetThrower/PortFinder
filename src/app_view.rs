@@ -34,7 +34,7 @@ use gpui_component::{
 use tokio::runtime::Handle as TokioHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::{capture, privilege, CaptureRequest, CaptureResult, InterfaceInfo};
+use crate::{capture, privilege, updater, CaptureRequest, CaptureResult, InterfaceInfo};
 
 /// Logical window width. Stays fixed — only the height grows or
 /// shrinks based on the privilege banner and result-card state.
@@ -88,6 +88,12 @@ const HEIGHT_RESULT_EMPTY: f32 = 40.0;
 /// version line visible with the same comfortable bottom inset
 /// the empty-state baseline gives.
 const HEIGHT_RESULT_FILLED: f32 = 230.0;
+/// Extra vertical room consumed by the "Update available" footer
+/// pill when it's shown. The pill is taller than a plain version-
+/// text line (Button widgets carry their own padding); without
+/// this allowance, the version row scrolls into the bottom edge
+/// when an update notification is up.
+const HEIGHT_UPDATE_PILL_EXTRA: f32 = 12.0;
 
 /// Brand accent. macOS system blue — the same colour the 3.x design
 /// system reached for whenever it needed to step outside the OS-
@@ -251,6 +257,16 @@ pub struct AppView {
     priv_status: Option<privilege::PrivilegeStatus>,
     is_installing: bool,
 
+    // Update-available state — populated by the boot-time GitHub
+    // Releases check (runs on a tokio-blocking task, posts back via
+    // `update_rx`). `update_dismissed` is the user's per-session
+    // "I saw it" flag; staying in-memory means the pill returns on
+    // next launch if an upgrade still hasn't happened, which is the
+    // right nag cadence for a tool that's used in 30-second bursts.
+    update_available: Option<updater::UpdateInfo>,
+    update_dismissed: bool,
+    update_result_rx: Receiver<updater::UpdateInfo>,
+
     // Subscriptions kept alive for the entity's lifetime.
     iface_sub: gpui::Subscription,
     _proto_sub: gpui::Subscription,
@@ -298,6 +314,27 @@ impl AppView {
         let priv_status = Some(privilege::get_privilege_status());
         let (tx, rx) = flume::bounded(1);
 
+        // Boot-time update check. Spawned on the tokio runtime via
+        // `spawn_blocking` because `ureq` is synchronous; the gpui
+        // side awaits the flume receiver in `spawn_update_listener`.
+        // Bounded channel of size 1 — there's at most one result.
+        let (update_tx, update_rx) = flume::bounded::<updater::UpdateInfo>(1);
+        let current_version = env!("CARGO_PKG_VERSION");
+        tokio_handle().spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                updater::check_for_update(current_version)
+            })
+            .await
+            .ok()
+            .flatten();
+            if let Some(info) = result {
+                log::info!("update check: {} available", info.version);
+                let _ = update_tx.send_async(info).await;
+            } else {
+                log::info!("update check: no newer release");
+            }
+        });
+
         // OS appearance observer. Fires whenever the system flips
         // Light↔Dark (Control Center toggle, scheduled sunrise/
         // sunset switch, etc.). Each fire re-applies the gpui-
@@ -327,12 +364,33 @@ impl AppView {
             copied_key: None,
             priv_status,
             is_installing: false,
+            update_available: None,
+            update_dismissed: false,
+            update_result_rx: update_rx,
             iface_sub,
             _proto_sub: proto_sub,
             _appearance_sub: appearance_sub,
         };
         view.spawn_capture_listener(cx);
+        view.spawn_update_listener(cx);
         view
+    }
+
+    /// gpui-side task: waits for the boot-time update check to
+    /// resolve, then surfaces the result via `update_available` so
+    /// the footer pill renders on the next paint. One-shot — the
+    /// channel is bounded(1) and never re-used.
+    fn spawn_update_listener(&mut self, cx: &mut Context<Self>) {
+        let rx = self.update_result_rx.clone();
+        cx.spawn(async move |this, cx| {
+            if let Ok(info) = rx.recv_async().await {
+                let _ = this.update(cx, |this, cx| {
+                    this.update_available = Some(info);
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
     }
 
     /// gpui-side task: drains the flume receiver and applies each
@@ -524,6 +582,9 @@ impl AppView {
         } else {
             HEIGHT_RESULT_EMPTY
         };
+        if self.update_available.is_some() && !self.update_dismissed {
+            h += HEIGHT_UPDATE_PILL_EXTRA;
+        }
         h
     }
 
@@ -684,14 +745,15 @@ impl Render for AppView {
                     .text_color(status_color)
                     .child(status_line),
             )
-            .child(
+            .child({
                 // Footer: hairline top border separates the version
                 // line from the live status line above it. `pt_2`
                 // (8 px) keeps the version text from sitting flush
-                // against the border. The outer `.gap_3()` already
-                // adds 12 px between the status row and this
-                // bordered footer, so visually it reads as
-                // "controls / status / —————— / version".
+                // against the border. Right side carries the
+                // "Update available" pill when the boot-time check
+                // has surfaced a newer release and the user hasn't
+                // dismissed it.
+                let update_pill = self.render_update_pill(cx);
                 div()
                     .flex()
                     .justify_between()
@@ -702,8 +764,8 @@ impl Render for AppView {
                     .text_xs()
                     .text_color(muted_fg)
                     .child(format!("v{}", env!("CARGO_PKG_VERSION")))
-                    .child(""),
-            )
+                    .when_some(update_pill, |this, el| this.child(el))
+            })
     }
 }
 
@@ -951,6 +1013,57 @@ impl AppView {
             );
         }
         col.into_any_element()
+    }
+
+    /// Footer "Update available" pill. Returns `None` when there's
+    /// no update to surface (either the check came back empty or
+    /// the user dismissed the pill for this session). The text half
+    /// opens the GitHub release page in the user's browser on
+    /// click; the trailing ✕ dismisses without navigating away.
+    fn render_update_pill(&mut self, cx: &mut Context<Self>) -> Option<gpui::AnyElement> {
+        let info = self.update_available.clone()?;
+        if self.update_dismissed {
+            return None;
+        }
+        let url = info.html_url.clone();
+        Some(
+            div()
+                .flex()
+                .items_center()
+                .gap_1()
+                .child(
+                    Button::new("update-pill-open")
+                        .label(format!("Update v{} available", info.version))
+                        .ghost()
+                        .small()
+                        .tooltip("Click to view this release on GitHub.")
+                        .on_click(move |_, _window, cx| {
+                            cx.open_url(&url);
+                        }),
+                )
+                .child(
+                    // No tooltip on the dismiss ✕ — gpui-component's
+                    // Tooltip overlay doesn't track its trigger
+                    // across removals, so when the pill is dismissed
+                    // mid-hover the tooltip orphans and lingers on
+                    // screen until the cursor moves over another
+                    // hoverable region. The ✕ glyph is universally
+                    // understood as "close" / "dismiss", so the
+                    // tooltip wasn't carrying real informational
+                    // weight anyway. The main pill's tooltip
+                    // ("Click to view this release on GitHub") still
+                    // tells the user what the pill itself is.
+                    Button::new("update-pill-dismiss")
+                        .label("✕")
+                        .ghost()
+                        .small()
+                        .on_click(cx.listener(|this, _, _window, cx| {
+                            this.update_dismissed = true;
+                            cx.notify();
+                        })),
+                )
+                .into_any_element(),
+        )
     }
 
     fn render_result_row(

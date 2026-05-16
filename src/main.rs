@@ -25,6 +25,7 @@ mod app_view;
 mod capture;
 pub mod cli;
 mod privilege;
+mod updater;
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
