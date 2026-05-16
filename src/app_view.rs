@@ -35,16 +35,47 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{capture, privilege, CaptureRequest, CaptureResult, InterfaceInfo};
 
-/// Logical window size. The Tauri build used 400×460 (or 500 on
-/// non-macOS) and grew on-the-fly when the privilege banner showed
-/// up. gpui's window resize API on macOS is fussier than the Tauri
-/// abstraction, so we just size up-front to fit the banner — the
-/// extra vertical space below the result card is fine when no
-/// banner is rendered. With `.small()` widgets and a proper macOS
-/// title bar (not transparent), the layout fits comfortably in 520
-/// vertical pixels.
+/// Logical window width. Stays fixed — only the height grows or
+/// shrinks based on the privilege banner and result-card state.
 const BASE_WIDTH: f32 = 420.0;
-const BASE_HEIGHT: f32 = 520.0;
+
+/// Per-state content-height pieces, summed in `desired_height()` to
+/// derive the right window height for the current state. Tuned to
+/// match the actual rendered layout (gpui doesn't autosize windows
+/// to content, so these have to track the per-element heights kept
+/// in `render`). Adjust if you change widget sizes or padding.
+///
+/// Numbers cover what gpui calls "content" (the area below the
+/// macOS title bar), so they don't include the ~28px title bar
+/// itself — `window.resize` sets content size directly.
+///
+/// Breakdown for HEIGHT_BASE (no banner, no result card):
+///   12 p_3 top padding
+/// + ~180 controls card (3 form sections + Switch + button row + p_3)
+/// + 12 gap_3
+/// + (result card not included — see HEIGHT_RESULT_*)
+/// + 12 gap_3
+/// + ~17 status line (text_xs)
+/// + 12 gap_3
+/// + ~17 version line (text_xs)
+/// + 12 p_3 bottom padding
+/// ≈ 274 px. Set to 320 — small headroom above the calculated
+/// total so the version footer stays clear of the bottom edge on
+/// subpixel rounding / font-metric variance. The footer also
+/// carries a hairline top border (1 px) plus pt_2 (8 px) internal
+/// padding, both of which the 320 px allowance covers.
+const HEIGHT_BASE: f32 = 320.0;
+/// Banner is conditionally rendered when capture privileges are
+/// missing. Tall enough for two lines of body text plus the
+/// Install / Download button on the macOS / Windows paths.
+const HEIGHT_BANNER: f32 = 110.0;
+/// Empty result card — a single italic line ("Run a capture to see
+/// switch info here.") plus padding.
+const HEIGHT_RESULT_EMPTY: f32 = 40.0;
+/// Populated result card — seven key/value rows with the standard
+/// row gap, plus card padding. Same height whether or not a field
+/// is "absent"; the absent rows still occupy their slot.
+const HEIGHT_RESULT_FILLED: f32 = 210.0;
 
 /// Brand accent. macOS system blue — the same colour the 3.x design
 /// system reached for whenever it needed to step outside the OS-
@@ -429,6 +460,29 @@ impl AppView {
         cx.notify();
     }
 
+    /// Content height the window should occupy given the current
+    /// state. The render hook compares this against
+    /// `window.bounds().size.height` and resizes when they
+    /// diverge — `cx.notify()` after every state change is what
+    /// re-triggers the comparison.
+    fn desired_height(&self) -> f32 {
+        let mut h = HEIGHT_BASE;
+        if self
+            .priv_status
+            .as_ref()
+            .map(|s| !s.has_access)
+            .unwrap_or(false)
+        {
+            h += HEIGHT_BANNER;
+        }
+        h += if self.result.is_some() {
+            HEIGHT_RESULT_FILLED
+        } else {
+            HEIGHT_RESULT_EMPTY
+        };
+        h
+    }
+
     fn copy_value(&mut self, key: ResultKey, value: String, cx: &mut Context<Self>) {
         cx.write_to_clipboard(ClipboardItem::new_string(value));
         self.copied_key = Some(key);
@@ -455,7 +509,20 @@ impl Focusable for AppView {
 }
 
 impl Render for AppView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Dynamic resize: pick the height that fits the current
+        // state (banner present? result populated?) and apply it if
+        // the window is currently the wrong height. `cx.notify()`
+        // after every state change re-enters render, so the resize
+        // re-evaluates on every flip. The 1px slack on the diff
+        // guards against rounding noise from gpui's px → device-px
+        // → px round-trip causing an infinite resize loop.
+        let desired = px(self.desired_height());
+        let current = window.bounds().size.height;
+        if (current - desired).abs() > px(1.0) {
+            window.resize(gpui::size(px(BASE_WIDTH), desired));
+        }
+
         // Read all theme colors up front so the immutable cx borrow
         // is dropped before the render helpers (which take `&mut cx`)
         // run. Theme::theme() returns `&Theme`; without the block
@@ -530,10 +597,20 @@ impl Render for AppView {
                     .child(status_line),
             )
             .child(
+                // Footer: hairline top border separates the version
+                // line from the live status line above it. `pt_2`
+                // (8 px) keeps the version text from sitting flush
+                // against the border. The outer `.gap_3()` already
+                // adds 12 px between the status row and this
+                // bordered footer, so visually it reads as
+                // "controls / status / —————— / version".
                 div()
                     .flex()
                     .justify_between()
                     .items_center()
+                    .pt_2()
+                    .border_t_1()
+                    .border_color(border)
                     .text_xs()
                     .text_color(muted_fg)
                     .child(format!("v{}", env!("CARGO_PKG_VERSION")))
@@ -937,7 +1014,15 @@ pub fn run() {
         #[cfg(target_os = "macos")]
         install_macos_dock_icon();
 
-        let bounds = Bounds::centered(None, gpui::size(px(BASE_WIDTH), px(BASE_HEIGHT)), cx);
+        // Initial bounds — sized for the "no banner, no result"
+        // state so the window doesn't visibly snap-resize on the
+        // first paint. If the privileges check at boot turns out
+        // to need a banner, the render hook resizes up on the
+        // first frame; visually that's a single 60–110 px grow,
+        // not the jarring full-window jump a wrong-direction
+        // initial size would cause.
+        let initial_h = HEIGHT_BASE + HEIGHT_RESULT_EMPTY;
+        let bounds = Bounds::centered(None, gpui::size(px(BASE_WIDTH), px(initial_h)), cx);
         let opts = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(bounds)),
             titlebar: Some(TitlebarOptions {
