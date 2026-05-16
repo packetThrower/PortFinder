@@ -27,6 +27,7 @@ use gpui::{
 use gpui_component::{
     button::{Button, ButtonVariants},
     select::{Select, SelectEvent, SelectItem, SelectState},
+    skeleton::Skeleton,
     switch::Switch,
     ActiveTheme, Disableable, IndexPath, Root, Sizable, Theme, ThemeMode,
 };
@@ -59,12 +60,14 @@ const BASE_WIDTH: f32 = 420.0;
 /// + 12 gap_3
 /// + ~17 version line (text_xs)
 /// + 12 p_3 bottom padding
-/// ≈ 274 px. Set to 320 — small headroom above the calculated
-/// total so the version footer stays clear of the bottom edge on
-/// subpixel rounding / font-metric variance. The footer also
-/// carries a hairline top border (1 px) plus pt_2 (8 px) internal
-/// padding, both of which the 320 px allowance covers.
-const HEIGHT_BASE: f32 = 320.0;
+///
+/// ≈ 274 px. Set to 307 — visually-tuned so the version footer's
+/// bottom inset reads as balanced with the 12 px top inset. Tuned
+/// by eye because the per-piece calculation drifts a few px from
+/// actual rendered heights (font metrics, hairline borders, gpui's
+/// px rounding); the rule of thumb is "tweak this constant, not
+/// the individual pieces, when the bottom dead-space looks wrong".
+const HEIGHT_BASE: f32 = 307.0;
 /// Banner is conditionally rendered when capture privileges are
 /// missing. Tall enough for two lines of body text plus the
 /// Install / Download button on the macOS / Windows paths.
@@ -74,8 +77,11 @@ const HEIGHT_BANNER: f32 = 110.0;
 const HEIGHT_RESULT_EMPTY: f32 = 40.0;
 /// Populated result card — seven key/value rows with the standard
 /// row gap, plus card padding. Same height whether or not a field
-/// is "absent"; the absent rows still occupy their slot.
-const HEIGHT_RESULT_FILLED: f32 = 210.0;
+/// is "absent"; the absent rows still occupy their slot. 210 px
+/// was too tight (clipped the version footer); 230 leaves the
+/// version line visible with the same comfortable bottom inset
+/// the empty-state baseline gives.
+const HEIGHT_RESULT_FILLED: f32 = 230.0;
 
 /// Brand accent. macOS system blue — the same colour the 3.x design
 /// system reached for whenever it needed to step outside the OS-
@@ -103,6 +109,21 @@ const CARD_BG_LIGHT: u32 = 0xf2f2f7;
 /// dark mode. One shade lighter than the window background so the
 /// cards still read as elevated content.
 const CARD_BG_DARK: u32 = 0x2c2c2e;
+
+/// Skeleton-loader fill. gpui-component's default `theme.skeleton`
+/// is a near-transparent gray that washes out against our
+/// `CARD_BG_LIGHT` surface — the loading rows render but are barely
+/// visible. Picking Apple's systemGray3 instead (the same neutral
+/// gray macOS uses for inactive form chrome and loading bars) gives
+/// the rows enough contrast against the card to read at a glance.
+/// The Skeleton widget's built-in pulse drops opacity to 0.5 every
+/// 2 s, so the resting colour needs to be solid enough that the
+/// dim half of the pulse still shows.
+const SKELETON_LIGHT: u32 = 0xc7c7cc;
+/// Dark-mode counterpart — Apple's systemGray2 (a touch lighter
+/// than systemGray3 here so the skeleton has visible contrast
+/// against `CARD_BG_DARK`, which is already a dim surface).
+const SKELETON_DARK: u32 = 0x48484a;
 
 /// Process-lifetime tokio runtime handle. The runtime itself is
 /// leaked (`mem::forget`) once at first access — gpui has its own
@@ -475,7 +496,12 @@ impl AppView {
         {
             h += HEIGHT_BANNER;
         }
-        h += if self.result.is_some() {
+        // Skeleton-loading state takes the same vertical space as a
+        // populated result (seven rows), so a capture click grows the
+        // window once on Start and the result-arrival doesn't move
+        // the window again — visually the skeletons just dissolve
+        // into the real values in place.
+        h += if self.result.is_some() || self.is_capturing {
             HEIGHT_RESULT_FILLED
         } else {
             HEIGHT_RESULT_EMPTY
@@ -540,7 +566,20 @@ impl Render for AppView {
             )
         };
 
-        let banner = self.render_privilege_banner(cx);
+        // Compute whether a banner is needed up front so we can
+        // skip the banner child entirely when it isn't. The previous
+        // shape always added a zero-size banner element, which made
+        // `gap_3` fire twice between the top padding and the first
+        // card (12 px padding + 12 px gap above empty banner + 12 px
+        // gap below empty banner = 24 px above the controls card,
+        // vs 12 px on the left/right edges). Conditional child gives
+        // a truly 12 px top inset matching the sides.
+        let needs_banner = self
+            .priv_status
+            .as_ref()
+            .map(|s| !s.has_access)
+            .unwrap_or(false);
+        let banner = needs_banner.then(|| self.render_privilege_banner(cx));
         let controls = self.render_controls(cx);
         let result_card = self.render_result_card(cx);
 
@@ -565,7 +604,7 @@ impl Render for AppView {
             .p_3()
             .bg(bg)
             .text_color(fg)
-            .child(banner)
+            .when_some(banner, |this, el| this.child(el))
             .child(
                 div()
                     .flex()
@@ -800,6 +839,16 @@ impl AppView {
     }
 
     fn render_result_card(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        // While a capture is in flight, paint seven skeleton rows so
+        // the user has a visual hint that work is happening — and so
+        // the result card's footprint doesn't change shape when the
+        // real values arrive (the skeletons match the eventual row
+        // layout: short label box on the left, variable-width value
+        // box on the right).
+        if self.is_capturing {
+            return Self::render_skeleton_rows();
+        }
+
         let Some(result) = self.result.clone() else {
             return div()
                 .text_sm()
@@ -821,6 +870,34 @@ impl AppView {
         let mut col = div().flex().flex_col().gap_1();
         for (key, label, raw) in rows {
             col = col.child(self.render_result_row(key, label, raw, cx));
+        }
+        col.into_any_element()
+    }
+
+    /// Seven gpui-component `Skeleton` rows shown while a capture
+    /// is in flight. Per-row value widths are hand-tuned to mimic
+    /// the natural variability of the actual fields (Switch Model
+    /// runs long, VLAN numbers run short) so the skeleton reads as
+    /// a preview of the real card rather than a uniform bar chart.
+    /// Skeleton's own pulse animation drives the loading affordance.
+    fn render_skeleton_rows() -> gpui::AnyElement {
+        // Per-row value widths, in px. Index aligns with the field
+        // order in render_result_card: switch name, IP, port, VLAN,
+        // voice VLAN, MTU, model.
+        const VALUE_WIDTHS_PX: [f32; 7] = [160.0, 110.0, 70.0, 40.0, 40.0, 60.0, 180.0];
+
+        let mut col = div().flex().flex_col().gap_1();
+        for &w in &VALUE_WIDTHS_PX {
+            col = col.child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .gap_2()
+                    .h(px(24.0))
+                    .child(Skeleton::new().w(px(72.0)).h_3())
+                    .child(Skeleton::new().w(px(w)).h_3()),
+            );
         }
         col.into_any_element()
     }
@@ -1121,6 +1198,16 @@ fn apply_brand_palette(cx: &mut App, mode: ThemeMode) {
         ThemeMode::Light => rgb(CARD_BG_LIGHT).into(),
     };
     theme.popover = card_bg;
+
+    // Skeleton fill — set per-mode so the result-card loading rows
+    // have visible contrast against the (deliberately subtle) card
+    // surface. Without this override, the gpui-component default
+    // skeleton colour is barely darker than `theme.popover` and
+    // the pulsing rows look like an empty card.
+    theme.skeleton = match mode {
+        ThemeMode::Dark => rgb(SKELETON_DARK).into(),
+        ThemeMode::Light => rgb(SKELETON_LIGHT).into(),
+    };
 }
 
 /// macOS-only: set the dock icon at runtime so `cargo run` shows the
