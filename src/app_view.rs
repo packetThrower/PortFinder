@@ -21,15 +21,15 @@ use std::time::Duration;
 use flume::{Receiver, Sender};
 use gpui::{
     div, prelude::*, px, rgb, App, AppContext, Bounds, ClipboardItem, Context, Entity, FocusHandle,
-    Focusable, Hsla, IntoElement, ParentElement, Render, SharedString, Styled, TitlebarOptions,
-    Window, WindowBounds, WindowOptions,
+    Focusable, Hsla, IntoElement, ParentElement, Render, SharedString, Styled, Window, WindowBounds,
+    WindowOptions,
 };
 use gpui_component::{
     button::{Button, ButtonVariants},
     select::{Select, SelectEvent, SelectItem, SelectState},
     skeleton::Skeleton,
     switch::Switch,
-    ActiveTheme, Disableable, IndexPath, Root, Sizable, Theme, ThemeMode,
+    ActiveTheme, Disableable, IndexPath, Root, Sizable, Theme, ThemeMode, TitleBar,
 };
 use tokio::runtime::Handle as TokioHandle;
 use tokio_util::sync::CancellationToken;
@@ -60,14 +60,18 @@ const BASE_WIDTH: f32 = 420.0;
 /// + 12 gap_3
 /// + ~17 version line (text_xs)
 /// + 12 p_3 bottom padding
+/// + 34 gpui-component TitleBar (drawn by AppView so the chrome is
+///   consistent across macOS / Linux / Windows; Linux Wayland in
+///   particular doesn't get server-side decorations on Mutter, so
+///   the app has to render its own)
 ///
-/// ≈ 274 px. Set to 307 — visually-tuned so the version footer's
+/// ≈ 308 px. Set to 341 — visually-tuned so the version footer's
 /// bottom inset reads as balanced with the 12 px top inset. Tuned
 /// by eye because the per-piece calculation drifts a few px from
 /// actual rendered heights (font metrics, hairline borders, gpui's
 /// px rounding); the rule of thumb is "tweak this constant, not
 /// the individual pieces, when the bottom dead-space looks wrong".
-const HEIGHT_BASE: f32 = 307.0;
+const HEIGHT_BASE: f32 = 341.0;
 /// Banner is conditionally rendered when capture privileges are
 /// missing. Sized for the macOS path's three-line body text
 /// ("PortFinder needs BPF access to capture packets. Installing
@@ -88,6 +92,15 @@ const HEIGHT_RESULT_EMPTY: f32 = 40.0;
 /// version line visible with the same comfortable bottom inset
 /// the empty-state baseline gives.
 const HEIGHT_RESULT_FILLED: f32 = 230.0;
+/// Capturing-state result card — same seven skeleton rows but at
+/// their actual rendered content size (7 × 24 px rows + 6 × 4 px
+/// gaps + 24 px card padding ≈ 216 px). `HEIGHT_RESULT_FILLED`
+/// (230) was over-allocating because populated text rows pack
+/// slightly tighter than the skeleton's `.h(px(24.0))` containers,
+/// which left 14 px of dead space below the version footer in the
+/// capturing state but not the populated state. Sizing this slot
+/// to the skeleton's actual height collapses that gap.
+const HEIGHT_RESULT_SKELETON: f32 = 206.0;
 /// Extra vertical room consumed by the "Update available" footer
 /// pill when it's shown. The pill is taller than a plain version-
 /// text line (Button widgets carry their own padding); without
@@ -572,13 +585,17 @@ impl AppView {
         {
             h += HEIGHT_BANNER;
         }
-        // Skeleton-loading state takes the same vertical space as a
-        // populated result (seven rows), so a capture click grows the
-        // window once on Start and the result-arrival doesn't move
-        // the window again — visually the skeletons just dissolve
-        // into the real values in place.
-        h += if self.result.is_some() || self.is_capturing {
+        // Three result-card states, three different card heights:
+        //   - populated: HEIGHT_RESULT_FILLED (full text rows)
+        //   - capturing: HEIGHT_RESULT_SKELETON (tighter skeleton
+        //     rows, so the window stays compact while waiting)
+        //   - idle: HEIGHT_RESULT_EMPTY (single-line placeholder)
+        // The window resize from SKELETON to FILLED when a capture
+        // lands gives the "got data" visual cue for free.
+        h += if self.result.is_some() {
             HEIGHT_RESULT_FILLED
+        } else if self.is_capturing {
+            HEIGHT_RESULT_SKELETON
         } else {
             HEIGHT_RESULT_EMPTY
         };
@@ -710,62 +727,83 @@ impl Render for AppView {
             .size_full()
             .flex()
             .flex_col()
-            .gap_3()
-            .p_3()
             .bg(bg)
             .text_color(fg)
-            .when_some(banner, |this, el| this.child(el))
+            // Custom title bar — gpui-component's TitleBar widget
+            // draws the "PortFinder" title + window controls. Lives
+            // outside the `gap_3 + p_3` body so the title bar
+            // touches the window edges; the body wrapper below
+            // re-introduces the padding for the rest of the layout.
+            // Required for Linux/Wayland (Mutter on GNOME doesn't
+            // do server-side decorations, so without this the app
+            // window has no chrome at all). On macOS the native
+            // traffic lights overlay on top via
+            // `traffic_light_position` in the WindowOptions.
+            .child(TitleBar::new().child(div().pl_2().text_sm().child("PortFinder")))
             .child(
+                // Body wrapper — sibling to TitleBar, holds the
+                // banner / cards / status / footer with the
+                // standard p_3 + gap_3 spacing. Title bar lives
+                // outside this so it stretches edge-to-edge.
                 div()
                     .flex()
                     .flex_col()
                     .gap_3()
                     .p_3()
-                    .rounded_md()
-                    .border_1()
-                    .border_color(border)
-                    .bg(card_bg)
-                    .child(controls),
+                    .when_some(banner, |this, el| this.child(el))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_3()
+                            .p_3()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(border)
+                            .bg(card_bg)
+                            .child(controls),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_2()
+                            .p_3()
+                            .rounded_md()
+                            .border_1()
+                            .border_color(border)
+                            .bg(card_bg)
+                            .child(result_card),
+                    )
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(status_color)
+                            .child(status_line),
+                    )
+                    .child({
+                        // Footer: hairline top border separates the
+                        // version line from the live status line
+                        // above it. `pt_2` keeps the version text
+                        // from sitting flush against the border.
+                        // Right side carries the "Update available"
+                        // pill when the boot-time check has surfaced
+                        // a newer release and the user hasn't
+                        // dismissed it.
+                        let update_pill = self.render_update_pill(cx);
+                        div()
+                            .flex()
+                            .justify_between()
+                            .items_center()
+                            .pt_2()
+                            .border_t_1()
+                            .border_color(border)
+                            .text_xs()
+                            .text_color(muted_fg)
+                            .child(format!("v{}", env!("CARGO_PKG_VERSION")))
+                            .when_some(update_pill, |this, el| this.child(el))
+                    }),
             )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .p_3()
-                    .rounded_md()
-                    .border_1()
-                    .border_color(border)
-                    .bg(card_bg)
-                    .child(result_card),
-            )
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(status_color)
-                    .child(status_line),
-            )
-            .child({
-                // Footer: hairline top border separates the version
-                // line from the live status line above it. `pt_2`
-                // (8 px) keeps the version text from sitting flush
-                // against the border. Right side carries the
-                // "Update available" pill when the boot-time check
-                // has surfaced a newer release and the user hasn't
-                // dismissed it.
-                let update_pill = self.render_update_pill(cx);
-                div()
-                    .flex()
-                    .justify_between()
-                    .items_center()
-                    .pt_2()
-                    .border_t_1()
-                    .border_color(border)
-                    .text_xs()
-                    .text_color(muted_fg)
-                    .child(format!("v{}", env!("CARGO_PKG_VERSION")))
-                    .when_some(update_pill, |this, el| this.child(el))
-            })
     }
 }
 
@@ -1264,20 +1302,33 @@ pub fn run() {
         // initial size would cause.
         let initial_h = HEIGHT_BASE + HEIGHT_RESULT_EMPTY;
         let bounds = Bounds::centered(None, gpui::size(px(BASE_WIDTH), px(initial_h)), cx);
+        // `TitleBar::title_bar_options()` returns the
+        // `TitlebarOptions` shape gpui-component's TitleBar widget
+        // expects: `title = None` (the widget draws the title text
+        // itself, so the OS doesn't double up), `appears_transparent
+        // = true` (the OS-provided chrome is hidden; the widget
+        // takes its place), and `traffic_light_position` correctly
+        // offset so the native macOS traffic lights overlay sits
+        // inside the widget's title bar instead of clipping the
+        // content area. Using this matters most on Linux/Wayland
+        // where the compositor (Mutter on GNOME) doesn't provide
+        // server-side decorations — without the widget the app
+        // window has zero chrome.
+        // `app_id` lets Wayland compositors (Mutter on GNOME, KWin
+        // on KDE) match the running window to the installed
+        // `portfinder.desktop` file and use its `Icon=portfinder`
+        // entry for the dock / overview / window-list. Without this,
+        // the compositor has no link from the window back to the
+        // .desktop and shows a generic placeholder icon while the
+        // app is open (the installed-app icon in System Settings
+        // looks correct because the .desktop file is found via the
+        // hicolor theme directly; only the *running* window needs
+        // the back-link). String must match the .desktop filename
+        // without the `.desktop` extension.
         let opts = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(bounds)),
-            titlebar: Some(TitlebarOptions {
-                title: Some("PortFinder".into()),
-                // `appears_transparent: false` keeps the native
-                // macOS title bar — title text in the middle, traffic
-                // lights on the left, full-height content underneath
-                // the bar. The 3.x Tauri build used a transparent
-                // title bar with the content flush against the top
-                // of the window, which left the controls card overlap
-                // the traffic-light hover area.
-                appears_transparent: false,
-                ..Default::default()
-            }),
+            titlebar: Some(TitleBar::title_bar_options()),
+            app_id: Some("portfinder".into()),
             ..Default::default()
         };
 
