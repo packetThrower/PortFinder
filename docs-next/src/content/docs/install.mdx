@@ -136,6 +136,20 @@ chmod +x PortFinder_<version>_amd64.AppImage
 ./PortFinder_<version>_amd64.AppImage
 ```
 
+<Aside type="note" title="Ubuntu 24.04+ / fresh installs">
+AppImage uses `libfuse2` for its on-the-fly mount. Ubuntu 24.04 stopped installing it by default — if you see *"AppImage requires FUSE to run"*, install it once:
+
+```bash
+sudo apt install libfuse2
+```
+
+Or skip the FUSE mount entirely (extracts to `/tmp` on each launch, slower start):
+
+```bash
+./PortFinder_<version>_amd64.AppImage --appimage-extract-and-run
+```
+</Aside>
+
 </TabItem>
 </Tabs>
 
