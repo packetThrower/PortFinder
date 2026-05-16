@@ -3,148 +3,106 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"
+      - ".gitignore"
+      - "docs-next/**"
+      - ".github/workflows/docs.yml"
+      - ".github/FUNDING.yml"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"
+      - ".gitignore"
+      - "docs-next/**"
+      - ".github/workflows/docs.yml"
+      - ".github/FUNDING.yml"
+  # release.yml gates on a green CI run before building artifacts.
   workflow_call:
 
+# Read-only — neither CI nor the release ci-call needs write.
+permissions:
+  contents: read
+
+# Cancel superseded PR runs. Pushes to main and workflow_call invocations
+# always run to completion so a release isn't taken out by a follow-up
+# commit landing during artifact builds.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  # Detect whether this push/PR touched any code path. Skipped when CI
-  # is invoked via workflow_call (release pipeline) so build always runs
-  # for releases.
-  changes:
-    if: github.event_name != 'workflow_call'
-    runs-on: ubuntu-latest
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            code:
-              - 'src-tauri/**'
-              - 'frontend/**'
-              - 'package.json'
-              - 'pnpm-lock.yaml'
-              - '.github/workflows/ci.yml'
-
-  # Full Linux build: fmt + clippy + tests + frontend build. The
-  # canonical place where regressions get caught.
-  build:
-    needs: [changes]
-    if: |
-      always() &&
-      (needs.changes.result == 'skipped' || needs.changes.outputs.code == 'true')
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libpcap-dev \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-
-      - name: Cache cargo registry
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Build frontend
-        working-directory: frontend
-        run: |
-          pnpm install
-          pnpm run build
-
-      - name: Cargo fmt
-        working-directory: src-tauri
-        run: cargo fmt --check
-
-      - name: Cargo clippy
-        working-directory: src-tauri
-        run: cargo clippy --all-targets -- -D warnings
-
-      - name: Cargo test
-        working-directory: src-tauri
-        run: cargo test --lib
-
-      # `cargo test --lib` regenerates frontend/src/bindings.ts from
-      # the current command + type set via tauri-specta. If anyone
-      # changed an IPC signature without committing the matching TS,
-      # this diff fails and the contributor knows to run `cargo test`
-      # locally and stage the result.
-      - name: Bindings up to date
-        run: git diff --exit-code frontend/src/bindings.ts
-
-  # Lightweight cross-platform compile check. Catches Windows-only and
-  # macOS-only typos / missing imports / wrong API names that the Linux
-  # build can't see (cfg(target_os = "...") gating). Faster than a full
-  # build — just `cargo check`, no clippy / tests / bundling.
-  cross-check:
-    needs: [changes]
-    if: |
-      always() &&
-      (needs.changes.result == 'skipped' || needs.changes.outputs.code == 'true')
+  rust:
+    name: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - runner: macos-latest
-            label: macos
+          # macOS — arm64 (Apple Silicon) + amd64 (Intel). macos-26
+          # is the Apple-Silicon-only runner; macos-15-intel replaced
+          # the retired macos-13 image.
+          - runner: macos-26
+            arch: arm64
+          - runner: macos-15-intel
+            arch: amd64
+          # Windows — x64 + arm64. windows-11-arm landed in 2025,
+          # native ARM runner, no Prism cross-compile dance.
           - runner: windows-latest
-            label: windows-amd64
+            arch: amd64
             npcap_lib: x64
+          - runner: windows-11-arm
+            arch: arm64
+            npcap_lib: ARM64
+          # Linux — amd64 + arm64.
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      # Third-party actions pinned to a full commit SHA. `persist-
+      # credentials: false` — this job never `git push`es.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          node-version: '20'
+          persist-credentials: false
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Rust (stable + clippy)
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
-          version: 9
+          toolchain: stable
+          components: clippy
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
-      - name: Cache cargo registry
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-          key: check-${{ matrix.label }}
-
-      # Tauri's generate_context!() needs the frontend dist to exist.
-      - name: Build frontend
-        working-directory: frontend
+      # Linux: libpcap for the capture crate, plus the wayland +
+      # x11 surface gpui_linux needs at compile time. No GTK /
+      # WebKit / appindicator — gpui owns the window + renderer
+      # end-to-end; the 3.x Tauri build needed all that, the 4.x
+      # gpui build doesn't.
+      - name: Install Linux deps
+        if: startsWith(matrix.runner, 'ubuntu-')
         run: |
-          pnpm install
-          pnpm run build
+          sudo apt-get update
+          sudo apt-get install -y \
+            libpcap-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev \
+            libwayland-dev \
+            libx11-dev libxcb1-dev libxcb-randr0-dev \
+            libxcb-xkb-dev libxcb-cursor-dev libxcb-shape0-dev \
+            libxcb-xfixes0-dev libxcb-render0-dev \
+            libfontconfig1-dev libfreetype-dev \
+            pkg-config
 
-      # Windows: Npcap SDK lib path so the `pcap` crate links.
+      - name: Install macOS deps
+        if: startsWith(matrix.runner, 'macos-')
+        run: brew install pkg-config
+
+      # Windows: Npcap SDK is what the `pcap` crate links against
+      # (wpcap.lib). Cached across runs so we don't redownload it
+      # every CI invocation.
       - name: Cache Npcap SDK
         if: startsWith(matrix.runner, 'windows')
         id: cache-npcap
@@ -166,39 +124,8 @@ jobs:
           echo "LIB=${{ github.workspace }}\npcap-sdk\Lib\${{ matrix.npcap_lib }};$env:LIB" >> $env:GITHUB_ENV
         shell: powershell
 
-      - name: Cargo check
-        working-directory: src-tauri
-        run: cargo check --all-targets
-
-      - name: Cargo clippy
-        working-directory: src-tauri
+      - name: cargo clippy
         run: cargo clippy --all-targets -- -D warnings
 
-  # Rollup job that branch protection should require. Always runs and
-  # passes when build + cross-check succeeded or were correctly skipped
-  # (docs-only changes). Fails when either failed or was cancelled.
-  ci:
-    name: CI
-    needs: [build, cross-check]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check job status
-        run: |
-          fail=0
-          for name in build cross-check; do
-            case "${name}" in
-              build) result="${{ needs.build.result }}" ;;
-              cross-check) result="${{ needs.cross-check.result }}" ;;
-            esac
-            case "${result}" in
-              success|skipped)
-                echo "${name}: ${result} → ok"
-                ;;
-              *)
-                echo "${name}: ${result} → fail"
-                fail=1
-                ;;
-            esac
-          done
-          exit $fail
+      - name: cargo test
+        run: cargo test

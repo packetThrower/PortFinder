@@ -25,14 +25,14 @@ Pre-built binaries for every release live on the [Releases page](https://github.
 brew install --cask packetThrower/tap/portfinder
 ```
 
-This installs `PortFinder.app` to `/Applications` and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder` so [`portfinder`](/PortFinder/usage/cli/) works from any shell. Update with `brew upgrade --cask portfinder`; remove with `brew uninstall --cask portfinder` (add `--zap` to also clear `~/Library/Application Support/PortFinder` and the WebKit cache).
+This installs `PortFinder.app` to `/Applications` and symlinks the headless CLI to `$(brew --prefix)/bin/portfinder` so [`portfinder`](/PortFinder/usage/cli/) works from any shell. Update with `brew upgrade --cask portfinder`; remove with `brew uninstall --cask portfinder` (add `--zap` to also clear `~/Library/Application Support/PortFinder`).
 
 The tap source lives at [packetThrower/homebrew-tap](https://github.com/packetThrower/homebrew-tap), shared with [Baudrun](https://github.com/packetThrower/Baudrun) and other packetThrower projects.
 
-For non-root packet capture, click **Install BPF Access** in the app once after install. Until you do, capture works only via `sudo portfinder capture …`.
+For non-root packet capture, click **Install BPF Helper** in the app once after install. Until you do, capture works only via `sudo portfinder capture …`. After installation, the helper appears in *System Settings → General → Login Items & Extensions* as **PortFinder BPF Helper**.
 
 <Aside type="tip" title="Already have Wireshark?">
-Wireshark's **ChmodBPF** helper is the same idea — if it's installed, PortFinder will use it and the in-app *Install BPF Access* button isn't needed.
+Wireshark's **ChmodBPF** helper is the same idea — if it's installed, PortFinder will use it and the in-app *Install BPF Helper* button isn't needed.
 </Aside>
 
 <details>
@@ -56,7 +56,7 @@ For non-root capture and a `portfinder` CLI on your `PATH`, also install the BPF
 
 1. Download `PortFinder-BPF-<version>.pkg` from the same release.
 2. Double-click to install. macOS will prompt for your password.
-3. Click **Install BPF Access** in the app the first time you run it (or re-run the `.pkg`).
+3. Click **Install BPF Helper** in the app the first time you run it (or re-run the `.pkg`).
 
 The BPF helper drops a symlink at `/usr/local/bin/portfinder` so the [CLI](/PortFinder/usage/cli/) is callable from any shell.
 </details>
@@ -64,19 +64,13 @@ The BPF helper drops a symlink at `/usr/local/bin/portfinder` so the [CLI](/Port
 <details>
 <summary>Just the CLI symlink (no BPF)</summary>
 
-If you don't need the BPF helper (e.g. you already have Wireshark's, or you're fine running with `sudo`) but you do want `portfinder` on your `PATH`, use the standalone scripts in the repo root:
+If you don't need the BPF helper (e.g. you already have Wireshark's, or you're fine running with `sudo`) but you do want `portfinder` on your `PATH`:
 
 ```bash
-# Install the symlink (no BPF, no group changes)
-curl -fsSLO https://raw.githubusercontent.com/packetThrower/PortFinder/main/install-cli.sh
-sudo sh install-cli.sh
-
-# Remove it later
-curl -fsSLO https://raw.githubusercontent.com/packetThrower/PortFinder/main/uninstall-cli.sh
-sudo sh uninstall-cli.sh
+sudo ln -sf /Applications/PortFinder.app/Contents/MacOS/PortFinder /usr/local/bin/portfinder
 ```
 
-`install-cli.sh` looks for `PortFinder.app` in `/Applications` or `~/Applications` and links the bundle's `portfinder` binary at `/usr/local/bin/portfinder`. `uninstall-cli.sh` removes it again, refusing to touch the symlink unless it actually points back into a `PortFinder.app` bundle.
+`PortFinder-BPF-<version>.pkg` from the release assets drops the same symlink as part of the install. The standalone `install-cli.sh` / `uninstall-cli.sh` scripts that shipped with 3.x are gone in 4.x — the symlink isn't worth its own bespoke installer.
 </details>
 
 ## Windows

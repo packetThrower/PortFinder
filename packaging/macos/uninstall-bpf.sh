@@ -1,17 +1,21 @@
 #!/bin/sh
-# uninstall-bpf.sh - Remove PortFinder BPF helper and restore default permissions
-# Usage: sudo ./uninstall-bpf.sh
+# uninstall-bpf.sh — remove the PortFinder BPF helper and restore
+# default permissions. Usage: sudo ./uninstall-bpf.sh
 #
-# This reverses everything the BPF installer does:
-# 1. Unloads and removes the LaunchDaemon
-# 2. Removes the ChmodBPF script
-# 3. Removes the current user from the access_bpf group
-# 4. Restores default BPF device permissions
-# 5. Optionally deletes the access_bpf group
+# Reverses everything the 4.x BPF installer + the legacy 3.x
+# ChmodBPF flow does:
+#   1. Unloads + removes the LaunchDaemon (both new + legacy
+#      labels, in case the user is mid-upgrade)
+#   2. Removes the helper binary
+#   3. Removes the current console user from access_bpf
+#   4. Restores default BPF device permissions (root-only)
+#   5. Optionally deletes the access_bpf group (only if Wireshark
+#      isn't relying on it)
 
 set -e
 
-DAEMON_PLIST="/Library/LaunchDaemons/coop.otec.portfinder.ChmodBPF.plist"
+DAEMON_PLIST="/Library/LaunchDaemons/io.github.packetThrower.PortFinder.BPFHelper.plist"
+LEGACY_DAEMON_PLIST="/Library/LaunchDaemons/coop.otec.portfinder.ChmodBPF.plist"
 INSTALL_DIR="/Library/Application Support/PortFinder"
 BPF_GROUP="access_bpf"
 
@@ -22,16 +26,15 @@ fi
 
 echo "Uninstalling PortFinder BPF helper..."
 
-# Unload the LaunchDaemon
-if [ -f "$DAEMON_PLIST" ]; then
-    launchctl unload "$DAEMON_PLIST" 2>/dev/null || true
-    rm -f "$DAEMON_PLIST"
-    echo "  Removed LaunchDaemon"
-else
-    echo "  LaunchDaemon not found (already removed?)"
-fi
+for plist in "$DAEMON_PLIST" "$LEGACY_DAEMON_PLIST"; do
+    if [ -f "$plist" ]; then
+        launchctl unload "$plist" 2>/dev/null || true
+        rm -f "$plist"
+        echo "  Removed LaunchDaemon: $(basename "$plist")"
+    fi
+done
 
-# Remove the ChmodBPF script
+# Remove the helper binary (both new + legacy filenames)
 if [ -d "$INSTALL_DIR" ]; then
     rm -rf "$INSTALL_DIR"
     echo "  Removed $INSTALL_DIR"
@@ -56,7 +59,7 @@ SYMLINK="/usr/local/bin/portfinder"
 if [ -L "$SYMLINK" ]; then
     TARGET=$(readlink "$SYMLINK")
     case "$TARGET" in
-        */PortFinder.app/Contents/MacOS/portfinder)
+        */PortFinder.app/Contents/MacOS/PortFinder)
             rm -f "$SYMLINK"
             echo "  Removed CLI symlink ($SYMLINK)"
             ;;

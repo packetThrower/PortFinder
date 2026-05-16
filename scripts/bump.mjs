@@ -1,10 +1,18 @@
 #!/usr/bin/env node
 // Bump the project version using SemVer (MAJOR.MINOR.PATCH).
-//   bump.mjs major  -> 3.4.5 -> 4.0.0
-//   bump.mjs minor  -> 3.4.5 -> 3.5.0
-//   bump.mjs patch  -> 3.4.5 -> 3.4.6
-// Writes version.txt, src-tauri/Cargo.toml, src-tauri/tauri.conf.json,
-// and root package.json in lockstep.
+//   bump.mjs major  -> 4.0.5 -> 5.0.0
+//   bump.mjs minor  -> 4.0.5 -> 4.1.0
+//   bump.mjs patch  -> 4.0.5 -> 4.0.6
+//
+// Writes version.txt and the [package] version in Cargo.toml.
+// The 3.x flow also updated tauri.conf.json, src-tauri/Cargo.toml,
+// and root package.json; those files are gone in the 4.x rewrite
+// (single Rust crate at the project root, no Tauri config, no
+// frontend package.json).
+//
+// The release workflow rewrites the bundled Info.plist's
+// CFBundleShortVersionString / CFBundleVersion from the tag at
+// build time, so Info.plist isn't part of the bump set.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 
@@ -15,9 +23,7 @@ if (!['major', 'minor', 'patch'].includes(mode)) {
 }
 
 const VERSION_FILE = 'version.txt';
-const CARGO_TOML = 'src-tauri/Cargo.toml';
-const TAURI_CONF = 'src-tauri/tauri.conf.json';
-const ROOT_PKG = 'package.json';
+const CARGO_TOML = 'Cargo.toml';
 
 const current = readFileSync(VERSION_FILE, 'utf8').trim();
 // Accept full SemVer 2 (MAJOR.MINOR.PATCH with optional -prerelease).
@@ -39,28 +45,36 @@ let next;
 if (mode === 'major') next = `${major + 1}.0.0`;
 else if (mode === 'minor') next = `${major}.${minor + 1}.0`;
 // Patch bump from a pre-release graduates to the same X.Y.Z, not Z+1
-// (e.g. 3.3.0-alpha.1 -> patch -> 3.3.0).
+// (e.g. 4.0.0-alpha.1 -> patch -> 4.0.0).
 else if (isPrerelease) next = `${major}.${minor}.${patch}`;
 else next = `${major}.${minor}.${patch + 1}`;
 
 writeFileSync(VERSION_FILE, next + '\n');
 
-const cargo = readFileSync(CARGO_TOML, 'utf8').replace(
-    /^version = ".*"$/m,
-    `version = "${next}"`,
-);
-writeFileSync(CARGO_TOML, cargo);
-
-const conf = readFileSync(TAURI_CONF, 'utf8').replace(
-    /"version": ".*"/,
-    `"version": "${next}"`,
-);
-writeFileSync(TAURI_CONF, conf);
-
-const pkg = readFileSync(ROOT_PKG, 'utf8').replace(
-    /"version": ".*"/,
-    `"version": "${next}"`,
-);
-writeFileSync(ROOT_PKG, pkg);
+// Cargo's [package] table allows only one `version = "..."` line;
+// the section-scoped reducer below rewrites only that line so any
+// `version = "..."` lines inside [dependencies] (there shouldn't be
+// any, but defensively) aren't touched.
+const cargo = readFileSync(CARGO_TOML, 'utf8');
+const rewritten = cargo
+    .split('\n')
+    .reduce(
+        (acc, line) => {
+            let { lines, inPkg, done } = acc;
+            if (line.startsWith('[')) {
+                inPkg = line.trim() === '[package]';
+            }
+            if (inPkg && !done && /^version = ".*"$/.test(line)) {
+                lines.push(`version = "${next}"`);
+                done = true;
+            } else {
+                lines.push(line);
+            }
+            return { lines, inPkg, done };
+        },
+        { lines: [], inPkg: false, done: false },
+    )
+    .lines.join('\n');
+writeFileSync(CARGO_TOML, rewritten);
 
 console.log(`Version bumped (${mode}): ${current} -> ${next}`);
