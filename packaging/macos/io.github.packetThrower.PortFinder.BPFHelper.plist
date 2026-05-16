@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchDaemon plist for PortFinder's BPF helper.
+
+  Label is the reverse-DNS of packetthrower.github.io/PortFinder
+  plus the .BPFHelper suffix — same shape Baudrun uses for its
+  org-scoped daemons (io.github.packetThrower.Baudrun.*). The
+  3.x daemon used `coop.otec.portfinder.ChmodBPF`; the install_
+  darwin.rs flow + the .pkg postinstall both unload + remove the
+  legacy plist so an upgrading user ends up with exactly one
+  daemon serving /dev/bpf*.
+
+  Program path: the file basename ("PortFinder BPF Helper") is
+  what macOS Background Items shows the user.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>io.github.packetThrower.PortFinder.BPFHelper</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>Program</key>
+    <string>/Library/Application Support/PortFinder/PortFinder BPF Helper</string>
+</dict>
+</plist>

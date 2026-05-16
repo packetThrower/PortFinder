@@ -1,0 +1,188 @@
+[package]
+name = "portfinder"
+version = "4.0.0-alpha.1"
+description = "Network switch port discovery tool using CDP/LLDP/MNDP."
+authors = ["Will Lehnertz <6597817+packetThrower@users.noreply.github.com>"]
+edition = "2021"
+license = "GPL-3.0-or-later"
+homepage = "https://packetthrower.github.io/PortFinder/"
+publish = false
+
+# Bin name = the .app's CFBundleExecutable (and the macOS dev-mode
+# dock tooltip / Cmd+Tab label / menu-bar app name for non-bundled
+# `cargo run`). Capitalised so the menu bar shows "PortFinder" rather
+# than the lowercase package name when launched without a .app
+# wrapper. The Cargo package name stays lowercase as is conventional.
+[[bin]]
+name = "PortFinder"
+path = "src/main.rs"
+
+[dependencies]
+# Zed's GPU-accelerated UI framework. Pinned (via Cargo.lock) to a
+# specific zed-industries/zed commit because the gpui crate is a
+# workspace member of that monorepo. Bump deliberately with
+# `cargo update -p gpui` so we know what changed.
+#
+# No `rev` here on purpose: gpui-component's git tip pins gpui as
+# `git = "..."` with no rev, and Cargo treats `git = "..."` and
+# `git = "..." rev = "..."` as different sources even when they
+# resolve to the same commit — duplicating the entire Zed crate
+# graph. Matching the spec (no rev) lets Cargo unify them. The
+# locked commit is reproducible via Cargo.lock.
+gpui = { git = "https://github.com/zed-industries/zed" }
+
+# Per-OS platform initialization for gpui. Provides
+# `gpui_platform::application()` — the entry-point constructor
+# replaces the older `Application::new()` on this fork.
+gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "wayland", "x11"] }
+
+# gpui-component (Apache-2.0 / MIT) — Button, Switch, Select,
+# Theme. Pinned to the same commit Baudrun uses so the gpui graph
+# stays unified across both apps in this org. Published `0.5.x` on
+# crates.io targets the older gpui 0.2 line and conflicts with our
+# Zed-git pin.
+gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "2d2524d89efc47270e9a0ee18f10fa72cd573eff" }
+
+# Bundled icon SVGs (Lucide set). Required at startup via
+# `.with_assets(...)` so any `IconName::*` widget code references
+# resolves to a real glyph — the gpui-component title-bar window
+# controls on Windows + Linux otherwise render blank.
+gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "2d2524d89efc47270e9a0ee18f10fa72cd573eff" }
+
+# pcap-on-libpcap (macOS / Linux) and pcap-on-Npcap (Windows). The
+# 3.x Tauri build was already on this crate; the parsers + capture
+# orchestration port across unchanged.
+pcap = "2"
+
+# Synchronous tokio runtime running on a dedicated OS thread for the
+# capture path. `capture::run` is async because internally it
+# `spawn_blocking`s the pcap read and races that against a
+# CancellationToken — gpui has its own executor but it can't host
+# spawn_blocking futures, so we keep tokio alongside it. Multi-
+# thread runtime because the multi-interface "sniff all" path
+# spawns one blocking task per interface.
+tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros", "time", "signal"] }
+tokio-util = "0.7"
+
+# Sync+async channel that bridges the tokio side (sends capture
+# results) and the gpui side (awaits them). Sender uses sync
+# `send_async`; receiver uses async `recv_async` inside a gpui
+# foreground task.
+flume = "0.12"
+
+# Headless CLI (`portfinder capture --protocol lldp …`). Same shape
+# as 3.x.
+clap = { version = "4", features = ["derive"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+log = "0.4"
+env_logger = "0.11"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.30", features = ["user"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+] }
+
+# macOS-only: set NSApplication's applicationIconImage at startup so
+# the dock icon picks up `resources/icons/icon.icns` even when running
+# via `cargo run` (no .app bundle). Production builds get the icon
+# from the bundle's Info.plist + Resources/icon.icns; this runtime
+# override exists purely for the dev workflow.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSGraphics", "NSGraphicsContext"] }
+objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry"] }
+
+[build-dependencies]
+# Build-time embed of resources/icons/icon.ico into the PortFinder.exe
+# PE resource section on Windows. No-op on non-Windows targets.
+embed-resource = "3"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = 3
+strip = true
+
+# cargo-packager bundler config. `cargo packager --release` reads
+# this table, builds the release binary via `before-packaging-
+# command`, wraps it into PortFinder.app using our hand-curated
+# Info.plist + .icns, and (per `formats`) optionally produces a
+# .dmg, .msi/.exe, .deb, .AppImage, or .pacman archive depending on
+# host OS. The `--formats` CLI flag overrides this list for one-off
+# local builds.
+[package.metadata.packager]
+product-name = "PortFinder"
+identifier = "io.github.packetThrower.PortFinder"
+category = "Utility"
+copyright = "© 2024–2026 packetThrower / PortFinder contributors"
+homepage = "https://packetthrower.github.io/PortFinder/"
+authors = ["Will Lehnertz"]
+publisher = "packetThrower"
+description = "Network switch port discovery tool using CDP/LLDP/MNDP."
+long-description = """
+PortFinder captures CDP, LLDP, and MNDP packets to identify what \
+switch, port, and VLAN your device is connected to. Cross-platform \
+(macOS + Windows + Linux). On macOS the bundled BPF helper grants \
+non-root access to /dev/bpf*; on Linux the .deb / .rpm sets \
+CAP_NET_RAW on the binary; on Windows it links delay-loaded against \
+Npcap so the app launches even if Npcap isn't installed yet (the \
+in-app banner walks the user through the install).\
+"""
+before-packaging-command = "cargo build --release"
+icons = ["resources/icons/icon.icns", "resources/icons/icon.png", "resources/icons/icon.ico"]
+
+[package.metadata.packager.deb]
+# Runtime dependencies for the .deb. dpkg/apt uses this list to
+# auto-install missing libs at `apt install ./portfinder.deb`. The
+# wayland/x11 surface gpui_linux pulls in needs all of these
+# present at runtime; libpcap0.8 is libpcap. Package names are the
+# apt runtime names (so libxkbcommon-x11-0, not -dev).
+depends = [
+  "libpcap0.8",
+  "libxkbcommon0",
+  "libxkbcommon-x11-0",
+  "libwayland-client0",
+  "libwayland-cursor0",
+  "libx11-6",
+  "libxcb1",
+  "libxcb-cursor0",
+  "libxcb-randr0",
+  "libxcb-render0",
+  "libxcb-shape0",
+  "libxcb-xfixes0",
+  "libxcb-xkb1",
+  "libfontconfig1",
+  "libfreetype6",
+]
+
+# Extra files installed alongside the binary. cargo-packager's .deb
+# already lays down the binary at /usr/bin/PortFinder and the icon
+# at /usr/share/icons/...; this `files` table adds the desktop
+# entry. Setting CAP_NET_RAW happens via the postinst hook the
+# release workflow injects (cargo-packager 0.11 doesn't expose
+# postinst directly).
+files = { "packaging/linux/portfinder.desktop" = "/usr/share/applications/portfinder.desktop", "resources/icons/icon.png" = "/usr/share/icons/hicolor/512x512/apps/portfinder.png" }
+
+[package.metadata.packager.macos]
+# Hand-curated Info.plist with CFBundleIdentifier matching
+# io.github.packetThrower.PortFinder (the new identifier scheme,
+# replacing the legacy com.packetthrower.portfinder from 3.x).
+info-plist-path = "resources/Info.plist"
+minimum-system-version = "11.0"
+# Ad-hoc codesign the .app bundle. Without `signing-identity` set,
+# cargo-packager leaves the bundle unsigned; on arm64 macOS the
+# linker auto-applies an ad-hoc signature to the inner Mach-O
+# binary while the bundle stays unsigned — an inconsistent state
+# Gatekeeper rejects as "damaged and can't be opened". `"-"` is
+# codesign's ad-hoc identity. Still not notarized — a quarantined
+# download is "unidentified developer" (right-click → Open, or
+# `xattr -cr`), which is what the README documents.
+signing-identity = "-"

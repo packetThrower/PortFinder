@@ -1,16 +1,40 @@
 #!/bin/sh
-# postinstall - Runs with root privileges during .pkg installation
-# Sets up BPF access for PortFinder packet capture on macOS.
+# postinstall — runs with root privileges during PortFinder BPF
+# helper .pkg installation. Sets up BPF access so PortFinder can
+# capture packets without sudo on macOS.
+#
+# Mirrors the install flow `privilege::install_darwin::install()`
+# performs from inside the GUI. Either path leaves the system in
+# the same state; the .pkg is for sysadmins deploying via MDM,
+# the in-app button is for individual users.
+
+set -e
 
 BPF_GROUP="access_bpf"
 INSTALL_DIR="/Library/Application Support/PortFinder"
-DAEMON_PLIST="/Library/LaunchDaemons/coop.otec.portfinder.ChmodBPF.plist"
+HELPER_BIN="$INSTALL_DIR/PortFinder BPF Helper"
+DAEMON_LABEL="io.github.packetThrower.PortFinder.BPFHelper"
+DAEMON_PLIST="/Library/LaunchDaemons/${DAEMON_LABEL}.plist"
+LEGACY_DAEMON_PLIST="/Library/LaunchDaemons/coop.otec.portfinder.ChmodBPF.plist"
+LEGACY_HELPER_BIN="$INSTALL_DIR/ChmodBPF"
 SCRIPT_DIR="$(dirname "$0")"
 
 # Determine the console user (the one who ran the installer)
 CONSOLE_USER=$(stat -f "%Su" /dev/console 2>/dev/null)
 if [ -z "$CONSOLE_USER" ] || [ "$CONSOLE_USER" = "root" ]; then
     CONSOLE_USER=$(who | grep console | head -1 | awk '{print $1}')
+fi
+
+# Drop the 3.x ChmodBPF daemon if it's still loaded so the new
+# helper is the only one touching /dev/bpf*. Wireshark's
+# org.wireshark.ChmodBPF is left alone — both daemons grant the
+# same access_bpf group ACL so they coexist cleanly.
+if [ -f "$LEGACY_DAEMON_PLIST" ]; then
+    launchctl unload "$LEGACY_DAEMON_PLIST" 2>/dev/null || true
+    rm -f "$LEGACY_DAEMON_PLIST"
+fi
+if [ -f "$LEGACY_HELPER_BIN" ]; then
+    rm -f "$LEGACY_HELPER_BIN"
 fi
 
 # Create access_bpf group if it doesn't exist
@@ -23,14 +47,15 @@ if [ -n "$CONSOLE_USER" ]; then
     dseditgroup -o edit -a "$CONSOLE_USER" -t user "$BPF_GROUP"
 fi
 
-# Install the ChmodBPF script
+# Install the helper script. The filename ("PortFinder BPF Helper")
+# is what macOS Background Items renders for the daemon.
 mkdir -p "$INSTALL_DIR"
-cp "$SCRIPT_DIR/ChmodBPF.sh" "$INSTALL_DIR/ChmodBPF"
-chmod 755 "$INSTALL_DIR/ChmodBPF"
-chown root:wheel "$INSTALL_DIR/ChmodBPF"
+cp "$SCRIPT_DIR/PortFinder BPF Helper.sh" "$HELPER_BIN"
+chmod 755 "$HELPER_BIN"
+chown root:wheel "$HELPER_BIN"
 
 # Install the LaunchDaemon
-cp "$SCRIPT_DIR/coop.otec.portfinder.ChmodBPF.plist" "$DAEMON_PLIST"
+cp "$SCRIPT_DIR/${DAEMON_LABEL}.plist" "$DAEMON_PLIST"
 chown root:wheel "$DAEMON_PLIST"
 chmod 644 "$DAEMON_PLIST"
 
@@ -39,13 +64,16 @@ launchctl unload "$DAEMON_PLIST" 2>/dev/null
 launchctl load "$DAEMON_PLIST"
 
 # Run immediately so it works without reboot
-"$INSTALL_DIR/ChmodBPF"
+"$HELPER_BIN"
 
-# Drop a symlink so the CLI is callable as `portfinder` from any shell.
+# Drop a symlink so the CLI is callable as `portfinder` from any
+# shell. CFBundleExecutable is `PortFinder` (capitalised) to match
+# what shows in the Dock / Cmd-Tab, while the symlink is the
+# lowercased convention.
 APP_BIN=""
 for candidate in \
-    "/Applications/PortFinder.app/Contents/MacOS/portfinder" \
-    "/Users/$CONSOLE_USER/Applications/PortFinder.app/Contents/MacOS/portfinder"; do
+    "/Applications/PortFinder.app/Contents/MacOS/PortFinder" \
+    "/Users/$CONSOLE_USER/Applications/PortFinder.app/Contents/MacOS/PortFinder"; do
     if [ -x "$candidate" ]; then
         APP_BIN="$candidate"
         break

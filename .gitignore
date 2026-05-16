@@ -1,13 +1,9 @@
-# Node / Tauri
-node_modules/
-frontend/dist/
-frontend/package.json.md5
-
 # Rust
-src-tauri/target/
+target/
+Cargo.lock.bak
 
-# MkDocs build output
-site/
+# cargo-packager output
+dist/
 
 # IDE
 .vscode/
@@ -22,3 +18,9 @@ Thumbs.db
 
 # Claude
 .claude/
+.claude-cli/
+
+# docs-next (Astro) — its own pnpm project, gitignored separately
+docs-next/node_modules/
+docs-next/dist/
+docs-next/.astro/

@@ -7,11 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Each major version line is a different implementation:
 
-- **3.x** — Tauri 2 + Rust + Svelte 5 (current, `main`)
+- **4.x** — Pure Rust + Zed gpui (current, `main`)
+- **3.x** — Tauri 2 + Rust + Svelte 5 ([`tauri-version`](https://github.com/packetThrower/PortFinder/tree/tauri-version) branch)
 - **2.x** — Wails 2 + Go + Svelte 5 ([`wails-version`](https://github.com/packetThrower/PortFinder/tree/wails-version) branch)
 - **1.x** — Original Python implementation ([`python-legacy`](https://github.com/packetThrower/PortFinder/tree/python-legacy) branch)
 
 ## [Unreleased]
+
+## [4.0.0-alpha.1] - 2026-05-16
+
+Major-version rewrite to pure Rust. Same product (still captures
+CDP / LLDP / MNDP, still shows you which switch port you're on),
+new stack: Zed's [gpui](https://www.gpui.rs/) replaces the Tauri 2
+WebView + Svelte 5 frontend from the 3.x line. Single binary, no
+Node / pnpm / Vite in the build path, smaller install footprint.
+
+### Added
+- **Pure-Rust GUI.** gpui (GPU-accelerated UI framework from Zed)
+  plus [gpui-component](https://github.com/longbridge/gpui-component)
+  for Button / Switch / Select / Theme. The window renders directly
+  on Metal (macOS), DirectX 12 (Windows), and Vulkan + Wayland/X11
+  (Linux) — no embedded browser, no IPC bridge to JS, no separate
+  frontend build.
+- **`PortFinder BPF Helper` is the new macOS Background Items name.**
+  The 3.x helper installed itself as `ChmodBPF` under the legacy
+  `coop.otec.portfinder.ChmodBPF` LaunchDaemon label, which showed
+  up in System Settings → General → Login Items & Extensions as
+  just "ChmodBPF". 4.x installs the helper at
+  `/Library/Application Support/PortFinder/PortFinder BPF Helper`
+  under the new `io.github.packetThrower.PortFinder.BPFHelper` label,
+  so users see a recognisably-named entry instead of an opaque one.
+  The installer (in-app button + standalone `.pkg`) unloads and
+  removes the 3.x daemon on upgrade so there's no overlap.
+
+### Changed
+- **Reverse-DNS identifier scheme** for the app bundle and helper
+  daemon. `com.packetthrower.portfinder` (3.x bundle) →
+  `io.github.packetThrower.PortFinder`, matching what Baudrun uses.
+  `coop.otec.portfinder.ChmodBPF` (3.x daemon) →
+  `io.github.packetThrower.PortFinder.BPFHelper`. All `coop.otec`
+  references removed.
+- **Build pipeline:** `cargo build --release` produces the binary;
+  [cargo-packager](https://github.com/crabnebula-dev/cargo-packager)
+  wraps it into `.dmg` / `.deb` / `.rpm` / `.AppImage` / `.pkg.tar.zst`
+  / NSIS / WiX bundles. Replaces the Tauri CLI's `tauri build` and
+  the pnpm + Vite frontend build that fed it.
+- **Linux post-install** now sets `cap_net_raw,cap_net_admin=eip`
+  on the installed binary (3.x set only `cap_net_raw+ep`).
+  CAP_NET_ADMIN was needed for some interface-state queries the
+  `pcap` crate makes internally on newer libpcap versions.
+- **Window size:** 420×560 on every platform (was 400×460 / 500 in
+  3.x, with on-the-fly resize for the privilege banner). gpui's
+  cross-platform resize story doesn't match Tauri's, so the new
+  build sizes for the banner up front — the trade-off is ~70 px
+  of dead space below the result card when the banner isn't there.
+
+### Removed
+- The 3.x `frontend/` tree (Svelte 5 + TypeScript + Vite).
+- The 3.x `src-tauri/` tree (Tauri 2 + tauri-specta bindings).
+- `package.json`, `pnpm-lock.yaml`, `node_modules/` at the project
+  root. The remaining `docs-next/` Astro project keeps its own
+  pnpm setup, but it's no longer in the application build path.
+- The i18n surface (Spanish, French, German translations) — English-
+  only at relaunch. Can return as Rust string tables if the
+  contributor bandwidth's there.
+- `install-cli.sh` / `uninstall-cli.sh` at the project root. The
+  in-app BPF helper install (and the standalone `.pkg`) already
+  drop the `/usr/local/bin/portfinder` symlink; the standalone
+  scripts were only useful for the BPF-less install path, which
+  is now rarer than it was on 3.x.
 
 ## [3.3.0-alpha.2] - 2026-05-02
 

@@ -1,0 +1,1038 @@
+//! gpui window + view for PortFinder.
+//!
+//! Mirrors the 3.x Tauri/Svelte UI:
+//!   - privilege-warning banner (BPF install on macOS, sudo hint on
+//!     Linux, Npcap download link on Windows);
+//!   - controls card: interface picker, "only with IPs" toggle,
+//!     protocol picker (LLDP / CDP / MNDP), Start / Stop;
+//!   - result card: 7 key/value rows with click-to-copy values;
+//!   - status text + version footer.
+//!
+//! Bridges to the (sync, libpcap-backed) capture module via a tokio
+//! runtime running on a background OS thread. `capture::run` is async
+//! because internally it `spawn_blocking`s the pcap read and races
+//! that against a CancellationToken — keeping that shape means the
+//! parsers and the CLI path port across the 3.x → 4.x rewrite
+//! unchanged. The gpui side talks to the runtime via flume channels.
+
+use std::sync::OnceLock;
+use std::time::Duration;
+
+use flume::{Receiver, Sender};
+use gpui::{
+    div, prelude::*, px, rgb, App, AppContext, Bounds, ClipboardItem, Context, Entity, FocusHandle,
+    Focusable, Hsla, IntoElement, ParentElement, Render, SharedString, Styled, TitlebarOptions,
+    Window, WindowBounds, WindowOptions,
+};
+use gpui_component::{
+    button::{Button, ButtonVariants},
+    select::{Select, SelectEvent, SelectItem, SelectState},
+    switch::Switch,
+    ActiveTheme, Disableable, IndexPath, Root, Sizable, Theme, ThemeMode,
+};
+use tokio::runtime::Handle as TokioHandle;
+use tokio_util::sync::CancellationToken;
+
+use crate::{capture, privilege, CaptureRequest, CaptureResult, InterfaceInfo};
+
+/// Logical window size. The Tauri build used 400×460 (or 500 on
+/// non-macOS) and grew on-the-fly when the privilege banner showed
+/// up. gpui's window resize API on macOS is fussier than the Tauri
+/// abstraction, so we just size up-front to fit the banner — the
+/// extra vertical space below the result card is fine when no
+/// banner is rendered. With `.small()` widgets and a proper macOS
+/// title bar (not transparent), the layout fits comfortably in 520
+/// vertical pixels.
+const BASE_WIDTH: f32 = 420.0;
+const BASE_HEIGHT: f32 = 520.0;
+
+/// Brand accent. macOS system blue — the same colour the 3.x design
+/// system reached for whenever it needed to step outside the OS-
+/// neutral palette (privilege-warning button, focused-toggle pill).
+/// Wired into the gpui-component Theme as `primary`, which flows
+/// through to the Start button's filled fill, the Switch's on-state
+/// pill, and the Select's focus ring.
+const BRAND_PRIMARY: u32 = 0x0078d4;
+/// Hover state — lighter shift on hover. ~10% brighter than the
+/// base; gpui-component derives the rest of the hover behaviour
+/// internally.
+const BRAND_PRIMARY_HOVER: u32 = 0x1f8fea;
+/// Active (pressed) state — darker than the base by ~10%.
+const BRAND_PRIMARY_ACTIVE: u32 = 0x005a9e;
+
+/// Process-lifetime tokio runtime handle. The runtime itself is
+/// leaked (`mem::forget`) once at first access — gpui has its own
+/// executor, but `capture::run` uses `tokio::task::spawn_blocking`
+/// internally so a tokio runtime needs to be entered when futures
+/// from that module execute.
+static TOKIO: OnceLock<TokioHandle> = OnceLock::new();
+
+fn tokio_handle() -> &'static TokioHandle {
+    TOKIO.get_or_init(|| {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .thread_name("portfinder-tokio")
+            .build()
+            .expect("start tokio runtime");
+        let handle = rt.handle().clone();
+        // Keep the runtime alive for the process. Dropping the
+        // Runtime tears down its worker threads, so we leak it —
+        // the OS reclaims the memory at exit.
+        std::mem::forget(rt);
+        handle
+    })
+}
+
+/// Discovery protocol the capture engine looks for. Local mirror of
+/// the string-based wire protocol — easier to round-trip into
+/// `CaptureRequest.protocol` on the way out.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Protocol {
+    Lldp,
+    Cdp,
+    Mndp,
+}
+
+impl Protocol {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Lldp => "LLDP",
+            Self::Cdp => "CDP",
+            Self::Mndp => "MNDP",
+        }
+    }
+
+    fn from_value(value: &str) -> Self {
+        match value {
+            "CDP" => Self::Cdp,
+            "MNDP" => Self::Mndp,
+            _ => Self::Lldp,
+        }
+    }
+}
+
+/// Select-widget option. Stores the user-facing title plus the
+/// stable value that gets round-tripped on `SelectEvent::Confirm`.
+#[derive(Clone)]
+struct Opt {
+    title: SharedString,
+    value: SharedString,
+}
+
+impl Opt {
+    fn new(title: impl Into<SharedString>, value: impl Into<SharedString>) -> Self {
+        Self {
+            title: title.into(),
+            value: value.into(),
+        }
+    }
+}
+
+impl SelectItem for Opt {
+    type Value = SharedString;
+    fn title(&self) -> SharedString {
+        self.title.clone()
+    }
+    fn value(&self) -> &Self::Value {
+        &self.value
+    }
+}
+
+/// Posted by the background tokio task through a flume channel to
+/// the gpui side when `capture::run` completes.
+enum CaptureEvent {
+    Done(Result<CaptureResult, String>),
+}
+
+/// One of the 7 result fields the GUI renders. The static string is
+/// what the click-to-copy ✓ indicator keys off so we can show
+/// "copied!" only on the row the user actually clicked.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct ResultKey(&'static str);
+
+pub struct AppView {
+    focus_handle: FocusHandle,
+
+    // Discovered interfaces + UI state for the picker.
+    interfaces: Vec<InterfaceInfo>,
+    only_with_ips: bool,
+    selected_interface_name: String,
+    interface_select: Entity<SelectState<Vec<Opt>>>,
+
+    // Protocol picker.
+    protocol: Protocol,
+    protocol_select: Entity<SelectState<Vec<Opt>>>,
+
+    // Capture state.
+    is_capturing: bool,
+    capture_cancel: Option<CancellationToken>,
+    capture_result_tx: Sender<CaptureEvent>,
+    capture_result_rx: Receiver<CaptureEvent>,
+
+    // Result + status.
+    result: Option<CaptureResult>,
+    error: String,
+    status_text: SharedString,
+    copied_key: Option<ResultKey>,
+
+    // Privileges + helper install.
+    priv_status: Option<privilege::PrivilegeStatus>,
+    is_installing: bool,
+
+    // Subscriptions kept alive for the entity's lifetime.
+    iface_sub: gpui::Subscription,
+    _proto_sub: gpui::Subscription,
+}
+
+impl AppView {
+    fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        // Initial interface list. Failures are non-fatal: an empty
+        // list means the user just sees the "Sniff all" placeholder
+        // until the refresh button gets clicked.
+        let interfaces = capture::list_interfaces().unwrap_or_default();
+        let initial_filtered = build_interface_opts(&interfaces, true);
+
+        let interface_select =
+            cx.new(|cx| SelectState::new(initial_filtered, Some(IndexPath::new(0)), window, cx));
+        let protocol_select = cx.new(|cx| {
+            SelectState::new(protocol_opts(), Some(IndexPath::new(0)), window, cx)
+        });
+
+        let iface_sub = cx.subscribe(
+            &interface_select,
+            |this, _state, event: &SelectEvent<Vec<Opt>>, cx| {
+                if let SelectEvent::Confirm(Some(value)) = event {
+                    this.selected_interface_name = value.to_string();
+                    cx.notify();
+                }
+            },
+        );
+        let proto_sub = cx.subscribe(
+            &protocol_select,
+            |this, _state, event: &SelectEvent<Vec<Opt>>, cx| {
+                if let SelectEvent::Confirm(Some(value)) = event {
+                    this.protocol = Protocol::from_value(value.as_ref());
+                    cx.notify();
+                }
+            },
+        );
+
+        let priv_status = Some(privilege::get_privilege_status());
+        let (tx, rx) = flume::bounded(1);
+
+        let mut view = Self {
+            focus_handle: cx.focus_handle(),
+            interfaces,
+            only_with_ips: true,
+            selected_interface_name: String::new(),
+            interface_select,
+            protocol: Protocol::Lldp,
+            protocol_select,
+            is_capturing: false,
+            capture_cancel: None,
+            capture_result_tx: tx,
+            capture_result_rx: rx,
+            result: None,
+            error: String::new(),
+            status_text: "Ready".into(),
+            copied_key: None,
+            priv_status,
+            is_installing: false,
+            iface_sub,
+            _proto_sub: proto_sub,
+        };
+        view.spawn_capture_listener(cx);
+        view
+    }
+
+    /// gpui-side task: drains the flume receiver and applies each
+    /// capture result to the view. Detached for the view's lifetime.
+    fn spawn_capture_listener(&mut self, cx: &mut Context<Self>) {
+        let rx = self.capture_result_rx.clone();
+        cx.spawn(async move |this, cx| {
+            while let Ok(event) = rx.recv_async().await {
+                let r = this.update(cx, |this, cx| match event {
+                    CaptureEvent::Done(res) => this.on_capture_done(res, cx),
+                });
+                if r.is_err() {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
+    fn refresh_interfaces(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match capture::list_interfaces() {
+            Ok(ifaces) => {
+                self.interfaces = ifaces;
+                self.rebuild_interface_select(window, cx);
+            }
+            Err(err) => {
+                self.error = format!("Failed to load interfaces: {err}");
+                self.status_text = "Error".into();
+            }
+        }
+        cx.notify();
+    }
+
+    fn rebuild_interface_select(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let opts = build_interface_opts(&self.interfaces, self.only_with_ips);
+        // SelectState doesn't expose a set-delegate method publicly,
+        // so swap the entity. The new subscription replaces the old
+        // one held on `iface_sub` — dropping the old Subscription
+        // unhooks the previous listener.
+        let new_state =
+            cx.new(|cx| SelectState::new(opts, Some(IndexPath::new(0)), window, cx));
+        let sub = cx.subscribe(
+            &new_state,
+            |this, _state, event: &SelectEvent<Vec<Opt>>, cx| {
+                if let SelectEvent::Confirm(Some(value)) = event {
+                    this.selected_interface_name = value.to_string();
+                    cx.notify();
+                }
+            },
+        );
+        self.interface_select = new_state;
+        self.iface_sub = sub;
+        self.selected_interface_name.clear();
+    }
+
+    fn start_capture(&mut self, cx: &mut Context<Self>) {
+        if self.is_capturing {
+            return;
+        }
+        self.is_capturing = true;
+        self.error.clear();
+        self.result = None;
+        self.status_text = format!("Capturing {}…", self.protocol.as_str()).into();
+
+        let cancel = CancellationToken::new();
+        if let Some(prev) = self.capture_cancel.take() {
+            prev.cancel();
+        }
+        self.capture_cancel = Some(cancel.clone());
+
+        let req = CaptureRequest {
+            interface_name: self.selected_interface_name.clone(),
+            protocol: self.protocol.as_str().to_string(),
+        };
+        let tx = self.capture_result_tx.clone();
+        tokio_handle().spawn(async move {
+            let res = capture::run(req, cancel).await;
+            let _ = tx.send_async(CaptureEvent::Done(res)).await;
+        });
+
+        cx.notify();
+    }
+
+    fn stop_capture(&mut self, cx: &mut Context<Self>) {
+        if let Some(token) = self.capture_cancel.take() {
+            token.cancel();
+        }
+        self.status_text = "Stopping…".into();
+        cx.notify();
+    }
+
+    fn on_capture_done(&mut self, res: Result<CaptureResult, String>, cx: &mut Context<Self>) {
+        self.is_capturing = false;
+        self.capture_cancel = None;
+        match res {
+            Ok(r) => {
+                self.result = Some(r);
+                self.status_text = "Complete".into();
+            }
+            Err(msg) => {
+                if msg.to_lowercase().contains("cancelled") {
+                    self.status_text = "Stopped".into();
+                } else {
+                    self.error = msg;
+                    self.status_text = "Error".into();
+                }
+            }
+        }
+        cx.notify();
+    }
+
+    fn install_bpf(&mut self, cx: &mut Context<Self>) {
+        if self.is_installing {
+            return;
+        }
+        self.is_installing = true;
+        self.error.clear();
+        self.status_text = "Installing helper…".into();
+        cx.notify();
+
+        // `privilege::install_bpf_helper` blocks on `osascript`; run
+        // it on a background thread so the UI stays responsive while
+        // the macOS auth dialog is up.
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_spawn(async { privilege::install_bpf_helper() })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.is_installing = false;
+                match result {
+                    Ok(()) => {
+                        this.status_text = "BPF helper installed".into();
+                        this.priv_status = Some(privilege::get_privilege_status());
+                    }
+                    Err(err) => {
+                        this.error = err;
+                        this.status_text = "Error".into();
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    fn toggle_only_with_ips(&mut self, value: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.only_with_ips == value {
+            return;
+        }
+        self.only_with_ips = value;
+        self.rebuild_interface_select(window, cx);
+        cx.notify();
+    }
+
+    fn copy_value(&mut self, key: ResultKey, value: String, cx: &mut Context<Self>) {
+        cx.write_to_clipboard(ClipboardItem::new_string(value));
+        self.copied_key = Some(key);
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(Duration::from_millis(1200))
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                if this.copied_key == Some(key) {
+                    this.copied_key = None;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+}
+
+impl Focusable for AppView {
+    fn focus_handle(&self, _cx: &App) -> FocusHandle {
+        self.focus_handle.clone()
+    }
+}
+
+impl Render for AppView {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Read all theme colors up front so the immutable cx borrow
+        // is dropped before the render helpers (which take `&mut cx`)
+        // run. Theme::theme() returns `&Theme`; without the block
+        // the immutable borrow lives through to the closing `.child(...)`
+        // call and the borrow checker rejects every helper invocation.
+        let (bg, fg, card_bg, border, muted_fg, danger) = {
+            let t = cx.theme();
+            (
+                t.background,
+                t.foreground,
+                t.popover,
+                t.border,
+                t.muted_foreground,
+                t.danger,
+            )
+        };
+
+        let banner = self.render_privilege_banner(cx);
+        let controls = self.render_controls(cx);
+        let result_card = self.render_result_card(cx);
+
+        let status_color = if self.error.is_empty() {
+            muted_fg
+        } else {
+            danger
+        };
+        let status_line = if !self.error.is_empty() {
+            self.error.clone().into()
+        } else {
+            self.status_text.clone()
+        };
+
+        div()
+            .id("portfinder-app")
+            .track_focus(&self.focus_handle)
+            .size_full()
+            .flex()
+            .flex_col()
+            .gap_3()
+            .p_3()
+            .bg(bg)
+            .text_color(fg)
+            .child(banner)
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .p_3()
+                    .rounded_md()
+                    .border_1()
+                    .border_color(border)
+                    .bg(card_bg)
+                    .child(controls),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .p_3()
+                    .rounded_md()
+                    .border_1()
+                    .border_color(border)
+                    .bg(card_bg)
+                    .child(result_card),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(status_color)
+                    .child(status_line),
+            )
+            .child(
+                div()
+                    .flex()
+                    .justify_between()
+                    .items_center()
+                    .text_xs()
+                    .text_color(muted_fg)
+                    .child(format!("v{}", env!("CARGO_PKG_VERSION")))
+                    .child(""),
+            )
+    }
+}
+
+impl AppView {
+    fn render_privilege_banner(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let Some(status) = self.priv_status.clone() else {
+            return div().w_0().h_0().into_any_element();
+        };
+        if status.has_access {
+            return div().w_0().h_0().into_any_element();
+        }
+
+        let theme = cx.theme();
+        let warning_bg = theme.warning.opacity(0.12);
+        let warning_fg = theme.foreground;
+        let border = theme.warning.opacity(0.4);
+
+        let body: gpui::AnyElement = match status.platform.as_str() {
+            "macos" if status.can_install => {
+                let installing = self.is_installing;
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(div().text_sm().child(
+                        "PortFinder needs BPF access to capture packets. \
+                         Installing the helper grants /dev/bpf* read access \
+                         to the access_bpf group.",
+                    ))
+                    .child(
+                        Button::new("install-bpf")
+                            .label(if installing { "Installing…" } else { "Install BPF Helper" })
+                            .small()
+                            .disabled(installing)
+                            .on_click(cx.listener(|this, _, _window, cx| this.install_bpf(cx))),
+                    )
+                    .into_any_element()
+            }
+            "linux" => div()
+                .text_sm()
+                .child(
+                    "PortFinder needs CAP_NET_RAW or root to capture packets. \
+                     Install the .deb / .rpm / .pkg.tar.zst package (it grants \
+                     CAP_NET_RAW automatically) or relaunch with `sudo`.",
+                )
+                .into_any_element(),
+            "windows" if !status.npcap_installed => div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(div().text_sm().child(
+                    "PortFinder needs Npcap to capture packets on Windows.",
+                ))
+                .child(
+                    Button::new("open-npcap")
+                        .label("Download Npcap")
+                        .small()
+                        .on_click(|_, _window, cx| {
+                            cx.open_url("https://npcap.com/#download");
+                        }),
+                )
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(theme.muted_foreground)
+                        .child("After installing, relaunch PortFinder."),
+                )
+                .into_any_element(),
+            "windows" if !status.npcap_non_admin => div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(div().text_sm().child(
+                    "Npcap was installed without the 'allow non-admin' option. \
+                     Run PortFinder as Administrator or reinstall Npcap with \
+                     non-admin support.",
+                ))
+                .into_any_element(),
+            _ => div()
+                .text_sm()
+                .child("PortFinder needs elevated privileges to capture packets.")
+                .into_any_element(),
+        };
+
+        div()
+            .p_3()
+            .rounded_md()
+            .border_1()
+            .border_color(border)
+            .bg(warning_bg)
+            .text_color(warning_fg)
+            .child(body)
+            .into_any_element()
+    }
+
+    fn render_controls(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let is_capturing = self.is_capturing;
+        let only_with_ips = self.only_with_ips;
+        let theme = cx.theme();
+
+        div()
+            .flex()
+            .flex_col()
+            .gap_3()
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(theme.muted_foreground)
+                            .child("Interface"),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .child(Select::new(&self.interface_select).small()),
+                            )
+                            .child(
+                                Button::new("refresh-interfaces")
+                                    .label("↻")
+                                    .small()
+                                    .tooltip("Refresh interface list")
+                                    .disabled(is_capturing)
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.refresh_interfaces(window, cx)
+                                    })),
+                            ),
+                    ),
+            )
+            .child(
+                Switch::new("only-with-ips")
+                    .checked(only_with_ips)
+                    .label("Only show interfaces with IPs")
+                    .small()
+                    .disabled(is_capturing)
+                    .on_click(cx.listener(|this, value: &bool, window, cx| {
+                        this.toggle_only_with_ips(*value, window, cx)
+                    })),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(theme.muted_foreground)
+                            .child("Protocol"),
+                    )
+                    .child(Select::new(&self.protocol_select).small()),
+            )
+            .child(
+                div()
+                    .flex()
+                    .gap_2()
+                    .child(
+                        Button::new("start-capture")
+                            .label("Start")
+                            .primary()
+                            .small()
+                            .disabled(is_capturing)
+                            .on_click(cx.listener(|this, _, _window, cx| this.start_capture(cx))),
+                    )
+                    .child(
+                        Button::new("stop-capture")
+                            .label("Stop")
+                            .small()
+                            .disabled(!is_capturing)
+                            .on_click(cx.listener(|this, _, _window, cx| this.stop_capture(cx))),
+                    ),
+            )
+            .into_any_element()
+    }
+
+    fn render_result_card(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let Some(result) = self.result.clone() else {
+            return div()
+                .text_sm()
+                .text_color(cx.theme().muted_foreground)
+                .child("Run a capture to see switch info here.")
+                .into_any_element();
+        };
+
+        let rows: [(ResultKey, &'static str, String); 7] = [
+            (ResultKey("switch"), "Switch Name", result.switch_name),
+            (ResultKey("ip"), "Switch IP", result.switch_ip),
+            (ResultKey("port"), "Switch Port", result.switch_port),
+            (ResultKey("vlan"), "VLAN", result.native_vlan),
+            (ResultKey("voiceVlan"), "Voice VLAN", result.voice_vlan),
+            (ResultKey("mtu"), "MTU", result.mtu),
+            (ResultKey("model"), "Switch Model", result.switch_model),
+        ];
+
+        let mut col = div().flex().flex_col().gap_1();
+        for (key, label, raw) in rows {
+            col = col.child(self.render_result_row(key, label, raw, cx));
+        }
+        col.into_any_element()
+    }
+
+    fn render_result_row(
+        &mut self,
+        key: ResultKey,
+        label: &'static str,
+        raw: String,
+        cx: &mut Context<Self>,
+    ) -> gpui::AnyElement {
+        let theme = cx.theme();
+        let muted = theme.muted_foreground;
+        let success = theme.success;
+        let absent = raw.is_empty() || raw == "N/A";
+        let copied = self.copied_key == Some(key);
+        // ElementId is constructable from `(&'static str, u64)` —
+        // hash the label pointer into a u64 so each row gets a
+        // unique id without allocating a SharedString per render.
+        let row_id = label.as_ptr() as u64;
+
+        // The right-hand cell. For long values (Switch Model on the
+        // SG350 advertises ~80 chars) we truncate with an ellipsis
+        // rather than letting the text run off the window edge.
+        // `.truncate()` is gpui's shortcut for the three CSS bits
+        // that make ellipsis actually appear: `overflow: hidden`,
+        // `white-space: nowrap`, `text-overflow: ellipsis`. The
+        // outer flex parent on the value cell also needs
+        // `.min_w_0()` — without it the parent's `min-width: auto`
+        // defaults keep the cell at its content width and the
+        // ellipsis never fires.
+        let value_el: gpui::AnyElement = if absent {
+            div()
+                .italic()
+                .text_color(muted)
+                .child("Not advertised")
+                .into_any_element()
+        } else {
+            let copy_payload = raw.clone();
+            div()
+                .id(("copy-value", row_id))
+                .cursor_pointer()
+                .flex()
+                .items_center()
+                .justify_end()
+                .gap_1()
+                .min_w_0()
+                .w_full()
+                .child(
+                    div()
+                        .min_w_0()
+                        .truncate()
+                        .text_right()
+                        .child(raw),
+                )
+                .child(if copied {
+                    div()
+                        .flex_shrink_0()
+                        .text_color(success)
+                        .child("✓")
+                        .into_any_element()
+                } else {
+                    div().w_0().h_0().into_any_element()
+                })
+                .on_mouse_up(
+                    gpui::MouseButton::Left,
+                    cx.listener(move |this, _, _window, cx| {
+                        this.copy_value(key, copy_payload.clone(), cx)
+                    }),
+                )
+                .into_any_element()
+        };
+
+        div()
+            .flex()
+            .items_center()
+            .gap_2()
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(muted)
+                    .w(px(96.0))
+                    .flex_shrink_0()
+                    .child(label),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .justify_end()
+                    .child(value_el),
+            )
+            .into_any_element()
+    }
+}
+
+fn build_interface_opts(interfaces: &[InterfaceInfo], only_with_ips: bool) -> Vec<Opt> {
+    let mut opts = Vec::new();
+    for iface in interfaces {
+        if !iface.name.is_empty() && only_with_ips && !iface.has_ip {
+            continue;
+        }
+        let title = format_interface_title(iface);
+        opts.push(Opt::new(title, iface.name.clone()));
+    }
+    if opts.is_empty() {
+        opts.push(Opt::new("Sniff all interfaces", ""));
+    }
+    opts
+}
+
+fn format_interface_title(iface: &InterfaceInfo) -> String {
+    if iface.name.is_empty() {
+        return "Sniff all interfaces".into();
+    }
+    let display = if iface.description.is_empty() {
+        iface.name.clone()
+    } else {
+        iface.description.clone()
+    };
+    let compact = compact_address(&iface.addresses);
+    if compact.is_empty() {
+        display
+    } else {
+        format!("{display} ({compact})")
+    }
+}
+
+fn compact_address(addrs: &str) -> String {
+    if addrs.is_empty() {
+        return String::new();
+    }
+    let parts: Vec<&str> = addrs.split(", ").collect();
+    let v4 = parts.iter().find(|p| {
+        // Dotted-quad heuristic. `split('.').count() == 4` reads the
+        // same as the Tauri-era `matches('.').count() == 3` did but
+        // sidesteps an ambiguous-method-resolution headache with
+        // `gpui_component::select::SelectItem::matches` (also takes
+        // `&str`) that the compiler can't auto-pick between when
+        // `&str` is in deref scope from the iterator's `&&str`.
+        p.split('.').count() == 4 && p.chars().all(|c| c.is_ascii_digit() || c == '.')
+    });
+    match v4 {
+        Some(s) => (*s).to_string(),
+        None => parts.first().copied().unwrap_or("").to_string(),
+    }
+}
+
+fn protocol_opts() -> Vec<Opt> {
+    vec![
+        Opt::new("LLDP", "LLDP"),
+        Opt::new("CDP", "CDP"),
+        Opt::new("MNDP", "MNDP"),
+    ]
+}
+
+/// Main GUI entrypoint. Starts gpui, opens the PortFinder window,
+/// and runs until the user closes it. Spawned by `main.rs` when no
+/// CLI args were passed.
+pub fn run() {
+    // Touch the tokio runtime so it spins up before the first
+    // capture click. Cheap; the runtime itself lives on its own
+    // thread pool.
+    let _ = tokio_handle();
+
+    // `gpui_platform::application()` is the canonical entry point
+    // for the Zed-git gpui line; crates.io's `Application::new()`
+    // would compile but doesn't exist on this fork. `with_assets`
+    // registers gpui-component's bundled icon SVGs as the app's
+    // asset source so any `IconName::*` referenced by widget code
+    // resolves to a real glyph.
+    let app = gpui_platform::application().with_assets(gpui_component_assets::Assets);
+    app.run(move |cx: &mut App| {
+        // gpui-component widgets (Input, Form, Select, Switch, …)
+        // require the Theme global to be installed before the first
+        // render — without this, the very first `Select::new` panics
+        // looking for `Theme`.
+        gpui_component::init(cx);
+
+        // Boot palette follows the system appearance. Theme live-
+        // updates are out of scope for this slice; relaunch picks
+        // up changes.
+        let mode = if matches!(
+            cx.window_appearance(),
+            gpui::WindowAppearance::Dark | gpui::WindowAppearance::VibrantDark
+        ) {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        };
+        Theme::change(mode, None, cx);
+        apply_brand_palette(cx);
+
+        // Dev-mode dock icon override on macOS. Production .app
+        // bundles get the icon from the Info.plist + Resources/
+        // path; `cargo run` without a bundle would otherwise drop
+        // to the default Cargo glyph in the Dock.
+        #[cfg(target_os = "macos")]
+        install_macos_dock_icon();
+
+        let bounds = Bounds::centered(None, gpui::size(px(BASE_WIDTH), px(BASE_HEIGHT)), cx);
+        let opts = WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            titlebar: Some(TitlebarOptions {
+                title: Some("PortFinder".into()),
+                // `appears_transparent: false` keeps the native
+                // macOS title bar — title text in the middle, traffic
+                // lights on the left, full-height content underneath
+                // the bar. The 3.x Tauri build used a transparent
+                // title bar with the content flush against the top
+                // of the window, which left the controls card overlap
+                // the traffic-light hover area.
+                appears_transparent: false,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let _ = cx.open_window(opts, |window, cx| {
+            let app_view = cx.new(|cx| AppView::new(window, cx));
+            // Root::new takes `impl Into<AnyView>`; the explicit
+            // `.into()` confuses the inference (E0283) because the
+            // turbofish-less form can match too many `Into` impls.
+            // Pass the entity directly — `Entity<AppView>: Into<AnyView>`
+            // resolves trivially when AppView: Render.
+            cx.new(|cx| Root::new(app_view, window, cx))
+        });
+
+        cx.activate(true);
+    });
+}
+
+/// Overrides the gpui-component theme's primary slot with our brand
+/// blue. Called once after `Theme::change`. The mutation is global
+/// across windows; we re-apply it after a future light/dark flip
+/// would otherwise reset back to the gpui-component defaults.
+///
+/// gpui-component splits its accent surface between two slot
+/// families: `primary` / `primary_*` (used by Switch's on-state
+/// pill, Select's focus ring, list-row highlight, etc.) and
+/// `button_primary` / `button_primary_*` (used **only** by Button's
+/// `.primary()` variant — the field is named separately so a host
+/// app can give the Start-button-style filled buttons their own
+/// fill colour without dragging every other accent surface with
+/// them). Both slot families need to be patched here or the Switch
+/// turns blue but the Start button stays the gpui-component default
+/// (near-black on light mode).
+fn apply_brand_palette(cx: &mut App) {
+    let theme = Theme::global_mut(cx);
+    let primary: Hsla = rgb(BRAND_PRIMARY).into();
+    let primary_hover: Hsla = rgb(BRAND_PRIMARY_HOVER).into();
+    let primary_active: Hsla = rgb(BRAND_PRIMARY_ACTIVE).into();
+    let white: Hsla = rgb(0xffffff).into();
+
+    // Accent surface — Switch on-state, Select focus ring, etc.
+    theme.primary = primary;
+    theme.primary_hover = primary_hover;
+    theme.primary_active = primary_active;
+    theme.primary_foreground = white;
+
+    // Filled-button surface — Start button's `.primary()` variant.
+    theme.button_primary = primary;
+    theme.button_primary_hover = primary_hover;
+    theme.button_primary_active = primary_active;
+    theme.button_primary_foreground = white;
+}
+
+/// macOS-only: set the dock icon at runtime so `cargo run` shows the
+/// real PortFinder glyph instead of the default Cargo / terminal
+/// binary icon. Production .app bundles ship the icon via the
+/// Info.plist + Resources path; this runtime override is dev-only.
+///
+/// Source PNG (1024×1024) gets composited onto a fresh 1024×1024
+/// canvas with Apple's "live area" inset (~80% of canvas), matching
+/// the inset cargo-packager's bundler applies when it generates the
+/// .icns. Without the inset, a `cargo run` dock icon would look
+/// noticeably larger than the same app's bundled icon.
+#[cfg(target_os = "macos")]
+fn install_macos_dock_icon() {
+    use objc2::AnyThread;
+    use objc2_app_kit::{NSApplication, NSCompositingOperation, NSImage};
+    use objc2_foundation::{NSPoint, NSRect, NSSize, NSString};
+    const CANVAS_PX: f64 = 1024.0;
+    const CONTENT_PX: f64 = 824.0;
+    const INSET_PX: f64 = (CANVAS_PX - CONTENT_PX) / 2.0;
+
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let icon_path = format!("{manifest_dir}/resources/icons/icon.icns");
+    // SAFETY: gpui_platform::application runs its callback on the
+    // macOS main thread, which is what NSApplication /
+    // NSGraphicsContext (lockFocus / unlockFocus) require.
+    // lockFocus / unlockFocus are deprecated in favour of the
+    // resolution-independent block-based
+    // `imageWithSize:flipped:drawingHandler:` API; the simpler form
+    // is fine for a one-shot icon override that never redraws.
+    #[allow(deprecated)]
+    unsafe {
+        let path = NSString::from_str(&icon_path);
+        let Some(source) = NSImage::initWithContentsOfFile(NSImage::alloc(), &path)
+        else {
+            log::warn!("dock icon: could not load {icon_path}");
+            return;
+        };
+        let canvas =
+            NSImage::initWithSize(NSImage::alloc(), NSSize::new(CANVAS_PX, CANVAS_PX));
+        canvas.lockFocus();
+        source.drawInRect_fromRect_operation_fraction(
+            NSRect::new(
+                NSPoint::new(INSET_PX, INSET_PX),
+                NSSize::new(CONTENT_PX, CONTENT_PX),
+            ),
+            NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(0.0, 0.0)),
+            NSCompositingOperation::Copy,
+            1.0,
+        );
+        canvas.unlockFocus();
+
+        let mtm = objc2::MainThreadMarker::new_unchecked();
+        let app = NSApplication::sharedApplication(mtm);
+        app.setApplicationIconImage(Some(&canvas));
+    }
+}

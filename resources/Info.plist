@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS bundle metadata for PortFinder. cargo-packager's
+  `info-plist-path` config (in Cargo.toml [package.metadata.packager.macos])
+  reads from here and writes the result into
+  PortFinder.app/Contents/Info.plist at bundle time. Keys we don't
+  specify get sensible defaults injected by the bundler.
+
+  CFBundleIdentifier flips from the 3.x `com.packetthrower.portfinder`
+  to `io.github.packetThrower.PortFinder` — same reverse-DNS
+  convention Baudrun uses (io.github.packetThrower.Baudrun), and
+  matches the new BPF helper plist label scheme
+  (io.github.packetThrower.PortFinder.BPFHelper).
+
+  The release.yml CI workflow rewrites
+  CFBundleShortVersionString + CFBundleVersion from the git tag
+  before invoking cargo-packager — the literal values here are
+  just placeholders.
+-->
+<plist version="1.0">
+<dict>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>MacOSX</string>
+    </array>
+
+    <key>CFBundleName</key>
+    <string>PortFinder</string>
+    <key>CFBundleDisplayName</key>
+    <string>PortFinder</string>
+    <!--
+      Must match the file name of the binary inside
+      Contents/MacOS/. The Cargo `[[bin]] name = "PortFinder"`
+      (capitalised) is what cargo-packager writes there;
+      LaunchServices uses this key to identify which binary to
+      spawn when the bundle is activated.
+    -->
+    <key>CFBundleExecutable</key>
+    <string>PortFinder</string>
+    <key>CFBundleIdentifier</key>
+    <string>io.github.packetThrower.PortFinder</string>
+
+    <!--
+      Version pair. Replaced by the release CI from the git tag
+      (`${GITHUB_REF_NAME#v}`) before bundling.
+    -->
+    <key>CFBundleShortVersionString</key>
+    <string>4.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>4.0.0</string>
+
+    <key>CFBundleIconFile</key>
+    <string>icon</string>
+
+    <!--
+      11.0 (Big Sur) is the earliest macOS that supports the modern
+      icon "live area" + universal binary slices we rely on.
+    -->
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2024–2026 packetThrower / PortFinder contributors</string>
+
+    <!--
+      Single-instance launch. Launch Services routes a second
+      launch attempt to the existing process via
+      `applicationShouldHandleReopen:`. PortFinder's window count
+      is one, so an extra launch should focus the existing window
+      rather than spawn a duplicate.
+    -->
+    <key>LSMultipleInstancesProhibited</key>
+    <true/>
+</dict>
+</plist>

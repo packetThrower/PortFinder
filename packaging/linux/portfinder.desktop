@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=PortFinder
+GenericName=Switch Port Discovery
+Comment=Identify which switch port your device is plugged into via CDP/LLDP/MNDP.
+Exec=PortFinder
+Icon=portfinder
+Terminal=false
+StartupWMClass=PortFinder
+Categories=Network;Utility;System;
+Keywords=cdp;lldp;mndp;switch;port;vlan;network;discovery;

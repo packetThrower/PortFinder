@@ -38,7 +38,7 @@ Native widgets per platform — same workflow, different chrome.
 
 PortFinder shows a banner if it can't capture packets:
 
-- **macOS** — click *Install BPF Access* once. The app installs a `LaunchDaemon` that makes `/dev/bpf*` readable for members of the `access_bpf` group, which Wireshark also uses.
+- **macOS** — click *Install BPF Helper* once. The app installs a `LaunchDaemon` that makes `/dev/bpf*` readable for members of the `access_bpf` group, which Wireshark also uses.
 - **Linux** — install the `.deb` or `.rpm` package. The postinstall sets `CAP_NET_RAW` on the binary so it doesn't need `sudo`.
 - **Windows** — install Npcap with "Allow non-administrators to capture" enabled.
 

@@ -3,71 +3,167 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      # Stable SemVer: v4.0.0, v4.1.2, etc.
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      # Pre-release SemVer: v4.0.0-alpha.1, v4.1.0-rc.2, etc. The
+      # release job inspects the tag and flips prerelease=true on
+      # the GitHub Release when a hyphen is present.
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
 
-permissions:
-  contents: write
+# No workflow-level `permissions:` — each job declares its own so
+# the `contents: write` needed to publish the release is scoped to
+# the one job that actually creates it.
+
+# Queue, don't cancel: a mid-flight release shouldn't be interrupted
+# by a retag of the same version (half-uploaded artifact risk).
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
-  build:
+  build-macos:
     needs: [ci]
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         include:
-          # macOS — single universal build that runs on Apple Silicon AND Intel
-          - runner: macos-latest
-            arch: universal
-            args: '--target universal-apple-darwin'
-            rust-targets: 'aarch64-apple-darwin,x86_64-apple-darwin'
-
-          # Linux x86_64
-          - runner: ubuntu-latest
-            arch: amd64
-            args: ''
-            rust-targets: ''
-
-          # Linux ARM64 — native ARM runner, no cross-compile
-          - runner: ubuntu-24.04-arm
+          - runner: macos-26
             arch: arm64
-            args: ''
-            rust-targets: ''
-
-          # Windows x86_64
-          - runner: windows-latest
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
             arch: amd64
-            args: ''
-            rust-targets: ''
-            npcap_lib: x64
-
-          # Windows ARM64 — native ARM runner
-          - runner: windows-11-arm
-            arch: arm64
-            args: ''
-            rust-targets: ''
-            npcap_lib: ARM64
-
+            target: x86_64-apple-darwin
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
-      - name: Install Linux system deps
-        if: startsWith(matrix.runner, 'ubuntu')
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      # `shared-key: release` makes successive release-tag runs
+      # share the release-mode `target/` cache across tags.
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          shared-key: release
+
+      - name: Install macOS build deps
+        run: brew install pkg-config
+
+      - name: Install cargo-packager
+        uses: taiki-e/install-action@e1c4cd42111751368541a7cb5db3522bd1f846a4 # v2.78.0
+        with:
+          tool: cargo-packager
+
+      - name: Patch version from tag
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libpcap-dev \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            xdg-utils
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v v="$VERSION" '
+            /^\[/ { in_pkg = ($0 == "[package]") }
+            in_pkg && /^version = / && !done { print "version = \"" v "\""; done=1; next }
+            { print }
+          ' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+          # Mirror to Info.plist so CFBundleShortVersionString /
+          # CFBundleVersion match the tag rather than the static
+          # value sitting in the file.
+          plutil -replace CFBundleShortVersionString -string "$VERSION" resources/Info.plist
+          plutil -replace CFBundleVersion -string "$VERSION" resources/Info.plist
+          echo "Building version: $VERSION"
+
+      # `-f app -f dmg` produces both bundle types in one cargo-
+      # packager invocation. `before-packaging-command` in
+      # Cargo.toml runs `cargo build --release` once and both
+      # formats reuse the resulting binary.
+      - name: Build .app + .dmg
+        run: cargo packager --release -f app -f dmg
+
+      - name: Build BPF helper .pkg
+        run: ./packaging/macos/build-pkg.sh
+
+      - name: Stage artifacts
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p release-artifacts
+          BUNDLE="target/release"
+
+          # cargo-packager's .dmg naming uses its own arch labels
+          # (`aarch64` for arm64, `x64` for amd64). Glob whatever it
+          # produced and rename to our convention.
+          DMG=$(find "${BUNDLE}" -maxdepth 1 -name 'PortFinder_*.dmg' | head -1)
+          if [ -z "$DMG" ]; then
+            echo "no .dmg produced by cargo-packager"
+            ls -la "$BUNDLE"
+            exit 1
+          fi
+          mv "$DMG" "release-artifacts/PortFinder_${VERSION}_${{ matrix.arch }}.dmg"
+
+          # Drag-droppable .app zip for users who'd rather skip the
+          # .dmg mount-and-drag. `ditto -c -k --keepParent` preserves
+          # resource forks and extended attributes (matters once
+          # signing lands; the .app's xattrs need to survive the
+          # round trip through the archive).
+          ditto -c -k --keepParent \
+            "${BUNDLE}/PortFinder.app" \
+            "release-artifacts/PortFinder-macOS-${{ matrix.arch }}-${VERSION}.zip"
+
+          # BPF helper .pkg — copied from build-pkg.sh's output.
+          if ls dist/PortFinder-BPF-*.pkg >/dev/null 2>&1; then
+            cp dist/PortFinder-BPF-*.pkg release-artifacts/
+          fi
+
+          echo "--- staged ---"
+          ls -la release-artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-${{ matrix.arch }}-package
+          path: release-artifacts/*
+
+  build-windows:
+    needs: [ci]
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            arch: amd64
+            target: x86_64-pc-windows-msvc
+            npcap_lib: x64
+          - runner: windows-11-arm
+            arch: arm64
+            target: aarch64-pc-windows-msvc
+            npcap_lib: ARM64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          shared-key: release
 
       - name: Cache Npcap SDK
-        if: startsWith(matrix.runner, 'windows')
         id: cache-npcap
         uses: actions/cache@v5
         with:
@@ -75,67 +171,310 @@ jobs:
           key: npcap-sdk-1.13
 
       - name: Download Npcap SDK
-        if: startsWith(matrix.runner, 'windows') && steps.cache-npcap.outputs.cache-hit != 'true'
+        if: steps.cache-npcap.outputs.cache-hit != 'true'
         run: |
           Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile npcap-sdk.zip
           Expand-Archive npcap-sdk.zip -DestinationPath npcap-sdk
         shell: powershell
 
       - name: Configure Npcap link path
-        if: startsWith(matrix.runner, 'windows')
         run: |
           echo "LIB=${{ github.workspace }}\npcap-sdk\Lib\${{ matrix.npcap_lib }};$env:LIB" >> $env:GITHUB_ENV
         shell: powershell
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-packager
+        uses: taiki-e/install-action@e1c4cd42111751368541a7cb5db3522bd1f846a4 # v2.78.0
         with:
-          targets: ${{ matrix.rust-targets }}
+          tool: cargo-packager
 
-      - name: Cache cargo registry
-        uses: Swatinem/rust-cache@v2
+      - name: Patch version from tag
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          (Get-Content Cargo.toml -Raw) -replace '(?m)^version = .*', "version = `"$version`"" |
+            Set-Content -NoNewline Cargo.toml
+          Write-Host "Building version: $version"
+
+      # NSIS ships on every Windows build. WiX/MSI is gated to
+      # stable amd64 only — see release-pipeline notes in Baudrun
+      # for why (cargo-packager 0.11 bundles WiX 3.11 which
+      # predates `-arch arm64`, and WiX rejects alphanumeric
+      # pre-release identifiers).
+      - name: Build .exe (NSIS) + .msi (stable amd64 only)
+        shell: cmd
+        run: cargo packager --release -f nsis ${{ (!contains(github.ref_name, '-') && matrix.arch == 'amd64') && '-f wix' || '' }}
+
+      - name: Stage artifacts
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $arch = "${{ matrix.arch }}"
+          $bundle = "target/release"
+          New-Item -ItemType Directory -Force release-artifacts | Out-Null
+
+          Get-ChildItem "$bundle/*-setup.exe" -ErrorAction SilentlyContinue |
+            Copy-Item -Destination release-artifacts/
+          Get-ChildItem "$bundle/*.msi" -ErrorAction SilentlyContinue |
+            Copy-Item -Destination release-artifacts/
+
+          # Portable .zip of the bare PortFinder.exe for users who
+          # don't want an installer.
+          Compress-Archive `
+            -Path "$bundle/PortFinder.exe" `
+            -DestinationPath "release-artifacts/PortFinder-Windows-$arch-$version.zip"
+
+          Write-Host "--- staged ---"
+          Get-ChildItem release-artifacts | ForEach-Object { $_.Name }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          workspaces: src-tauri
-          key: ${{ matrix.arch }}
+          name: windows-${{ matrix.arch }}-package
+          path: release-artifacts/*
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+  build-linux:
+    needs: [ci]
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+            target: x86_64-unknown-linux-gnu
+            rpm_arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            target: aarch64-unknown-linux-gnu
+            rpm_arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          node-version: '20'
+          persist-credentials: false
 
-      # Pinned at v4 — v6 fails on windows-11-arm runners with broken
-      # `.cmd.EXE` symlinks in setup. Track upstream issue before bumping.
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
-          version: 9
+          toolchain: stable
+          targets: ${{ matrix.target }}
 
-      - name: Install frontend deps
-        run: pnpm install
-        working-directory: frontend
-
-      - name: Build with tauri-action
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
-          projectPath: src-tauri
-          tagName: ${{ github.ref_name }}
-          releaseName: 'PortFinder ${{ github.ref_name }}'
-          releaseDraft: false
-          # Mark releases as pre-release when the tag includes a SemVer
-          # pre-release suffix (e.g. v3.3.0-alpha.1, v4.0.0-rc.2). Plain
-          # vX.Y.Z tags ship as full releases.
+          shared-key: release
+
+      # libpcap-dev for capture; the wayland/x11 + freetype +
+      # fontconfig surface gpui_linux pulls in at compile time;
+      # AppImage tooling (fuse / libfuse2 / file); libarchive-
+      # tools for fpm -t pacman's bsdtar.
+      - name: Install Linux build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libpcap-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev \
+            libwayland-dev \
+            libx11-dev libxcb1-dev libxcb-randr0-dev \
+            libxcb-xkb-dev libxcb-cursor-dev libxcb-shape0-dev \
+            libxcb-xfixes0-dev libxcb-render0-dev \
+            libfontconfig1-dev libfreetype-dev \
+            pkg-config \
+            file fuse3 libfuse2 ruby-dev \
+            libarchive-tools
+
+      - name: Install cargo-packager
+        uses: taiki-e/install-action@e1c4cd42111751368541a7cb5db3522bd1f846a4 # v2.78.0
+        with:
+          tool: cargo-packager
+
+      - name: Install fpm (for .rpm + .pkg.tar.zst)
+        run: sudo gem install --no-document fpm
+
+      - name: Patch version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v v="$VERSION" '
+            /^\[/ { in_pkg = ($0 == "[package]") }
+            in_pkg && /^version = / && !done { print "version = \"" v "\""; done=1; next }
+            { print }
+          ' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+          echo "Building version: $VERSION"
+
+      - name: Build .deb + .AppImage
+        run: cargo packager --release -f deb -f appimage
+
+      # cargo-packager 0.11 doesn't expose .deb postinst hooks, so
+      # we patch the freshly-built .deb to inject one that runs
+      # setcap on the installed binary. Without this, the first
+      # capture attempt fails with EPERM and the user has to
+      # manually `sudo setcap cap_net_raw+ep /usr/bin/PortFinder`.
+      - name: Inject .deb postinst (setcap CAP_NET_RAW)
+        run: |
+          set -e
+          DEB=$(find target/release -maxdepth 1 -name '*.deb' | head -1)
+          if [ -z "$DEB" ]; then
+            echo "no .deb produced by cargo-packager — nothing to patch"
+            exit 0
+          fi
+          echo "Patching $DEB with postinst hook"
+
+          WORK=$(mktemp -d)
+          dpkg-deb -R "$DEB" "$WORK"
+          mkdir -p "$WORK/DEBIAN"
+
+          cp packaging/linux/portfinder-postinstall.sh "$WORK/DEBIAN/postinst"
+          chmod 0755 "$WORK/DEBIAN/postinst"
+
+          dpkg-deb -Z xz -b "$WORK" "$DEB"
+          rm -rf "$WORK"
+
+      - name: Build .rpm via fpm
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCH="${{ matrix.rpm_arch }}"
+          BIN="target/release/PortFinder"
+
+          mkdir -p pkg/usr/bin
+          cp "$BIN" pkg/usr/bin/PortFinder
+          chmod +x pkg/usr/bin/PortFinder
+
+          mkdir -p pkg/usr/share/applications
+          cp packaging/linux/portfinder.desktop pkg/usr/share/applications/
+
+          mkdir -p pkg/usr/share/icons/hicolor/512x512/apps
+          cp resources/icons/icon.png pkg/usr/share/icons/hicolor/512x512/apps/portfinder.png
+
+          mkdir -p release-artifacts
+          # `()(64bit)` arch qualifier on every SONAME: RPM-based
+          # distros auto-generate library `Provides:` as
+          # `libfoo.so.N()(64bit)` on 64-bit arches — both aarch64
+          # and x86_64 use the same 64bit token.
+          fpm -s dir -t rpm -C pkg \
+            --name portfinder --version "$VERSION" --architecture "$ARCH" \
+            --license GPL-3.0-or-later \
+            --description "Network switch port discovery via CDP/LLDP/MNDP." \
+            --url "https://packetthrower.github.io/PortFinder/" \
+            --vendor "packetThrower" --maintainer "packetThrower" \
+            --depends 'libpcap.so.1()(64bit)' \
+            --depends 'libxkbcommon.so.0()(64bit)' \
+            --depends 'libxkbcommon-x11.so.0()(64bit)' \
+            --depends 'libwayland-client.so.0()(64bit)' \
+            --depends 'libwayland-cursor.so.0()(64bit)' \
+            --depends 'libX11.so.6()(64bit)' \
+            --depends 'libxcb.so.1()(64bit)' \
+            --depends 'libxcb-cursor.so.0()(64bit)' \
+            --depends 'libxcb-randr.so.0()(64bit)' \
+            --depends 'libxcb-render.so.0()(64bit)' \
+            --depends 'libxcb-shape.so.0()(64bit)' \
+            --depends 'libxcb-xfixes.so.0()(64bit)' \
+            --depends 'libxcb-xkb.so.1()(64bit)' \
+            --depends 'libfontconfig.so.1()(64bit)' \
+            --depends 'libfreetype.so.6()(64bit)' \
+            --after-install packaging/linux/portfinder-postinstall.sh \
+            --package "release-artifacts/PortFinder-${VERSION}-1.${ARCH}.rpm"
+
+      - name: Build .pkg.tar.zst via fpm
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCH="${{ matrix.rpm_arch }}"
+          fpm -s dir -t pacman -C pkg \
+            --name portfinder --version "$VERSION" --architecture "$ARCH" \
+            --license GPL-3.0-or-later \
+            --description "Network switch port discovery via CDP/LLDP/MNDP." \
+            --url "https://packetthrower.github.io/PortFinder/" \
+            --vendor "packetThrower" --maintainer "packetThrower" \
+            --after-install packaging/linux/portfinder-postinstall.sh \
+            --package "release-artifacts/portfinder-${VERSION}-1-${ARCH}.pkg.tar.zst"
+
+      - name: Stage artifacts
+        run: |
+          mkdir -p release-artifacts
+          BUNDLE="target/release"
+          echo "--- cargo-packager outputs ---"
+          ls -la "$BUNDLE" 2>/dev/null || true
+          cp "$BUNDLE"/*.deb release-artifacts/ 2>/dev/null || true
+          cp "$BUNDLE"/*.AppImage release-artifacts/ 2>/dev/null || true
+          echo "--- staged ---"
+          ls -la release-artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linux-${{ matrix.arch }}-package
+          path: release-artifacts/*
+
+  release:
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts
+          pattern: "*-package"
+
+      - name: Generate SHA256SUMS
+        run: |
+          for dir in artifacts/*/; do
+            (cd "$dir" && sha256sum ./*)
+          done | sort > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Build release notes
+        run: |
+          CURRENT_TAG="${GITHUB_REF_NAME}"
+          REPO_URL="https://github.com/${GITHUB_REPOSITORY}"
+
+          if [[ "${CURRENT_TAG}" == *-* ]]; then
+            IS_PRERELEASE=1
+            PREV_TAG=$(git describe --tags --abbrev=0 "${CURRENT_TAG}^" 2>/dev/null || true)
+          else
+            IS_PRERELEASE=0
+            PREV_TAG=$(git describe --tags --abbrev=0 --exclude='*-*' "${CURRENT_TAG}^" 2>/dev/null || true)
+          fi
+
+          {
+            if [ "$IS_PRERELEASE" = "1" ]; then
+              echo "> Pre-release. Published for testing. Behaviour and artifacts are not final."
+              echo
+            fi
+
+            echo "## What's Changed"
+            echo
+            if [ -n "$PREV_TAG" ]; then
+              git log --no-merges --format='* %s (%h)' "${PREV_TAG}..${CURRENT_TAG}"
+              echo
+              echo "**Full Changelog**: ${REPO_URL}/compare/${PREV_TAG}...${CURRENT_TAG}"
+            else
+              git log --no-merges --format='* %s (%h)' "${CURRENT_TAG}"
+              echo
+              echo "**Full Changelog**: ${REPO_URL}/commits/${CURRENT_TAG}"
+            fi
+          } > release-notes.md
+
+          echo "--- Generated release notes ---"
+          cat release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          files: |
+            artifacts/macos-arm64-package/*
+            artifacts/macos-amd64-package/*
+            artifacts/windows-amd64-package/*
+            artifacts/windows-arm64-package/*
+            artifacts/linux-amd64-package/*
+            artifacts/linux-arm64-package/*
+            SHA256SUMS
+          body_path: release-notes.md
+          draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
-          args: ${{ matrix.args }}
-
-      - name: Build BPF helper pkg (macOS)
-        if: matrix.runner == 'macos-latest'
-        run: ./packaging/macos/build-pkg.sh
-
-      - name: Upload BPF helper pkg
-        if: matrix.runner == 'macos-latest'
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: dist/PortFinder-BPF-*.pkg
