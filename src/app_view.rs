@@ -392,6 +392,11 @@ impl AppView {
         if self.is_capturing {
             return;
         }
+        log::info!(
+            "start_capture: interface={:?} protocol={}",
+            self.selected_interface_name,
+            self.protocol.as_str()
+        );
         self.is_capturing = true;
         self.error.clear();
         self.result = None;
@@ -425,6 +430,13 @@ impl AppView {
     }
 
     fn on_capture_done(&mut self, res: Result<CaptureResult, String>, cx: &mut Context<Self>) {
+        log::info!(
+            "on_capture_done: {}",
+            match &res {
+                Ok(r) => format!("ok({})", r.switch_name),
+                Err(e) => format!("err({e})"),
+            }
+        );
         self.is_capturing = false;
         self.capture_cancel = None;
         match res {
@@ -550,8 +562,39 @@ impl Render for AppView {
         // guards against rounding noise from gpui's px → device-px
         // → px round-trip causing an infinite resize loop.
         let desired = px(self.desired_height());
-        let current = window.bounds().size.height;
+        // Use `viewport_size()` (not `bounds().size`) because the two
+        // gpui platform backends interpret bounds differently:
+        //   - macOS: `bounds()` returns the FULL window frame (content
+        //     + title bar). `resize()` sets just the CONTENT size.
+        //   - Windows: `bounds()` returns the logical content area.
+        //     `resize()` sets the CONTENT size (border offset added
+        //     internally before SetWindowPos).
+        // Comparing `bounds().size` against the desired content size
+        // is therefore always ~28 px off on macOS — `resize()` fires
+        // every render because they never converge (the loop is a
+        // no-op visually but spams the log). `viewport_size()` is
+        // the drawable area on both backends, so the comparison is
+        // cross-platform-consistent.
+        let current = window.viewport_size().height;
         if (current - desired).abs() > px(1.0) {
+            // Log resize events to the desktop debug log. Only fires
+            // on actual mismatch — animation-driven re-renders (the
+            // skeleton pulse) shouldn't spam the log because the
+            // desired stays constant while pulsing. Useful for the
+            // Windows-specific "did the resize actually take effect"
+            // diagnosis.
+            log::info!(
+                "render: resize viewport.h={} -> desired={} (scale={}, capturing={}, result={}, banner_visible={})",
+                current,
+                desired,
+                window.scale_factor(),
+                self.is_capturing,
+                self.result.is_some(),
+                self.priv_status
+                    .as_ref()
+                    .map(|s| !s.has_access)
+                    .unwrap_or(false),
+            );
             window.resize(gpui::size(px(BASE_WIDTH), desired));
         }
 

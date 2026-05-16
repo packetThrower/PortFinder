@@ -66,7 +66,7 @@ pub struct CaptureResult {
 }
 
 fn main() {
-    env_logger::init();
+    init_logging();
 
     // Filter out macOS bundle launch noise (-psn_xxx). What's left
     // decides whether the user invoked us as a CLI or just double-
@@ -90,6 +90,62 @@ fn main() {
         Err(e) => e.exit(),
     };
     std::process::exit(cli::run(cli));
+}
+
+/// Bring up env_logger with `info` as the default level and the
+/// output piped to `~/Desktop/portfinder-debug.log` (created /
+/// appended). The desktop target makes it trivial for testers to
+/// find the log without spelunking through Application Support, and
+/// the `RUST_LOG` env var still overrides everything for users who
+/// want to crank it up or down.
+///
+/// Logging to a file rather than stderr matters in production: the
+/// GUI subsystem on Windows detaches from the console, and the
+/// .app bundle on macOS launches with no stderr stream you can read
+/// after the fact. A desktop file is the friendliest "always there,
+/// always inspectable" target.
+fn init_logging() {
+    use env_logger::{Builder, Target};
+    use std::fs::OpenOptions;
+
+    let mut builder = Builder::new();
+    // Honour RUST_LOG if it's set; otherwise default to `info`. This
+    // is what `Builder::from_env(Env::default().default_filter_or)`
+    // does inline.
+    if let Ok(filter) = std::env::var("RUST_LOG") {
+        builder.parse_filters(&filter);
+    } else {
+        builder.filter_level(log::LevelFilter::Info);
+    }
+
+    if let Some(path) = desktop_log_path() {
+        if let Ok(file) = OpenOptions::new().create(true).append(true).open(&path) {
+            builder.target(Target::Pipe(Box::new(file)));
+        }
+    }
+    builder.init();
+
+    log::info!(
+        "PortFinder v{} starting (target_os={})",
+        env!("CARGO_PKG_VERSION"),
+        std::env::consts::OS
+    );
+}
+
+/// Resolve `~/Desktop/portfinder-debug.log` on macOS / Linux /
+/// Windows without pulling in a dirs crate. Returns None if neither
+/// `HOME` nor `USERPROFILE` is set — in that case the logger falls
+/// back to stderr (which still works for `cargo run`).
+fn desktop_log_path() -> Option<std::path::PathBuf> {
+    #[cfg(windows)]
+    let home = std::env::var("USERPROFILE").ok()?;
+    #[cfg(not(windows))]
+    let home = std::env::var("HOME").ok()?;
+    Some(
+        std::path::PathBuf::from(home)
+            .join("Desktop")
+            .join("portfinder-debug.log"),
+    )
 }
 
 /// On Windows, the GUI subsystem detaches from the console. Without
