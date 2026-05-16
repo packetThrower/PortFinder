@@ -160,6 +160,16 @@ before-packaging-command = "cargo build --release"
 icons = ["resources/icons/icon.icns", "resources/icons/icon.png", "resources/icons/icon.ico"]
 
 [package.metadata.packager.deb]
+# Debian Package: field. Without an explicit override, cargo-packager
+# kebab-cases the product-name ("PortFinder") to "port-finder", which
+# is what GNOME Software / apt list / dpkg -l would show — the
+# hyphenated form breaks brand consistency with the .desktop file's
+# `Name=PortFinder` and the binary's own `PortFinder` capitalisation.
+# Single-word lowercase matches the conventional Debian package name
+# shape ("portfinder") while keeping the user-visible app name
+# (launcher entry, dock tooltip, dialog titles) capitalised via the
+# .desktop file we ship in packaging/linux/.
+package-name = "portfinder"
 # Runtime dependencies for the .deb. dpkg/apt uses this list to
 # auto-install missing libs at `apt install ./portfinder.deb`. The
 # wayland/x11 surface gpui_linux pulls in needs all of these
