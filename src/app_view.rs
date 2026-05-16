@@ -69,9 +69,15 @@ const BASE_WIDTH: f32 = 420.0;
 /// the individual pieces, when the bottom dead-space looks wrong".
 const HEIGHT_BASE: f32 = 307.0;
 /// Banner is conditionally rendered when capture privileges are
-/// missing. Tall enough for two lines of body text plus the
-/// Install / Download button on the macOS / Windows paths.
-const HEIGHT_BANNER: f32 = 110.0;
+/// missing. Sized for the macOS path's three-line body text
+/// ("PortFinder needs BPF access to capture packets. Installing
+/// the helper grants /dev/bpf* read access to the access_bpf
+/// group.") plus the Install BPF Helper button, plus the card's
+/// own p_3 padding and the gap_2 between body and button. The
+/// previous 110 px was tuned for the (incorrect) assumption of
+/// two body lines; the real wrap pushes to three and the button
+/// itself is fuller than estimated.
+const HEIGHT_BANNER: f32 = 145.0;
 /// Empty result card — a single italic line ("Run a capture to see
 /// switch info here.") plus padding.
 const HEIGHT_RESULT_EMPTY: f32 = 40.0;
