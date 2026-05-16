@@ -4694,6 +4694,7 @@ dependencies = [
  "objc2-app-kit",
  "objc2-foundation",
  "pcap",
+ "security-framework",
  "serde",
  "serde_json",
  "tokio",

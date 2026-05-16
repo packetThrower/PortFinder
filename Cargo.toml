@@ -95,6 +95,15 @@ windows-sys = { version = "0.59", features = [
 # from the bundle's Info.plist + Resources/icon.icns; this runtime
 # override exists purely for the dev workflow.
 [target.'cfg(target_os = "macos")'.dependencies]
+# Rust wrappers around macOS Security.framework. We use it to call
+# AuthorizationServices for the BPF helper installer — the
+# `system.privilege.admin` rights request shows the calling app's
+# name ("PortFinder wants to make changes") in the password prompt,
+# vs the previous `osascript`-shellout path which surfaced as
+# "osascript wants to make changes" and confused users. The crate
+# also handles the FFI boilerplate around the deprecated-but-still-
+# functional `AuthorizationExecuteWithPrivileges`.
+security-framework = "3"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSGraphics", "NSGraphicsContext"] }
 objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry"] }

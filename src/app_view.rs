@@ -695,6 +695,7 @@ impl AppView {
                             .label(if installing { "Installing…" } else { "Install BPF Helper" })
                             .small()
                             .disabled(installing)
+                            .tooltip("One-time install. Lets PortFinder capture without sudo.")
                             .on_click(cx.listener(|this, _, _window, cx| this.install_bpf(cx))),
                     )
                     .into_any_element()
@@ -718,6 +719,7 @@ impl AppView {
                     Button::new("open-npcap")
                         .label("Download Npcap")
                         .small()
+                        .tooltip("Opens npcap.com to download the installer.")
                         .on_click(|_, _window, cx| {
                             cx.open_url("https://npcap.com/#download");
                         }),

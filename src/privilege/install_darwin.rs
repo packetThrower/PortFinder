@@ -1,6 +1,7 @@
-use std::io::Write;
+use std::io::{Read, Write};
 use std::os::unix::fs::PermissionsExt;
-use std::process::Command;
+
+use security_framework::authorization::{Authorization, AuthorizationItemSetBuilder, Flags};
 
 // Single shell script that:
 //   1. Removes the legacy `coop.otec.portfinder.ChmodBPF` daemon + helper
@@ -115,7 +116,9 @@ fi
 "#;
 
 pub fn install() -> Result<(), String> {
-    // Write the script to a temp file the elevated shell can read.
+    // Write the script to a temp file the elevated shell will read.
+    // The script itself is identical to the legacy osascript path —
+    // only the elevation mechanism is different.
     let dir = std::env::temp_dir();
     let path = dir.join(format!("portfinder-bpf-{}.sh", std::process::id()));
     {
@@ -132,29 +135,120 @@ pub fn install() -> Result<(), String> {
             .map_err(|e| format!("failed to chmod temp script: {e}"))?;
     }
 
-    // Use osascript to elevate. The 'do shell script' command shows the
-    // standard macOS authentication dialog for the calling app (in this
-    // case osascript). The script runs as root and any non-zero exit
-    // surfaces as a non-zero osascript exit too.
-    let path_str = path.to_string_lossy().replace('\'', r"'\''");
-    let applescript = format!(
-        "do shell script \"/bin/sh '{}'\" with administrator privileges",
-        path_str
-    );
-    let output = Command::new("osascript")
-        .args(["-e", &applescript])
-        .output()
-        .map_err(|e| format!("failed to run osascript: {e}"))?;
+    let path_str = path.to_string_lossy().into_owned();
+    let result = run_with_admin_privileges(&path_str);
 
+    // Clean up the temp script regardless of how the run went.
     let _ = std::fs::remove_file(&path);
 
-    if output.status.success() {
-        return Ok(());
-    }
+    result
+}
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    if stderr.contains("-128") || stderr.to_lowercase().contains("user canceled") {
-        return Err("authorization cancelled by user".into());
+/// Request the `system.privilege.admin` right via macOS
+/// AuthorizationServices and exec `/bin/sh <script>` as root. The
+/// dialog box that pops up reads "PortFinder wants to make changes"
+/// rather than the previous "osascript wants to make changes" because
+/// the auth request now originates from inside this process. A
+/// custom `prompt` string is wired into the auth environment so the
+/// body text under the title spells out what the install does, not
+/// the generic AuthorizationServices default.
+///
+/// Wraps the deprecated `AuthorizationExecuteWithPrivileges` API
+/// (via security-framework). The replacement Apple recommends is
+/// SMJobBless, which requires a Developer-ID-signed helper bundle
+/// with `SMAuthorizedClients` matching our team identifier — blocked
+/// on us getting an Apple Developer account. Until then, the
+/// deprecated call still works on macOS 15 (Sequoia) and 26 (Tahoe).
+fn run_with_admin_privileges(script_path: &str) -> Result<(), String> {
+    // OSStatus code for "user clicked Cancel" in the auth dialog.
+    // Hardcoded because security-framework-sys doesn't re-export
+    // the named constant publicly.
+    const ERR_AUTHORIZATION_CANCELED: i32 = -60006;
+
+    let rights = AuthorizationItemSetBuilder::new()
+        .add_right("system.privilege.admin")
+        .map_err(|e| format!("auth: declaring required right failed: {e}"))?
+        .build();
+
+    // Build the auth environment. `prompt` overrides the body text
+    // under the dialog title (title stays "PortFinder wants to make
+    // changes", driven by the calling process's identity). `icon`
+    // swaps the generic padlock/exec glyph for PortFinder's own
+    // icon — kAuthorizationEnvironmentIcon wants a path to a
+    // PNG/JPEG/TIFF (not .icns), so we point at icon.png in the
+    // bundle's Resources/ in production and fall back to the
+    // repo's resources/icons/icon.png in dev (`cargo run`).
+    let mut env_builder = AuthorizationItemSetBuilder::new()
+        .add_string(
+            "prompt",
+            "PortFinder needs to install the BPF helper for packet capture.",
+        )
+        .map_err(|e| format!("auth: setting prompt failed: {e}"))?;
+    if let Some(icon_path) = find_dialog_icon() {
+        env_builder = env_builder
+            .add_string("icon", icon_path)
+            .map_err(|e| format!("auth: setting icon failed: {e}"))?;
     }
-    Err(format!("BPF helper installation failed: {}", stderr.trim()))
+    let env = env_builder.build();
+
+    let auth = Authorization::new(
+        Some(rights),
+        Some(env),
+        Flags::INTERACTION_ALLOWED | Flags::EXTEND_RIGHTS | Flags::PREAUTHORIZE,
+    )
+    .map_err(|e| {
+        if e.code() == ERR_AUTHORIZATION_CANCELED {
+            "authorization cancelled by user".to_string()
+        } else {
+            format!("authorization failed: {e}")
+        }
+    })?;
+
+    // Use the piped variant so we can read the script's output to
+    // EOF — that read blocks until the child exits, which is what we
+    // want as a "wait for completion" signal. The non-piped variant
+    // returns the moment the child is forked, which would let our
+    // caller's `refresh_privileges()` run before the install finishes
+    // and report stale "no helper installed" state.
+    let pipe = auth
+        .execute_with_privileges_piped("/bin/sh", [script_path], Flags::DEFAULTS)
+        .map_err(|e| format!("BPF helper install failed: {e}"))?;
+
+    let mut output = String::new();
+    let _ = std::io::BufReader::new(pipe).read_to_string(&mut output);
+
+    Ok(())
+}
+
+/// Locate the PNG that AuthorizationServices should display in the
+/// password dialog. Returns the path as a string if a usable icon is
+/// found, or None if neither candidate exists (in which case the
+/// dialog falls back to the generic padlock).
+///
+/// Two candidates checked in order:
+///   1. Production: `<bundle>/Contents/Resources/icon.png`,
+///      derived from the running binary's path. cargo-packager
+///      copies `resources/icons/icon.png` into that slot when it
+///      builds the .app.
+///   2. Dev (`cargo run`): the repo-root `resources/icons/icon.png`,
+///      resolved via `CARGO_MANIFEST_DIR` so the path is correct no
+///      matter where the binary runs from.
+///
+/// Only PNG / JPEG / TIFF work here — kAuthorizationEnvironmentIcon
+/// doesn't understand .icns, so we deliberately skip the .icns even
+/// though it sits right next to icon.png in the bundle.
+fn find_dialog_icon() -> Option<String> {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(contents_dir) = exe.parent().and_then(|p| p.parent()) {
+            let bundle_icon = contents_dir.join("Resources/icon.png");
+            if bundle_icon.exists() {
+                return Some(bundle_icon.to_string_lossy().into_owned());
+            }
+        }
+    }
+    let dev_icon = format!("{}/resources/icons/icon.png", env!("CARGO_MANIFEST_DIR"));
+    if std::path::Path::new(&dev_icon).exists() {
+        return Some(dev_icon);
+    }
+    None
 }
