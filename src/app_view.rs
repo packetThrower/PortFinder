@@ -60,6 +60,19 @@ const BRAND_PRIMARY_HOVER: u32 = 0x1f8fea;
 /// Active (pressed) state — darker than the base by ~10%.
 const BRAND_PRIMARY_ACTIVE: u32 = 0x005a9e;
 
+/// Card surface — macOS 26's "secondary system grouped background"
+/// (`UIColor.secondarySystemGroupedBackground` on iOS, the same
+/// neutral gray Apple paints under elevated content in System
+/// Settings, Mail, Notes, Messages). Cool gray, not warm — the
+/// previous warm-cream tint read as 90s Aqua / OS 9 dialog
+/// background, which clashes with the Liquid Glass aesthetic Tahoe
+/// (macOS 26) drives toward.
+const CARD_BG_LIGHT: u32 = 0xf2f2f7;
+/// Dark-mode counterpart — Apple's `secondarySystemBackground` in
+/// dark mode. One shade lighter than the window background so the
+/// cards still read as elevated content.
+const CARD_BG_DARK: u32 = 0x2c2c2e;
+
 /// Process-lifetime tokio runtime handle. The runtime itself is
 /// leaked (`mem::forget`) once at first access — gpui has its own
 /// executor, but `capture::run` uses `tokio::task::spawn_blocking`
@@ -183,6 +196,12 @@ pub struct AppView {
     // Subscriptions kept alive for the entity's lifetime.
     iface_sub: gpui::Subscription,
     _proto_sub: gpui::Subscription,
+    // OS appearance observer. Fires on every system Light/Dark flip
+    // (Control Center toggle, scheduled sunrise/sunset switch, etc.)
+    // and reapplies the theme so the chrome tracks the OS without a
+    // relaunch. Held to keep the callback alive for the view's
+    // lifetime; drop = unsubscribe.
+    _appearance_sub: gpui::Subscription,
 }
 
 impl AppView {
@@ -221,6 +240,17 @@ impl AppView {
         let priv_status = Some(privilege::get_privilege_status());
         let (tx, rx) = flume::bounded(1);
 
+        // OS appearance observer. Fires whenever the system flips
+        // Light↔Dark (Control Center toggle, scheduled sunrise/
+        // sunset switch, etc.). Each fire re-applies the gpui-
+        // component Theme + our brand palette overrides; the
+        // explicit `refresh_windows` ensures every open window
+        // repaints with the new palette on the next frame.
+        let appearance_sub = window.observe_window_appearance(|window, cx| {
+            apply_system_theme(cx, window.appearance());
+            cx.refresh_windows();
+        });
+
         let mut view = Self {
             focus_handle: cx.focus_handle(),
             interfaces,
@@ -241,6 +271,7 @@ impl AppView {
             is_installing: false,
             iface_sub,
             _proto_sub: proto_sub,
+            _appearance_sub: appearance_sub,
         };
         view.spawn_capture_listener(cx);
         view
@@ -893,19 +924,11 @@ pub fn run() {
         // looking for `Theme`.
         gpui_component::init(cx);
 
-        // Boot palette follows the system appearance. Theme live-
-        // updates are out of scope for this slice; relaunch picks
-        // up changes.
-        let mode = if matches!(
-            cx.window_appearance(),
-            gpui::WindowAppearance::Dark | gpui::WindowAppearance::VibrantDark
-        ) {
-            ThemeMode::Dark
-        } else {
-            ThemeMode::Light
-        };
-        Theme::change(mode, None, cx);
-        apply_brand_palette(cx);
+        // Boot palette follows the system appearance. AppView
+        // installs an `observe_window_appearance` subscription
+        // when its window opens, so subsequent OS theme flips
+        // re-apply this helper live — no relaunch needed.
+        apply_system_theme(cx, cx.window_appearance());
 
         // Dev-mode dock icon override on macOS. Production .app
         // bundles get the icon from the Info.plist + Resources/
@@ -946,10 +969,30 @@ pub fn run() {
     });
 }
 
+/// Map an OS appearance to a gpui-component ThemeMode and install
+/// it, then re-apply our brand palette. Always paired: every
+/// `Theme::change` resets the theme's slots back to gpui-component
+/// defaults for the new mode, so the brand override must come after.
+/// Called once at boot in `run()`, and again from the per-window
+/// `observe_window_appearance` callback on every system Light/Dark
+/// flip.
+fn apply_system_theme(cx: &mut App, appearance: gpui::WindowAppearance) {
+    let mode = if matches!(
+        appearance,
+        gpui::WindowAppearance::Dark | gpui::WindowAppearance::VibrantDark
+    ) {
+        ThemeMode::Dark
+    } else {
+        ThemeMode::Light
+    };
+    Theme::change(mode, None, cx);
+    apply_brand_palette(cx, mode);
+}
+
 /// Overrides the gpui-component theme's primary slot with our brand
-/// blue. Called once after `Theme::change`. The mutation is global
-/// across windows; we re-apply it after a future light/dark flip
-/// would otherwise reset back to the gpui-component defaults.
+/// blue. Called by `apply_system_theme` immediately after every
+/// `Theme::change` so the override survives both the initial boot
+/// and any future light/dark flip.
 ///
 /// gpui-component splits its accent surface between two slot
 /// families: `primary` / `primary_*` (used by Switch's on-state
@@ -961,7 +1004,7 @@ pub fn run() {
 /// them). Both slot families need to be patched here or the Switch
 /// turns blue but the Start button stays the gpui-component default
 /// (near-black on light mode).
-fn apply_brand_palette(cx: &mut App) {
+fn apply_brand_palette(cx: &mut App, mode: ThemeMode) {
     let theme = Theme::global_mut(cx);
     let primary: Hsla = rgb(BRAND_PRIMARY).into();
     let primary_hover: Hsla = rgb(BRAND_PRIMARY_HOVER).into();
@@ -979,6 +1022,20 @@ fn apply_brand_palette(cx: &mut App) {
     theme.button_primary_hover = primary_hover;
     theme.button_primary_active = primary_active;
     theme.button_primary_foreground = white;
+
+    // Card surface — Apple's secondary-system-fill grays so the
+    // cards read as native macOS 26 (Tahoe) elevated content rather
+    // than a custom palette. Overrides `theme.popover` because
+    // that's the slot `render` reads for `card_bg`. Side effect:
+    // Select's open-dropdown popover and any gpui-component Tooltip
+    // use the same slot, so they pick up the same neutral gray —
+    // desirable consistency (every elevated surface in the app
+    // speaks the same colour, matching System Settings' behaviour).
+    let card_bg: Hsla = match mode {
+        ThemeMode::Dark => rgb(CARD_BG_DARK).into(),
+        ThemeMode::Light => rgb(CARD_BG_LIGHT).into(),
+    };
+    theme.popover = card_bg;
 }
 
 /// macOS-only: set the dock icon at runtime so `cargo run` shows the
