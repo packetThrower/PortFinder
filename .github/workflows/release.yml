@@ -56,6 +56,12 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           shared-key: release
+          # Preserve the cache even when a later step (build,
+          # packaging, hdiutil DMG mount) fails. Default discards
+          # on failure, which made the alpha.2 hdiutil flake force
+          # a full 10-min cold compile on the rerun — this flag
+          # makes the retry pick up where the failed run left off.
+          cache-on-failure: true
 
       - name: Install macOS build deps
         run: brew install pkg-config
@@ -162,6 +168,12 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           shared-key: release
+          # Preserve the cache even when a later step (build,
+          # packaging, hdiutil DMG mount) fails. Default discards
+          # on failure, which made the alpha.2 hdiutil flake force
+          # a full 10-min cold compile on the rerun — this flag
+          # makes the retry pick up where the failed run left off.
+          cache-on-failure: true
 
       - name: Cache Npcap SDK
         id: cache-npcap
@@ -264,6 +276,12 @@ jobs:
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           shared-key: release
+          # Preserve the cache even when a later step (build,
+          # packaging, hdiutil DMG mount) fails. Default discards
+          # on failure, which made the alpha.2 hdiutil flake force
+          # a full 10-min cold compile on the rerun — this flag
+          # makes the retry pick up where the failed run left off.
+          cache-on-failure: true
 
       # libpcap-dev for capture; the wayland/x11 + freetype +
       # fontconfig surface gpui_linux pulls in at compile time;

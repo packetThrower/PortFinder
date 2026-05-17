@@ -76,6 +76,12 @@ jobs:
 
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          # Preserve the cache even when a later step (clippy, test)
+          # fails. Default is to discard on failure, which forces a
+          # full recompile on the retry — wasteful when the failure
+          # is a flake or a one-line lint fix.
+          cache-on-failure: true
 
       # Linux: libpcap for the capture crate, plus the wayland +
       # x11 surface gpui_linux needs at compile time. No GTK /
