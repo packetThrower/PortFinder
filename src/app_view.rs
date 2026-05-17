@@ -22,7 +22,7 @@ use flume::{Receiver, Sender};
 use gpui::{
     div, prelude::*, px, rgb, App, AppContext, Bounds, ClipboardItem, Context, Entity, FocusHandle,
     Focusable, Hsla, IntoElement, ParentElement, Render, SharedString, Styled, Window, WindowBounds,
-    WindowOptions,
+    WindowDecorations, WindowOptions,
 };
 use gpui_component::{
     button::{Button, ButtonVariants},
@@ -1342,9 +1342,24 @@ pub fn run() {
         // hicolor theme directly; only the *running* window needs
         // the back-link). String must match the .desktop filename
         // without the `.desktop` extension.
+        // `window_decorations: Some(Client)` is what makes gpui
+        // send `set_mode(MODE_CLIENT_SIDE)` over xdg-decoration to
+        // the Wayland compositor on window construction. Without
+        // it, gpui defaults to `Server` (per
+        // `crates/gpui/src/window.rs:1319` on Zed commit
+        // 3bd9d13b — `unwrap_or(WindowDecorations::Server)`),
+        // which KWin (KDE Plasma) honours by drawing its own
+        // server-side title bar ON TOP of our gpui-component
+        // TitleBar widget — dual title bars on every KDE install.
+        // Mutter (GNOME) ignores the protocol and always does
+        // CSD so the bug isn't visible there. `title_bar_options()`
+        // only styles the in-window widget; it doesn't touch
+        // `window_decorations` (gpui-component's own example apps
+        // pair the two settings explicitly).
         let opts = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(bounds)),
             titlebar: Some(TitleBar::title_bar_options()),
+            window_decorations: Some(WindowDecorations::Client),
             app_id: Some("portfinder".into()),
             ..Default::default()
         };
