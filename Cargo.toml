@@ -1,6 +1,6 @@
 [package]
 name = "portfinder"
-version = "4.0.0-alpha.8"
+version = "4.0.0-alpha.9"
 description = "Network switch port discovery tool using CDP/LLDP/MNDP."
 authors = ["Will Lehnertz <6597817+packetThrower@users.noreply.github.com>"]
 edition = "2021"
@@ -220,7 +220,7 @@ depends = [
 # entry. Setting CAP_NET_RAW happens via the postinst hook the
 # release workflow injects (cargo-packager 0.11 doesn't expose
 # postinst directly).
-files = { "packaging/linux/portfinder.desktop" = "/usr/share/applications/portfinder.desktop", "resources/icons/icon.png" = "/usr/share/icons/hicolor/512x512/apps/portfinder.png" }
+files = { "packaging/linux/portfinder.desktop" = "/usr/share/applications/portfinder.desktop", "resources/icons/icon.png" = "/usr/share/icons/hicolor/512x512/apps/portfinder.png", "packaging/linux/io.github.packetThrower.PortFinder.metainfo.xml" = "/usr/share/metainfo/io.github.packetThrower.PortFinder.metainfo.xml" }
 
 [package.metadata.packager.macos]
 # Hand-curated Info.plist with CFBundleIdentifier matching

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AppStream metainfo for PortFinder. Reads picked up by GNOME
+  Software (and other AppStream-aware front-ends) for both
+  installed packages and the "open a downloaded .deb/.rpm" path
+  used by Fedora's Software center. Without this file the
+  Software UI shows "Unknown author / Unknown license" and
+  fabricates a name from the filename (e.g. "PortFinder-4"
+  from PortFinder-4.0.0-alpha.8-1.aarch64.rpm).
+
+  Identifier matches the macOS bundle identifier and the
+  .desktop launchable target (portfinder.desktop) so every
+  surface — Apple's CFBundleIdentifier, GNOME's app id, the
+  Linux desktop entry — refers to the same logical app.
+-->
+<component type="desktop-application">
+  <id>io.github.packetThrower.PortFinder</id>
+
+  <name>PortFinder</name>
+  <summary>Discover which switch port your device is plugged into</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <description>
+    <p>
+      PortFinder captures CDP, LLDP, and MNDP packets to identify
+      which switch, port, and VLAN your device is currently
+      connected to. Handy when you arrive at a new desk, are
+      troubleshooting a patch panel, or just want to confirm a
+      port assignment without logging into the switch.
+    </p>
+    <p>
+      Cross-platform: a single Rust binary ships as .deb, .rpm,
+      and pacman packages on Linux, an .app bundle on macOS, and
+      an NSIS installer on Windows. The Linux packages set
+      CAP_NET_RAW on the binary so non-root users can capture
+      directly.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">portfinder.desktop</launchable>
+
+  <!--
+    AppStream 1.0 expects a reverse-DNS `id` on `<developer>`, but
+    its validator rejects the uppercase `T` in
+    `io.github.packetThrower`. Going all-lowercase
+    (`io.github.packetthrower`) would mismatch the macOS
+    CFBundleIdentifier we use elsewhere (where Apple preserves
+    case), so we omit the id and rely on `<name>` only. GNOME
+    Software displays the name fine without it.
+  -->
+  <developer>
+    <name>packetThrower</name>
+  </developer>
+
+  <url type="homepage">https://packetthrower.github.io/PortFinder/</url>
+  <url type="bugtracker">https://github.com/packetThrower/PortFinder/issues</url>
+  <url type="vcs-browser">https://github.com/packetThrower/PortFinder</url>
+
+  <categories>
+    <category>Network</category>
+    <category>Utility</category>
+  </categories>
+
+  <keywords>
+    <keyword>cdp</keyword>
+    <keyword>lldp</keyword>
+    <keyword>mndp</keyword>
+    <keyword>switch</keyword>
+    <keyword>port</keyword>
+    <keyword>vlan</keyword>
+    <keyword>network</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1" />
+</component>

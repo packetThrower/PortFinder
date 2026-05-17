@@ -390,6 +390,15 @@ jobs:
           mkdir -p pkg/usr/share/icons/hicolor/512x512/apps
           cp resources/icons/icon.png pkg/usr/share/icons/hicolor/512x512/apps/portfinder.png
 
+          # AppStream metainfo — GNOME Software reads this to show
+          # the proper name, license, summary, and "by packetThrower"
+          # in its install UI. Without it the Software center shows
+          # "PortFinder-4 / Unknown author / Unknown license" because
+          # it falls back to parsing the .rpm filename.
+          mkdir -p pkg/usr/share/metainfo
+          cp packaging/linux/io.github.packetThrower.PortFinder.metainfo.xml \
+             pkg/usr/share/metainfo/
+
           mkdir -p release-artifacts
           # `()(64bit)` arch qualifier on every SONAME: RPM-based
           # distros auto-generate library `Provides:` as
