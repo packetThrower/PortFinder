@@ -17,6 +17,26 @@ publish = false
 name = "PortFinder"
 path = "src/main.rs"
 
+# Console-subsystem CLI sibling, built only when the `windows-cli`
+# feature is enabled. On Windows, the PE subsystem byte is fixed
+# at link time — a single binary can be either GUI-friendly (no
+# console flash from File Explorer) or CLI-friendly (PowerShell
+# waits and stdio routes) but not both. PortFinder.exe ships as
+# `windows_subsystem = "windows"` for the former, portfinder-cli.exe
+# defaults to `console` for the latter. The release workflow
+# enables this feature only on the Windows build step so macOS
+# and Linux packages stay single-binary (their argv dispatch
+# through PortFinder works correctly without a separate console
+# binary, since there's no subsystem distinction). See `src/lib.rs`
+# for the full background.
+[[bin]]
+name = "portfinder-cli"
+path = "src/bin/portfinder-cli.rs"
+required-features = ["windows-cli"]
+
+[features]
+windows-cli = []
+
 [dependencies]
 # Zed's GPU-accelerated UI framework. Pinned (via Cargo.lock) to a
 # specific zed-industries/zed commit because the gpui crate is a
@@ -179,6 +199,19 @@ in-app banner walks the user through the install).\
 """
 before-packaging-command = "cargo build --release"
 icons = ["resources/icons/icon.icns", "resources/icons/icon.png", "resources/icons/icon.ico"]
+
+# Single-binary by default. Windows additionally ships the
+# `portfinder-cli.exe` console-subsystem sibling, but that's
+# routed in via `--config packaging/windows/Packager.json` in
+# the release workflow rather than declared here — cargo-packager's
+# `binaries` field is global with no per-format filter, so listing
+# the cli binary in Cargo.toml would also bundle it into the
+# macOS .app and Linux .deb. See `src/lib.rs` for the dual-binary
+# rationale and `packaging/windows/README.md` for the override
+# mechanics.
+[[package.metadata.packager.binaries]]
+path = "PortFinder"
+main = true
 
 [package.metadata.packager.deb]
 # Debian Package: field. Without an explicit override, cargo-packager
