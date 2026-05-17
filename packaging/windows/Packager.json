@@ -1,0 +1,23 @@
+{
+  "productName": "PortFinder",
+  "identifier": "io.github.packetThrower.PortFinder",
+  "category": "Utility",
+  "copyright": "© 2024–2026 packetThrower / PortFinder contributors",
+  "homepage": "https://packetthrower.github.io/PortFinder/",
+  "authors": ["Will Lehnertz"],
+  "publisher": "packetThrower",
+  "description": "Network switch port discovery tool using CDP/LLDP/MNDP.",
+  "longDescription": "PortFinder captures CDP, LLDP, and MNDP packets to identify what switch, port, and VLAN your device is connected to. Cross-platform (macOS + Windows + Linux). On macOS the bundled BPF helper grants non-root access to /dev/bpf*; on Linux the .deb / .rpm sets CAP_NET_RAW on the binary; on Windows it links delay-loaded against Npcap so the app launches even if Npcap isn't installed yet (the in-app banner walks the user through the install).",
+
+  "beforePackagingCommand": "cargo build --release --features windows-cli",
+  "icons": [
+    "resources/icons/icon.icns",
+    "resources/icons/icon.png",
+    "resources/icons/icon.ico"
+  ],
+
+  "binaries": [
+    { "path": "PortFinder", "main": true },
+    { "path": "portfinder-cli", "main": false }
+  ]
+}

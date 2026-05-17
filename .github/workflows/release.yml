@@ -207,14 +207,34 @@ jobs:
             Set-Content -NoNewline Cargo.toml
           Write-Host "Building version: $version"
 
+      # Windows-only: build the console-subsystem `portfinder-cli`
+      # sibling alongside the GUI `PortFinder.exe`, then package
+      # both into the NSIS / WiX installers. macOS / Linux stay
+      # single-binary because `required-features = ["windows-cli"]`
+      # on the cli `[[bin]]` in Cargo.toml keeps them from
+      # compiling it. See `src/lib.rs` for the dual-binary
+      # rationale and `packaging/windows/README.md` for the
+      # config-override mechanics.
+      #
       # NSIS ships on every Windows build. WiX/MSI is gated to
       # stable amd64 only — see release-pipeline notes in Baudrun
       # for why (cargo-packager 0.11 bundles WiX 3.11 which
       # predates `-arch arm64`, and WiX rejects alphanumeric
       # pre-release identifiers).
+      #
+      # The `--config` override is required because cargo-packager's
+      # `binaries` field is global — no per-format filter — and
+      # listing the cli binary in `[package.metadata.packager]`
+      # would also bundle it into the macOS .app and Linux .deb.
+      # `Get-Content -Raw` inlines the JSON because cargo-packager
+      # 0.11.8 has a bug where `--config <file_path>` errors with
+      # "Not a directory" — only raw JSON inline works.
       - name: Build .exe (NSIS) + .msi (stable amd64 only)
-        shell: cmd
-        run: cargo packager --release -f nsis ${{ (!contains(github.ref_name, '-') && matrix.arch == 'amd64') && '-f wix' || '' }}
+        shell: pwsh
+        run: |
+          $config = Get-Content packaging/windows/Packager.json -Raw
+          $wix_flag = if (!"${{ github.ref_name }}".Contains("-") -and "${{ matrix.arch }}" -eq "amd64") { "-f wix" } else { "" }
+          cargo packager --release -f nsis $wix_flag.Split() --config $config --out-dir target/release --binaries-dir target/release
 
       - name: Stage artifacts
         shell: pwsh
@@ -229,10 +249,14 @@ jobs:
           Get-ChildItem "$bundle/*.msi" -ErrorAction SilentlyContinue |
             Copy-Item -Destination release-artifacts/
 
-          # Portable .zip of the bare PortFinder.exe for users who
-          # don't want an installer.
+          # Portable .zip of both binaries for users who don't
+          # want an installer. portfinder-cli.exe is the
+          # console-subsystem CLI sibling (built via the
+          # `windows-cli` feature in the previous step);
+          # PortFinder.exe is the GUI entry. See `src/lib.rs`
+          # for why two exist.
           Compress-Archive `
-            -Path "$bundle/PortFinder.exe" `
+            -Path "$bundle/PortFinder.exe", "$bundle/portfinder-cli.exe" `
             -DestinationPath "release-artifacts/PortFinder-Windows-$arch-$version.zip"
 
           Write-Host "--- staged ---"
