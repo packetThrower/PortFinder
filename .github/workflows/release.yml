@@ -358,6 +358,17 @@ jobs:
       - name: Build .rpm via fpm
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          # RPM version strings forbid hyphens (the hyphen is the
+          # field separator between version and release). The
+          # canonical RPM convention for pre-releases is the
+          # tilde, which sorts BEFORE digits, so dnf knows
+          # `4.0.0~alpha.4 < 4.0.0` and upgrades cleanly when
+          # stable lands. Without this, fpm silently rewrites the
+          # hyphen to an underscore (`4.0.0_alpha.4`) — sorts
+          # correctly only by lexical accident, reads worse in
+          # `dnf list installed`, and is technically a different
+          # convention from the rest of the RPM ecosystem.
+          RPM_VERSION="${VERSION//-/~}"
           ARCH="${{ matrix.rpm_arch }}"
           BIN="target/release/PortFinder"
 
@@ -377,12 +388,12 @@ jobs:
           # `libfoo.so.N()(64bit)` on 64-bit arches — both aarch64
           # and x86_64 use the same 64bit token.
           fpm -s dir -t rpm -C pkg \
-            --name portfinder --version "$VERSION" --architecture "$ARCH" \
+            --name portfinder --version "$RPM_VERSION" --architecture "$ARCH" \
             --license GPL-3.0-or-later \
             --description "Network switch port discovery via CDP/LLDP/MNDP." \
             --url "https://packetthrower.github.io/PortFinder/" \
             --vendor "packetThrower" --maintainer "packetThrower" \
-            --depends 'libpcap.so.1()(64bit)' \
+            --depends 'libpcap' \
             --depends 'libxkbcommon.so.0()(64bit)' \
             --depends 'libxkbcommon-x11.so.0()(64bit)' \
             --depends 'libwayland-client.so.0()(64bit)' \
