@@ -72,6 +72,23 @@ const BASE_WIDTH: f32 = 420.0;
 /// px rounding); the rule of thumb is "tweak this constant, not
 /// the individual pieces, when the bottom dead-space looks wrong".
 const HEIGHT_BASE: f32 = 341.0;
+
+/// Extra vertical room added to `desired_height()` on Linux to
+/// compensate for client-side-decoration overhead. On Wayland
+/// compositors that don't support SSD (Mutter on GNOME, the
+/// default on Ubuntu), gpui_linux reports `viewport_size()` as
+/// the full window allocation but the compositor reserves some
+/// of that area for shadow + resize handles — net effect is that
+/// our `viewport_size` matches `desired_height` numerically while
+/// the visually-rendered content area is ~24 px shorter, clipping
+/// the version footer at the bottom edge. 24 px was measured from
+/// the gap between requested 393 px and visibly-rendered ~370 px
+/// on Ubuntu 24.04 + Mutter. Zero on macOS / Windows where the
+/// compositor doesn't claw back any of our content area.
+#[cfg(target_os = "linux")]
+const HEIGHT_CSD_PADDING: f32 = 24.0;
+#[cfg(not(target_os = "linux"))]
+const HEIGHT_CSD_PADDING: f32 = 0.0;
 /// Banner is conditionally rendered when capture privileges are
 /// missing. Sized for the macOS path's three-line body text
 /// ("PortFinder needs BPF access to capture packets. Installing
@@ -576,7 +593,7 @@ impl AppView {
     /// diverge — `cx.notify()` after every state change is what
     /// re-triggers the comparison.
     fn desired_height(&self) -> f32 {
-        let mut h = HEIGHT_BASE;
+        let mut h = HEIGHT_BASE + HEIGHT_CSD_PADDING;
         if self
             .priv_status
             .as_ref()
