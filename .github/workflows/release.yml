@@ -387,7 +387,7 @@ jobs:
             --description "Network switch port discovery via CDP/LLDP/MNDP." \
             --url "https://packetthrower.github.io/PortFinder/" \
             --vendor "packetThrower" --maintainer "packetThrower" \
-            --depends 'libpcap.so.1()(64bit)' \
+            --depends 'libpcap' \
             --depends 'libxkbcommon.so.0()(64bit)' \
             --depends 'libxkbcommon-x11.so.0()(64bit)' \
             --depends 'libwayland-client.so.0()(64bit)' \
