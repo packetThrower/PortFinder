@@ -124,10 +124,31 @@ objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry"] }
 # PE resource section on Windows. No-op on non-Windows targets.
 embed-resource = "3"
 
+[profile.dev]
+# `line-tables-only` keeps panic backtraces line-resolved (file +
+# line, no variable names) while dropping the rest of DWARF debug
+# info — cuts target/ size dramatically and shaves a measurable
+# chunk off debug-build link time. Matters most for CI where the
+# Swatinem/rust-cache upload step is gated on target/ size, and
+# for `cargo run` iteration locally. Full debug stays available
+# via `RUSTFLAGS="-Cdebuginfo=full" cargo run` when needed.
+debug = "line-tables-only"
+
 [profile.release]
 panic = "abort"
-codegen-units = 1
-lto = true
+# `codegen-units = 16` parallelises codegen across cores at the
+# cost of a few percent runtime perf. Was 1 (the most aggressive
+# whole-program optimisation setting); for PortFinder — a UI
+# event-loop app, not throughput-bound — the runtime hit is
+# invisible, while CI release builds shave 30%+ off the codegen
+# phase. Pair with `lto = "thin"` below for the recommended
+# "fast-enough release" combo.
+codegen-units = 16
+# `"thin"` LTO does cross-crate inlining like full LTO does but
+# parallelises across codegen units instead of forcing a single
+# whole-program pass. ~95% of the runtime win of `lto = true` at
+# ~30% of the compile time on gpui's ~830-crate dep graph.
+lto = "thin"
 opt-level = 3
 strip = true
 
