@@ -220,7 +220,13 @@ depends = [
 # entry. Setting CAP_NET_RAW happens via the postinst hook the
 # release workflow injects (cargo-packager 0.11 doesn't expose
 # postinst directly).
-files = { "packaging/linux/portfinder.desktop" = "/usr/share/applications/portfinder.desktop", "resources/icons/icon.png" = "/usr/share/icons/hicolor/512x512/apps/portfinder.png", "packaging/linux/io.github.packetThrower.PortFinder.metainfo.xml" = "/usr/share/metainfo/io.github.packetThrower.PortFinder.metainfo.xml" }
+# cargo-packager auto-generates `/usr/share/applications/PortFinder.desktop`
+# from the product-name with content identical to our hand-maintained
+# `packaging/linux/portfinder.desktop`, so the explicit `files=` entry
+# for the .desktop file is omitted to avoid shipping two launcher
+# entries in the .deb. (The .rpm / pacman builds in release.yml still
+# stage our .desktop manually since fpm doesn't auto-generate one.)
+files = { "resources/icons/icon.png" = "/usr/share/icons/hicolor/512x512/apps/portfinder.png", "packaging/linux/io.github.packetThrower.PortFinder.metainfo.xml" = "/usr/share/metainfo/io.github.packetThrower.PortFinder.metainfo.xml" }
 
 [package.metadata.packager.macos]
 # Hand-curated Info.plist with CFBundleIdentifier matching

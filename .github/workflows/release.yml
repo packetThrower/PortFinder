@@ -384,8 +384,12 @@ jobs:
           echo "Patched DT_NEEDED:"
           patchelf --print-needed pkg/usr/bin/PortFinder | grep -i pcap
 
+          # Install the .desktop file as `PortFinder.desktop` so it
+          # matches the AppStream launchable id (which itself matches
+          # cargo-packager's auto-gen name for the .deb). Single
+          # capitalised filename across every Linux package format.
           mkdir -p pkg/usr/share/applications
-          cp packaging/linux/portfinder.desktop pkg/usr/share/applications/
+          cp packaging/linux/portfinder.desktop pkg/usr/share/applications/PortFinder.desktop
 
           mkdir -p pkg/usr/share/icons/hicolor/512x512/apps
           cp resources/icons/icon.png pkg/usr/share/icons/hicolor/512x512/apps/portfinder.png

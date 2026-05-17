@@ -39,7 +39,14 @@
     </p>
   </description>
 
-  <launchable type="desktop-id">portfinder.desktop</launchable>
+  <!--
+    cargo-packager generates the .desktop file as
+    `PortFinder.desktop` from product-name; the .rpm / pacman
+    builds stage our copy at the same capitalised path so this
+    launchable id resolves identically on every Linux package
+    format.
+  -->
+  <launchable type="desktop-id">PortFinder.desktop</launchable>
 
   <!--
     AppStream 1.0 expects a reverse-DNS `id` on `<developer>`, but
