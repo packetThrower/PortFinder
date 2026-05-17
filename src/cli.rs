@@ -81,6 +81,16 @@ pub fn run(cli: Cli) -> i32 {
         }
     });
 
+    // Detach rather than waiting for any in-flight spawn_blocking
+    // pcap reads to wind down. The blocking loop in
+    // `capture::capture_blocking` polls cancellation every
+    // `PCAP_TIMEOUT_MS` (50 ms), so dropping the runtime would
+    // normally only stall ~50 ms — but under VM load that has been
+    // seen to wedge for seconds, and there's nothing those threads
+    // can produce now that the result has been consumed. The
+    // process::exit(...) call in main will tear them down anyway.
+    runtime.shutdown_background();
+
     match result {
         Ok(()) => 0,
         Err(msg) => {
@@ -93,13 +103,34 @@ pub fn run(cli: Cli) -> i32 {
 async fn run_capture(interface: String, protocol: String, json: bool) -> Result<(), String> {
     let cancel = CancellationToken::new();
 
-    // Forward Ctrl+C to the cancellation token so the user can interrupt
-    // a long-running capture cleanly.
+    // Forward Ctrl+C to the cancellation token so the user can
+    // interrupt a long-running capture cleanly. The handler loops
+    // and counts presses: the first ^C cancels gracefully, any
+    // subsequent ^C aborts via `process::exit(130)` (the standard
+    // 128+SIGINT exit code).
+    //
+    // The loop matters because `tokio::signal::ctrl_c()` installs
+    // a SIGINT handler with the OS that *replaces* the kernel
+    // default (terminate). Once that handler is in place,
+    // signals are absorbed by tokio's stream regardless of whether
+    // anyone's awaiting them — so without an explicit second-press
+    // escape hatch, a wedged blocking task makes the process
+    // unkillable from the terminal short of SIGKILL.
     let cancel_for_signal = cancel.clone();
     tokio::spawn(async move {
-        if tokio::signal::ctrl_c().await.is_ok() {
-            eprintln!("\ninterrupted");
-            cancel_for_signal.cancel();
+        let mut presses = 0u8;
+        loop {
+            if tokio::signal::ctrl_c().await.is_err() {
+                return;
+            }
+            presses = presses.saturating_add(1);
+            if presses == 1 {
+                eprintln!("\ninterrupted");
+                cancel_for_signal.cancel();
+            } else {
+                eprintln!("force-exit");
+                std::process::exit(130);
+            }
         }
     });
 
