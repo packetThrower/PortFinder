@@ -365,6 +365,25 @@ jobs:
           cp "$BIN" pkg/usr/bin/PortFinder
           chmod +x pkg/usr/bin/PortFinder
 
+          # Rewrite the libpcap SONAME embedded in DT_NEEDED.
+          # Ubuntu's libpcap0.8 package ships SONAME `libpcap.so.0.8`
+          # and rustc bakes that into the binary at link time, so the
+          # binary won't load on Fedora / RHEL / openSUSE / Arch —
+          # all of which ship `libpcap.so.1`. The 0.x -> 1.x bump in
+          # 2008 was a project rebranding, not an ABI break: every
+          # symbol the pcap crate uses (pcap_open_live, pcap_close,
+          # pcap_loop, ...) is identical across the two SONAMEs, and
+          # the Tauri-era binary on this repo was actually broken on
+          # Fedora for the same reason — nobody had tested it. Patch
+          # the copy in `pkg/usr/bin/PortFinder` only; the .deb (built
+          # separately by cargo-packager from `target/release/`) keeps
+          # the libpcap.so.0.8 SONAME which is correct for Debian /
+          # Ubuntu installs.
+          sudo apt-get install -y patchelf
+          patchelf --replace-needed libpcap.so.0.8 libpcap.so.1 pkg/usr/bin/PortFinder
+          echo "Patched DT_NEEDED:"
+          patchelf --print-needed pkg/usr/bin/PortFinder | grep -i pcap
+
           mkdir -p pkg/usr/share/applications
           cp packaging/linux/portfinder.desktop pkg/usr/share/applications/
 
@@ -387,7 +406,7 @@ jobs:
             --description "Network switch port discovery via CDP/LLDP/MNDP." \
             --url "https://packetthrower.github.io/PortFinder/" \
             --vendor "packetThrower" --maintainer "packetThrower" \
-            --depends 'libpcap' \
+            --depends 'libpcap.so.1()(64bit)' \
             --depends 'libxkbcommon.so.0()(64bit)' \
             --depends 'libxkbcommon-x11.so.0()(64bit)' \
             --depends 'libwayland-client.so.0()(64bit)' \
