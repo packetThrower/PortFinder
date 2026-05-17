@@ -27,12 +27,21 @@
 fn main() {
     #[cfg(target_os = "windows")]
     {
-        // Bin name is the capitalised "PortFinder" set in
-        // [[bin]] name = "PortFinder"; the linker arg targets that
-        // specific binary so debug-built test binaries (which
-        // don't link wpcap) don't pick up the flag.
-        println!("cargo:rustc-link-arg-bin=PortFinder=/DELAYLOAD:wpcap.dll");
-        println!("cargo:rustc-link-arg-bin=PortFinder=delayimp.lib");
+        // Apply DELAYLOAD broadly — both the GUI binary
+        // (`PortFinder.exe`) and the console-subsystem CLI
+        // sibling (`portfinder-cli.exe`, built behind the
+        // `windows-cli` feature) link pcap, and the library test
+        // binary (`cargo test` after the lib.rs split) does too
+        // via the `pub mod capture` declaration. Without the
+        // flag on any of them, the binary refuses to start when
+        // wpcap.dll isn't on disk — the user (or CI runner) gets
+        // a "code execution cannot proceed because wpcap.dll was
+        // not found" dialog before the app's privilege-warning
+        // banner ever has a chance to render. `rustc-link-arg`
+        // (no -bin suffix) covers every binary the crate
+        // produces, including test binaries.
+        println!("cargo:rustc-link-arg=/DELAYLOAD:wpcap.dll");
+        println!("cargo:rustc-link-arg=delayimp.lib");
     }
 
     // `compile` returns a status type that's only useful on
