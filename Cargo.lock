@@ -4678,7 +4678,7 @@ dependencies = [
 
 [[package]]
 name = "portfinder"
-version = "4.0.0-alpha.11"
+version = "4.0.0-alpha.12"
 dependencies = [
  "clap",
  "embed-resource",
