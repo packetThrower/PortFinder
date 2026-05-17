@@ -345,6 +345,13 @@ jobs:
           cp packaging/linux/portfinder-postinstall.sh "$WORK/DEBIAN/postinst"
           chmod 0755 "$WORK/DEBIAN/postinst"
 
+          # Matching prerm removes the lowercase /usr/bin/portfinder
+          # symlink that postinst created. dpkg doesn't track it (the
+          # symlink isn't in the .deb file manifest), so without this
+          # `apt purge` leaves a dangling link behind.
+          cp packaging/linux/portfinder-preremove.sh "$WORK/DEBIAN/prerm"
+          chmod 0755 "$WORK/DEBIAN/prerm"
+
           dpkg-deb -Z xz -b "$WORK" "$DEB"
           rm -rf "$WORK"
 
@@ -391,6 +398,7 @@ jobs:
             --depends 'libfontconfig.so.1()(64bit)' \
             --depends 'libfreetype.so.6()(64bit)' \
             --after-install packaging/linux/portfinder-postinstall.sh \
+            --before-remove packaging/linux/portfinder-preremove.sh \
             --package "release-artifacts/PortFinder-${VERSION}-1.${ARCH}.rpm"
 
       - name: Build .pkg.tar.zst via fpm
@@ -404,6 +412,7 @@ jobs:
             --url "https://packetthrower.github.io/PortFinder/" \
             --vendor "packetThrower" --maintainer "packetThrower" \
             --after-install packaging/linux/portfinder-postinstall.sh \
+            --before-remove packaging/linux/portfinder-preremove.sh \
             --package "release-artifacts/portfinder-${VERSION}-1-${ARCH}.pkg.tar.zst"
 
       - name: Stage artifacts
