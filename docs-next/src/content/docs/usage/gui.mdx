@@ -45,3 +45,20 @@ PortFinder shows a banner if it can't capture packets:
 ## Sniff all interfaces
 
 Selecting **Sniff all Interfaces** runs a capture on every non-loopback NIC in parallel and returns the first matching packet. Useful when you don't know which physical port is patched into the switch.
+
+## Settings
+
+A hamburger menu in the title bar opens a small settings panel:
+
+- **Write debug log** — toggles file-based logging. Default OFF — a fresh install never drops a log file anywhere until you flip the switch. When enabled, log lines go to the platform's conventional log directory and the toggle takes effect immediately (no relaunch).
+- **Open log folder** — opens the platform log directory in Finder / Explorer / your file manager. Useful when you've enabled logging and want to send the file to support.
+
+Log file location per platform:
+
+| | Path |
+|---|---|
+| macOS | `~/Library/Logs/PortFinder/portfinder.log` *(Console.app picks this up automatically)* |
+| Linux | `~/.local/state/portfinder/portfinder.log` *(XDG state dir)* |
+| Windows | `%LOCALAPPDATA%\PortFinder\Logs\portfinder.log` *(Local, not Roaming)* |
+
+Settings persist as a tiny JSON file at the platform config directory (`~/Library/Application Support/PortFinder/settings.json` on macOS, `~/.config/portfinder/` on Linux, `%APPDATA%\PortFinder\` on Windows).

@@ -44,6 +44,20 @@ Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol), LLD
 3. Click Start and PortFinder captures the next discovery packet
 4. Displays: Switch Name, Switch IP, Switchport, Native VLAN, Voice VLAN, MTU, Switch Model
 
+## Settings
+
+A hamburger menu in the title bar opens a small settings panel with a
+**Write debug log** toggle (off by default — opt in when reporting a bug)
+and an **Open log folder** shortcut. When the toggle is on, log lines
+go to the platform's conventional log directory and Console.app picks
+them up automatically on macOS:
+
+- macOS: `~/Library/Logs/PortFinder/portfinder.log`
+- Linux: `~/.local/state/portfinder/portfinder.log`
+- Windows: `%LOCALAPPDATA%\PortFinder\Logs\portfinder.log`
+
+The toggle takes effect immediately — no relaunch needed.
+
 ## CLI
 
 The headless CLI shares the capture engine with the GUI. Run with no args to launch the GUI; pass a subcommand to use the CLI.
