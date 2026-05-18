@@ -15,8 +15,9 @@
 //! parsers and the CLI path port across the 3.x → 4.x rewrite
 //! unchanged. The gpui side talks to the runtime via flume channels.
 
+use std::collections::VecDeque;
 use std::sync::OnceLock;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use flume::{Receiver, Sender};
 use gpui::{
@@ -127,12 +128,13 @@ const HEIGHT_BANNER: f32 = 145.0;
 /// switch info here.") plus padding.
 const HEIGHT_RESULT_EMPTY: f32 = 40.0;
 /// Populated result card — seven key/value rows with the standard
-/// row gap, plus the "Copy as JSON" footer row (~28 px: small
-/// button + pt_1 gap), plus card padding. Same height whether or
-/// not a field is "absent"; the absent rows still occupy their
-/// slot. Was 230 before the JSON footer was added; bumped by the
-/// footer row height so the version line still clears the card.
-const HEIGHT_RESULT_FILLED: f32 = 258.0;
+/// row gap, plus the action-button footer row (small button +
+/// `pt_2` / `mt_1` / 1 px top divider ≈ 38 px), plus card padding.
+/// Same height whether or not a field is "absent"; the absent
+/// rows still occupy their slot. Was 230 before the JSON footer
+/// landed; bumped to 258 then to 268 when the divider + History
+/// button row got the extra inset.
+const HEIGHT_RESULT_FILLED: f32 = 268.0;
 /// Capturing-state result card — same seven skeleton rows but at
 /// their actual rendered content size (7 × 24 px rows + 6 × 4 px
 /// gaps + 24 px card padding ≈ 216 px). `HEIGHT_RESULT_FILLED`
@@ -290,6 +292,39 @@ struct ResultKey(&'static str);
 /// "Copied" next to the JSON button vs next to a row's value.
 const RESULT_KEY_JSON: ResultKey = ResultKey("json");
 
+/// One entry in the in-memory capture history. Captured on
+/// successful capture completion (`on_capture_done` with
+/// `Ok`); failures, cancellations, and "Not advertised"-on-
+/// every-field cases do still land here (a result with all
+/// `"N/A"` fields can still be the answer to "is this port
+/// even patched"). Stored in `AppView::history` as a
+/// `VecDeque` with `HISTORY_MAX` cap, oldest evicted first.
+///
+/// In-memory only — discarded on app close. Persistence is a
+/// follow-up the TODO file flags; for now the use case the
+/// in-app history needs to cover is "I just captured port A
+/// then port B and want to compare them," which fits the
+/// session-scoped shape.
+#[derive(Clone)]
+struct HistoryEntry {
+    result: CaptureResult,
+    protocol: Protocol,
+    interface_name: String,
+    /// Wall-clock-independent — `Instant` is monotonic and
+    /// can't go backwards across DST flips or NTP slews. The
+    /// history list renders relative ("2m ago") rather than
+    /// absolute, so the lack of a wall-clock anchor is fine.
+    captured_at: Instant,
+}
+
+/// Cap on `AppView::history`. Past this many captures the
+/// oldest entry gets evicted on `push_back`. 10 picked from
+/// the "bouncing between switches / comparing two cables"
+/// use case the TODO file describes — a tech walking a rack
+/// is unlikely to be juggling more than ~10 ports in their
+/// short-term-memory window.
+const HISTORY_MAX: usize = 10;
+
 pub struct AppView {
     focus_handle: FocusHandle,
 
@@ -314,6 +349,12 @@ pub struct AppView {
     error: String,
     status_text: SharedString,
     copied_key: Option<ResultKey>,
+
+    // Last N capture results, newest at the back. Populated
+    // by `on_capture_done` with `Ok`; rendered via the
+    // History popover on the result card. In-memory only —
+    // see `HistoryEntry` for the persistence-deferred note.
+    history: VecDeque<HistoryEntry>,
 
     // Privileges + helper install.
     priv_status: Option<privilege::PrivilegeStatus>,
@@ -502,6 +543,7 @@ impl AppView {
             error: String::new(),
             status_text: "Ready".into(),
             copied_key: None,
+            history: VecDeque::with_capacity(HISTORY_MAX),
             priv_status,
             is_installing: false,
             update_available: None,
@@ -642,6 +684,21 @@ impl AppView {
         self.capture_cancel = None;
         match res {
             Ok(r) => {
+                // Push to history before claiming `r` for
+                // `self.result` — keeps the entry's `result`
+                // and the rendered card consistent without a
+                // second clone. `HISTORY_MAX` cap is enforced
+                // by `pop_front` before `push_back`, so the
+                // deque never exceeds capacity.
+                if self.history.len() >= HISTORY_MAX {
+                    self.history.pop_front();
+                }
+                self.history.push_back(HistoryEntry {
+                    result: r.clone(),
+                    protocol: self.protocol,
+                    interface_name: self.selected_interface_name.clone(),
+                    captured_at: Instant::now(),
+                });
                 self.result = Some(r);
                 self.status_text = "Complete".into();
             }
@@ -726,6 +783,14 @@ impl AppView {
             HEIGHT_RESULT_FILLED
         } else if self.is_capturing {
             HEIGHT_RESULT_SKELETON
+        } else if !self.history.is_empty() {
+            // Empty state with a History button below the
+            // "Run a capture…" placeholder gets ~30 px more
+            // vertical than the bare placeholder. Idle state
+            // never shows the History button until a capture
+            // has landed, so the first-launch height is still
+            // exactly HEIGHT_RESULT_EMPTY.
+            HEIGHT_RESULT_EMPTY + 30.0
         } else {
             HEIGHT_RESULT_EMPTY
         };
@@ -1191,11 +1256,27 @@ impl AppView {
         }
 
         let Some(result) = self.result.clone() else {
-            return div()
-                .text_sm()
-                .text_color(cx.theme().muted_foreground)
-                .child("Run a capture to see switch info here.")
-                .into_any_element();
+            // Idle / no-result state. Renders the standard
+            // "Run a capture…" placeholder, plus a History
+            // button below it when prior captures exist — gives
+            // a path back to past data after the user has
+            // started a fresh capture (which clears `result`
+            // to None) but then cancelled / lost focus.
+            let history_btn = self.render_history_popover(cx);
+            let mut placeholder = div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(cx.theme().muted_foreground)
+                        .child("Run a capture to see switch info here."),
+                );
+            if let Some(el) = history_btn {
+                placeholder = placeholder.child(div().flex().justify_end().child(el));
+            }
+            return placeholder.into_any_element();
         };
 
         let rows: [(ResultKey, &'static str, String); 7] = [
@@ -1211,6 +1292,12 @@ impl AppView {
         let json_copied = self.copied_key == Some(RESULT_KEY_JSON);
         let success = cx.theme().success;
         let muted = cx.theme().muted_foreground;
+        let border = cx.theme().border;
+        // Built before the row loop so the borrow of `self`
+        // ends before the loop's `self.render_result_row` —
+        // `Option<AnyElement>` is `'static`, so storing it
+        // ahead of time is free.
+        let history_btn = self.render_history_popover(cx);
         let mut col = div().flex().flex_col().gap_1();
         for (key, label, raw) in rows {
             col = col.child(self.render_result_row(key, label, raw, cx));
@@ -1234,10 +1321,18 @@ impl AppView {
                 .items_center()
                 .justify_end()
                 .gap_2()
-                .pt_1()
+                // Top border + extra top padding separates the
+                // action-button row from the seven value rows
+                // above. Matches the divider style the About
+                // section uses in the settings popover.
+                .pt_2()
+                .mt_1()
+                .border_t_1()
+                .border_color(border)
                 .when(json_copied, |this| {
                     this.child(div().text_xs().text_color(success).child("Copied"))
                 })
+                .when_some(history_btn, |this, el| this.child(el))
                 .child(
                     Button::new("copy-result-json")
                         .label("Copy as JSON")
@@ -1290,6 +1385,235 @@ impl AppView {
             );
         }
         col.into_any_element()
+    }
+
+    /// "History (N)" button + popover, surfaced next to the
+    /// "Copy as JSON" button on the result card. Returns
+    /// `None` when the history is empty so the caller skips
+    /// rendering altogether (a "History (0)" button with
+    /// nothing to show would be just noise). Snapshots
+    /// `self.history` into the popover closure at construct
+    /// time — if a new capture lands while the popover is
+    /// open, it shows the old list until the popover is
+    /// reopened. Acceptable: the popover is short-lived and
+    /// the new capture is also visible in the result card
+    /// behind the popover.
+    ///
+    /// Each row renders a relative timestamp ("2m ago"),
+    /// protocol + interface, and switch name + IP. Click →
+    /// `restore_from_history` swaps `self.result` to that
+    /// entry's data. The popover's own outside-click handler
+    /// closes it on the next mouse-up.
+    fn render_history_popover(&mut self, cx: &mut Context<Self>) -> Option<gpui::AnyElement> {
+        if self.history.is_empty() {
+            return None;
+        }
+
+        // Snapshot history newest-first. `iter().rev()` over
+        // a deque is cheap (it's a doubly-ended queue) so we
+        // don't pay for a reversed `Vec` allocation.
+        let entries: Vec<(usize, HistoryEntry)> = self
+            .history
+            .iter()
+            .enumerate()
+            .rev()
+            .map(|(ix, e)| (ix, e.clone()))
+            .collect();
+        let count = entries.len();
+        let entity = cx.entity().clone();
+        let theme = cx.theme();
+        let muted = theme.muted_foreground;
+        let border = theme.border;
+        let hover_bg = theme.muted;
+
+        Some(
+            Popover::new("history-popover")
+                .trigger(
+                    Button::new("history-trigger")
+                        .label(format!("History ({count})"))
+                        .ghost()
+                        .small()
+                        .tooltip("Show recent capture results (this session)."),
+                )
+                .content(move |_, _, _| {
+                    let mut col = div()
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .p_2()
+                        .w(px(320.0))
+                        .child(
+                            div()
+                                .text_xs()
+                                .text_color(muted)
+                                .pb_1()
+                                .child(format!("Recent captures ({count})")),
+                        );
+                    for (ix, entry) in entries.iter().cloned() {
+                        let entity_for_click = entity.clone();
+                        let entity_for_right_click = entity.clone();
+                        let switch_name = if entry.result.switch_name.is_empty()
+                            || entry.result.switch_name == "N/A"
+                        {
+                            "(no switch name)".to_string()
+                        } else {
+                            entry.result.switch_name.clone()
+                        };
+                        let switch_ip = if entry.result.switch_ip.is_empty()
+                            || entry.result.switch_ip == "N/A"
+                        {
+                            "—".to_string()
+                        } else {
+                            entry.result.switch_ip.clone()
+                        };
+                        let iface = if entry.interface_name.is_empty() {
+                            "all".to_string()
+                        } else {
+                            entry.interface_name.clone()
+                        };
+                        // Port is the field most relevant to
+                        // "which cable did I plug into" — surface
+                        // it on the meta line when advertised.
+                        // Drop the segment entirely on "N/A" /
+                        // empty rather than rendering the literal
+                        // sentinel.
+                        let port_segment = if entry.result.switch_port.is_empty()
+                            || entry.result.switch_port == "N/A"
+                        {
+                            String::new()
+                        } else {
+                            format!(" · {}", entry.result.switch_port)
+                        };
+                        let meta = format!(
+                            "{} · {} on {}{}",
+                            format_ago(entry.captured_at),
+                            entry.protocol.as_str(),
+                            iface,
+                            port_segment,
+                        );
+                        col = col.child(
+                            div()
+                                .id(("history-row", ix))
+                                .cursor_pointer()
+                                .flex()
+                                .flex_col()
+                                .gap_0p5()
+                                .p_2()
+                                .border_t_1()
+                                .border_color(border)
+                                .hover(|this| this.bg(hover_bg))
+                                .tooltip(|window, cx| -> AnyView {
+                                    Tooltip::element(|_, _| {
+                                        div().w(px(220.0)).text_sm().child(
+                                            "Click to restore this capture · \
+                                             right-click to copy as JSON",
+                                        )
+                                    })
+                                    .build(window, cx)
+                                })
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(muted)
+                                        .child(meta),
+                                )
+                                .child(
+                                    div()
+                                        .flex()
+                                        .items_center()
+                                        .justify_between()
+                                        .gap_2()
+                                        .text_sm()
+                                        .child(div().truncate().min_w_0().child(switch_name))
+                                        .child(
+                                            div()
+                                                .flex_shrink_0()
+                                                .text_color(muted)
+                                                .child(switch_ip),
+                                        ),
+                                )
+                                .on_click(move |_, _window, cx| {
+                                    entity_for_click.update(cx, |this, cx| {
+                                        this.restore_from_history(ix, cx);
+                                    });
+                                })
+                                // Right-click → silently copy that
+                                // entry's CaptureResult as JSON
+                                // (same `serde_json::to_string_pretty`
+                                // shape the CLI / "Copy as JSON"
+                                // footer button produce). Silent:
+                                // the popover stays open on right-
+                                // click, no banner/toast feedback —
+                                // the discoverable hint is the row
+                                // tooltip above. Pragmatic: an
+                                // explicit "Copied" indicator
+                                // inside a popover that closes on
+                                // outside-click is awkward.
+                                .on_mouse_down(
+                                    gpui::MouseButton::Right,
+                                    move |_, _window, cx| {
+                                        entity_for_right_click.update(cx, |this, cx| {
+                                            this.copy_history_entry_json(ix, cx);
+                                        });
+                                    },
+                                ),
+                        );
+                    }
+                    col.into_any_element()
+                })
+                .into_any_element(),
+        )
+    }
+
+    /// Copy a history entry's `CaptureResult` as JSON, same
+    /// format the CLI's `--json` flag and the result-card's
+    /// "Copy as JSON" footer button produce. Bound to right-
+    /// click on each row in `render_history_popover`. Silent —
+    /// the popover stays open, no toast feedback. The row's
+    /// tooltip hints at the gesture's existence.
+    fn copy_history_entry_json(&mut self, ix: usize, cx: &mut Context<Self>) {
+        let Some(entry) = self.history.get(ix) else { return };
+        let json = match serde_json::to_string_pretty(&entry.result) {
+            Ok(s) => s,
+            Err(e) => {
+                log::warn!("copy history entry as json failed: {e}");
+                return;
+            }
+        };
+        log::info!("copy_history_entry_json: ix={ix}");
+        cx.write_to_clipboard(ClipboardItem::new_string(json));
+    }
+
+    /// Reinstate the result + status text from a past
+    /// capture. Doesn't touch the interface picker or
+    /// protocol selector — those control the *next* capture
+    /// and resetting them would be surprising. The status
+    /// line lets the user see the entry didn't come from a
+    /// live capture.
+    fn restore_from_history(&mut self, ix: usize, cx: &mut Context<Self>) {
+        let Some(entry) = self.history.get(ix).cloned() else {
+            return;
+        };
+        log::info!(
+            "restore_from_history: ix={ix} protocol={} iface={}",
+            entry.protocol.as_str(),
+            entry.interface_name,
+        );
+        self.result = Some(entry.result);
+        self.error.clear();
+        self.copied_key = None;
+        self.status_text = format!(
+            "Restored from history · {} on {} · {}",
+            entry.protocol.as_str(),
+            if entry.interface_name.is_empty() {
+                "all"
+            } else {
+                &entry.interface_name
+            },
+            format_ago(entry.captured_at),
+        )
+        .into();
+        cx.notify();
     }
 
     /// Footer "Update available" pill. Returns `None` when there's
@@ -1776,6 +2100,25 @@ fn protocol_opts() -> Vec<Opt> {
 /// single-line width wins over any `max_w` we set on the tooltip
 /// itself — the box stretches and overflows the popover. A `div`
 /// with `.w(220px)` pins the line-break boundary.
+/// "2m ago" / "1h ago" style relative timestamp for the
+/// History popover. Resolution drops to whole units —
+/// granularity isn't useful for "did I capture this before
+/// or after that other port" reasoning, just "roughly when."
+/// `Instant` is monotonic, so this is robust against wall-
+/// clock jumps (DST, NTP slews) — see `HistoryEntry.captured_at`.
+fn format_ago(t: Instant) -> String {
+    let secs = t.elapsed().as_secs();
+    if secs < 5 {
+        "just now".to_string()
+    } else if secs < 60 {
+        format!("{secs}s ago")
+    } else if secs < 3600 {
+        format!("{}m ago", secs / 60)
+    } else {
+        format!("{}h ago", secs / 3600)
+    }
+}
+
 fn log_level_label(
     id: &'static str,
     label: &'static str,
