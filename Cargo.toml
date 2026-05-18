@@ -1,6 +1,6 @@
 [package]
 name = "portfinder"
-version = "4.0.0-alpha.15"
+version = "4.0.0-alpha.16"
 description = "Network switch port discovery tool using CDP/LLDP/MNDP."
 authors = ["Will Lehnertz <6597817+packetThrower@users.noreply.github.com>"]
 edition = "2021"
