@@ -42,6 +42,15 @@ cargo build --release
 # binary at target/release/PortFinder
 ```
 
+On Windows, build the CLI sibling binary in the same step by
+enabling its feature flag. Other platforms skip it — the binary
+isn't shipped in their bundles.
+
+```bash
+cargo build --release --features windows-cli
+# also produces target/release/portfinder-cli.exe
+```
+
 For platform installers, install
 [cargo-packager](https://github.com/crabnebula-dev/cargo-packager) and
 let it wrap the release binary:
@@ -62,6 +71,7 @@ need it if you're testing bundle output.
 cargo test
 ```
 
-`cargo test` runs the in-binary unit tests in `src/capture/` and
-`src/privilege/`. There's no library target, so don't pass `--lib`
-— it errors with "no library targets found".
+Runs the unit tests in `src/capture/` and `src/privilege/`. The
+crate has both a library target (`src/lib.rs`) and binary targets
+(`src/main.rs`, `src/bin/portfinder-cli.rs`); `cargo test --lib`
+narrows to library-only.

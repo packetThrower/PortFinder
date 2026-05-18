@@ -45,3 +45,20 @@ The same release ships a desktop app and a headless CLI. Pick the one that fits 
     `portfinder capture --interface en0 --protocol LLDP --json`. [CLI usage →](/PortFinder/usage/cli/)
   </Card>
 </CardGrid>
+
+## Beyond a one-shot capture
+
+<CardGrid>
+  <Card title="Capture history" icon="list-format">
+    Last 10 captures live in an in-app popover with relative timestamps, switch name + IP, and per-entry restore. Opt in to **Save capture history** in the settings menu to persist them to disk across launches.
+  </Card>
+  <Card title="Copy as JSON" icon="seti:json">
+    One click on the result card copies the full capture as pretty-printed JSON — byte-identical to `portfinder capture --json`. Right-click on a history row does the same for a past capture.
+  </Card>
+  <Card title="Keyboard-friendly" icon="seti:default">
+    <kbd>⌘R</kbd> / <kbd>Ctrl</kbd>+<kbd>R</kbd> starts and stops capture without leaving the keyboard. Click-to-copy on any value cell; muted *Not advertised* for fields the switch didn't broadcast.
+  </Card>
+  <Card title="Customizable logging" icon="seti:log">
+    Three-stop log level slider (Normal / Verbose / Trace) applies live to every active logger. CLI takes `-v` / `-vv` / `-q` / `--log-file` to override per-invocation without touching persisted settings.
+  </Card>
+</CardGrid>

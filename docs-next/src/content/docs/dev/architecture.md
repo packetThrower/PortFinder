@@ -46,17 +46,33 @@ both paths.
 
 | Path | Purpose |
 |---|---|
-| `src/main.rs` | Binary entrypoint. Declares modules, defines `CaptureRequest` / `CaptureResult` / `InterfaceInfo`, dispatches CLI vs GUI by argv. |
-| `src/app_view.rs` | gpui UI: interface picker, protocol selector, Start / Stop, result panel, privilege banner. Hosts the tokio runtime that drives `capture::run`. |
-| `src/cli.rs` | Headless `clap`-based CLI (`capture` / `list` / `privileges` subcommands). |
+| `src/lib.rs` | Library crate. Hosts the module declarations and the shared types (`CaptureRequest`, `CaptureResult`, `InterfaceInfo`) plus `init_logging`. Both binary entry points consume this. |
+| `src/main.rs` | `PortFinder` binary entry point (GUI). `windows_subsystem = "windows"` on Windows release builds. Dispatches CLI vs GUI by argv on macOS / Linux; on Windows the dispatch is preserved for `cargo run` but shipping CLI usage routes through the sibling binary below. |
+| `src/bin/portfinder-cli.rs` | `portfinder-cli` binary entry point. No `windows_subsystem` attribute → console subsystem on Windows, so PowerShell waits for it and stdio routes correctly. Gated behind `[features] windows-cli` so non-Windows builds don't compile it. |
+| `src/app_view.rs` | gpui UI: interface picker, protocol selector, Start / Stop, result panel, privilege banner, settings popover, history popover. Hosts the tokio runtime that drives `capture::run`. |
+| `src/cli.rs` | Headless `clap`-based CLI (`capture` / `list` / `privileges` subcommands plus the global `-v` / `-vv` / `-q` / `--log-file` flags). |
 | `src/capture/` | pcap capture orchestration plus hand-rolled CDP, LLDP, and MNDP TLV parsers. |
 | `src/privilege/` | Per-platform privilege detection + macOS BPF helper installer (`install_darwin.rs` inlines the install script). |
+| `src/settings.rs` | Persistent settings (`settings.json`) + history (`history.json`) + live logger pipe (`LogPipe`). `set_logging_enabled` swaps `RwLock<Option<File>>` so the in-app toggle takes effect without a relaunch. |
+| `src/updater.rs` | Boot-time GitHub-Releases check for a newer version, behind the footer's "Update available" pill. |
 | `Cargo.toml` | Root crate manifest. `[package.metadata.packager]` carries the cargo-packager bundle config (icons, identifiers, deb deps, macOS plist path). |
 | `build.rs` | Embeds `resources/icons/icon.ico` into `PortFinder.exe` (Windows). Marks `wpcap.dll` as delay-loaded so the binary launches even if Npcap isn't installed. |
 | `resources/Info.plist` | macOS bundle Info.plist. `CFBundleIdentifier = io.github.packetThrower.PortFinder`. |
 | `resources/icons/` | `.icns` / `.ico` / `.png` consumed by cargo-packager + the Windows `.rc`. |
 | `packaging/macos/` | Standalone BPF helper `.pkg` builder + scripts. `PortFinder BPF Helper.sh` is the actual helper; the matching `io.github.packetThrower.PortFinder.BPFHelper.plist` is the LaunchDaemon. |
-| `packaging/linux/` | `portfinder.desktop` + post-install hook (sets `CAP_NET_RAW`). |
+| `packaging/linux/` | `portfinder.desktop` + post-install hook (sets `CAP_NET_RAW`) + DEP-5 `copyright` + `changelog.Debian.template` (lintian compliance). |
+| `packaging/windows/` | Windows-only cargo-packager override (`Packager.json`) that adds the `portfinder-cli.exe` sibling to the NSIS / WiX bundles. See its README for the drift warning. |
+
+## Windows dual binary
+
+The Windows installer ships **both** `PortFinder.exe` (GUI) and `portfinder-cli.exe`. A PE binary has a single "subsystem" byte set at link time and one `.exe` has to pick one:
+
+- `IMAGE_SUBSYSTEM_WINDOWS_GUI` (`windows_subsystem = "windows"` in `src/main.rs`): no console allocated on launch; the shell fire-and-forgets the process. Right for File Explorer double-click — no black console window flashes up next to the GUI.
+- `IMAGE_SUBSYSTEM_WINDOWS_CUI` (default for `src/bin/portfinder-cli.rs`, which has no `windows_subsystem` attribute): kernel allocates a console; PowerShell waits for the process to exit before redrawing the prompt; stdio routes correctly. Right for CLI usage.
+
+There's no runtime override. `AttachConsole` works for stdio routing but the shell has already redrawn its prompt by the time CLI output arrives. Real-world precedent: wezterm ships `wezterm` + `wezterm-gui`; Zed ships `cli` + `zed`.
+
+Cargo wires this up via `[features] windows-cli = []` plus `required-features = ["windows-cli"]` on `[[bin]] name = "portfinder-cli"`, so non-Windows `cargo build --release` doesn't compile it. The Windows release workflow passes `--config "$(Get-Content packaging/windows/Packager.json -Raw)"` to cargo-packager, which adds the CLI to the bundle and runs `cargo build --release --features windows-cli` for the build.
 
 ## Capture flow
 
