@@ -46,19 +46,55 @@ PortFinder shows a banner if it can't capture packets:
 
 Selecting **Sniff all Interfaces** runs a capture on every non-loopback NIC in parallel and returns the first matching packet. Useful when you don't know which physical port is patched into the switch.
 
+## Result card
+
+After a capture lands you get seven rows: Switch Name, Switch IP, Switch Port, VLAN, Voice VLAN, MTU, Switch Model. Fields the switch didn't advertise render as a muted *Not advertised*.
+
+- **Click any value** to copy that one field to the clipboard.
+- **Copy as JSON** copies the full result as pretty-printed JSON — byte-identical to what `portfinder capture --json` produces, so you can paste it into a ticket or pipe it through `jq`.
+- **History (N)** opens a popover with the last ten captures. Each row shows a relative timestamp ("2m ago · LLDP on en0 · Gi1/0/24") plus the switch name and IP. **Left-click** restores that capture to the card; **right-click** silently copies the entry as JSON.
+
+History is session-scoped by default; flipping **Save capture history** in the settings menu writes it to disk so it survives restarts.
+
+## Keyboard shortcuts
+
+| Action | macOS | Linux / Windows |
+|---|---|---|
+| Start / Stop capture | <kbd>⌘R</kbd> | <kbd>Ctrl</kbd>+<kbd>R</kbd> |
+| Quit | <kbd>⌘Q</kbd> | <kbd>Alt</kbd>+<kbd>F4</kbd> |
+
+The shortcut is also wired into the **PortFinder** application menu as *Start/Stop Capture*. It's inert while the settings popover is open, so the popover's controls keep arrow-key focus.
+
 ## Settings
 
-A hamburger menu in the title bar opens a small settings panel:
+A hamburger menu in the title bar opens the settings panel. The popover is grouped into **Capture**, **Logging**, **About**, and a folders row.
 
-- **Write debug log** — toggles file-based logging. Default OFF — a fresh install never drops a log file anywhere until you flip the switch. When enabled, log lines go to the platform's conventional log directory and the toggle takes effect immediately (no relaunch).
-- **Open log folder** — opens the platform log directory in Finder / Explorer / your file manager. Useful when you've enabled logging and want to send the file to support.
+### Capture
 
-Log file location per platform:
+- **Save capture history** — when on, the History popover persists to a `history.json` file alongside `settings.json`. Default OFF. Flipping ON snapshots the current in-memory deque to disk immediately, so quit + relaunch round-trips. Flipping OFF deletes the file; the in-memory deque stays for the rest of the session.
 
-| | Path |
-|---|---|
-| macOS | `~/Library/Logs/PortFinder/portfinder.log` *(Console.app picks this up automatically)* |
-| Linux | `~/.local/state/portfinder/portfinder.log` *(XDG state dir)* |
-| Windows | `%LOCALAPPDATA%\PortFinder\Logs\portfinder.log` *(Local, not Roaming)* |
+### Logging
 
-Settings persist as a tiny JSON file at the platform config directory (`~/Library/Application Support/PortFinder/settings.json` on macOS, `~/.config/portfinder/` on Linux, `%APPDATA%\PortFinder\` on Windows).
+- **Log level** — slider with three discrete stops:
+  - **Normal** (info) — lifecycle events only: boot, capture start/stop, settings flips. The default.
+  - **Verbose** (debug) — adds per-event capture diagnostics ("PortFinder isn't capturing" debugging).
+  - **Trace** — adds per-pcap-tick noise (~20 Hz per interface). Almost always overkill; useful for libpcap timing questions.
+
+  The level applies live to every active logger, including any parallel `portfinder capture` invocation in another terminal. CLI `-v` / `-vv` / `-q` flags still override at runtime.
+- **Write debug log** — toggles file logging. Default OFF — a fresh install never drops a log file anywhere until you flip the switch. When enabled, log lines go to the platform's conventional log directory and the toggle takes effect immediately (no relaunch). Rotates at 1 MiB to `portfinder.log.1`.
+
+### About
+
+The **About →** row opens a sub-page inside the same popover with version, GitHub link, GPL-3.0 license link, and a platform-specific capture-privilege status row (BPF helper on macOS, Npcap on Windows, "Capture access" on Linux). The privilege row is read-only status — installation flows live on the prominent banner up top.
+
+### Folders
+
+Two buttons reveal the relevant directories in your file manager.
+
+| | Settings folder | Log folder |
+|---|---|---|
+| macOS | `~/Library/Application Support/PortFinder/` | `~/Library/Logs/PortFinder/` *(Console.app picks this up automatically)* |
+| Linux | `~/.config/portfinder/` *(XDG config dir)* | `~/.local/state/portfinder/` *(XDG state dir)* |
+| Windows | `%APPDATA%\PortFinder\` | `%LOCALAPPDATA%\PortFinder\Logs\` *(Local, not Roaming)* |
+
+The settings folder holds `settings.json` and (when **Save capture history** is on) `history.json`. The log folder holds `portfinder.log` plus the rotated `portfinder.log.1` if you've crossed the 1 MiB threshold.

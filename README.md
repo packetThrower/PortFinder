@@ -44,19 +44,36 @@ Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol), LLD
 3. Click Start and PortFinder captures the next discovery packet
 4. Displays: Switch Name, Switch IP, Switchport, Native VLAN, Voice VLAN, MTU, Switch Model
 
+## Result card
+
+After a capture lands:
+
+- **Click any value** to copy that one field to the clipboard.
+- **Copy as JSON** copies the full result as `serde_json` pretty-printed output — same shape `portfinder capture --json` produces.
+- **History (N)** opens a popover with the last 10 captures (session-scoped by default; opt-in disk persistence via the settings menu). Left-click an entry to restore it to the card; right-click to copy that entry as JSON.
+
+## Keyboard shortcuts
+
+| Action | macOS | Linux / Windows |
+|---|---|---|
+| Start / Stop capture | <kbd>⌘R</kbd> | <kbd>Ctrl</kbd>+<kbd>R</kbd> |
+| Quit | <kbd>⌘Q</kbd> | <kbd>Alt</kbd>+<kbd>F4</kbd> |
+
 ## Settings
 
-A hamburger menu in the title bar opens a small settings panel with a
-**Write debug log** toggle (off by default — opt in when reporting a bug)
-and an **Open log folder** shortcut. When the toggle is on, log lines
-go to the platform's conventional log directory and Console.app picks
-them up automatically on macOS:
+A hamburger menu in the title bar opens the settings panel:
 
-- macOS: `~/Library/Logs/PortFinder/portfinder.log`
+- **Save capture history** — when on, the in-app history popover persists to `history.json` alongside `settings.json`. Default off; flipping the toggle off deletes the file (in-memory deque stays for the rest of the session).
+- **Log level** — slider with three stops (Normal / Verbose / Trace). Applies live to every logger (GUI + any parallel CLI invocation). Default Normal (info-level).
+- **Write debug log** — toggles file logging. Default off; the log file appears only after you flip the switch. Takes effect immediately, no relaunch.
+- **About →** opens an in-popover sub-page with version, GitHub, GPL-3.0 license, and BPF helper / Npcap / capture-access status.
+- **Settings folder** / **Log folder** buttons reveal the platform-conventional directories in your file manager.
+
+Log file location per platform:
+
+- macOS: `~/Library/Logs/PortFinder/portfinder.log` *(Console.app indexes it)*
 - Linux: `~/.local/state/portfinder/portfinder.log`
 - Windows: `%LOCALAPPDATA%\PortFinder\Logs\portfinder.log`
-
-The toggle takes effect immediately — no relaunch needed.
 
 ## CLI
 
@@ -69,6 +86,12 @@ portfinder list --with-ip                                  # interfaces with IPs
 portfinder privileges                                      # diagnose access
 portfinder --help                                          # see all options
 ```
+
+Global flags work alongside any subcommand:
+
+- `-v` / `-vv` — bump log verbosity to debug / trace
+- `-q` — warnings + errors only
+- `--log-file <PATH>` — override the platform-default log path for this invocation (process-scoped, doesn't touch persisted settings)
 
 Press Ctrl+C to interrupt a running capture; a second press force-exits. The Homebrew cask, Scoop manifest, and Linux `.deb` / `.rpm` / `pacman` packages all expose `portfinder` on `PATH` so the commands above work from any shell on every platform.
 

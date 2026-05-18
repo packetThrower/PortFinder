@@ -11,6 +11,23 @@ The CLI shares the capture engine with the GUI. Pass a subcommand to use the CLI
 portfinder --help
 ```
 
+## Global flags
+
+These work alongside any subcommand and are mutually compatible with the GUI's persisted log settings — CLI flags override at runtime without writing to disk.
+
+| Flag | Description |
+|---|---|
+| `-v` | Bump log verbosity to debug. |
+| `-vv` | Bump log verbosity to trace (per-pcap-tick noise; rarely useful). |
+| `-q` | Quiet — warnings + errors only. Conflicts with `-v`. |
+| `--log-file <PATH>` | Override the platform-default log path for this invocation. Process-scoped — doesn't touch persisted settings or the GUI's log location. |
+
+```bash
+portfinder -v capture --protocol LLDP
+portfinder -q capture --json
+portfinder --log-file /tmp/pf.log capture
+```
+
 ## Subcommands
 
 ### `capture`
