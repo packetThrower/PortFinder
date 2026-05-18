@@ -100,6 +100,14 @@ serde_json = "1"
 log = "0.4"
 env_logger = "0.11"
 
+# Per-platform standard directory resolution for the settings file
+# and the debug log destination — `~/Library/Logs/PortFinder/` on
+# macOS, `$XDG_STATE_HOME/portfinder/` on Linux,
+# `%LOCALAPPDATA%\PortFinder\Logs\` on Windows. Already in the
+# transitive dep graph via gpui's font-kit chain; declaring directly
+# so we don't break if upstream drops it.
+dirs = "6"
+
 # Sync HTTP client for the on-launch GitHub Releases update check.
 # `ureq` is the minimal-deps sync flavour — bundles rustls so we
 # don't pull in OpenSSL. The check runs once per launch on a

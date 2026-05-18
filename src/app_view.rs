@@ -26,10 +26,11 @@ use gpui::{
 };
 use gpui_component::{
     button::{Button, ButtonVariants},
+    popover::Popover,
     select::{Select, SelectEvent, SelectItem, SelectState},
     skeleton::Skeleton,
     switch::Switch,
-    ActiveTheme, Disableable, IndexPath, Root, Sizable, Theme, ThemeMode, TitleBar,
+    ActiveTheme, Disableable, IconName, IndexPath, Root, Sizable, Theme, ThemeMode, TitleBar,
 };
 use tokio::runtime::Handle as TokioHandle;
 use tokio_util::sync::CancellationToken;
@@ -46,7 +47,9 @@ use tokio_util::sync::CancellationToken;
 // later if anyone asks.
 actions!(portfinder, [Quit]);
 
-use crate::{capture, privilege, updater, CaptureRequest, CaptureResult, InterfaceInfo};
+use crate::{
+    capture, privilege, settings, updater, CaptureRequest, CaptureResult, InterfaceInfo,
+};
 
 /// Logical window width. Stays fixed — only the height grows or
 /// shrinks based on the privilege banner and result-card state.
@@ -309,6 +312,15 @@ pub struct AppView {
     update_dismissed: bool,
     update_result_rx: Receiver<updater::UpdateInfo>,
 
+    // User-toggled settings, loaded from the persisted JSON at
+    // startup and re-saved whenever the title-bar hamburger
+    // toggle flips a value. Currently just `debug_log`, but the
+    // struct is shaped for additional opt-ins to land here
+    // without per-field plumbing. The toggle takes effect live
+    // via `settings::set_logging_enabled` — no "restart to
+    // apply" dance needed.
+    settings: settings::Settings,
+
     // Subscriptions kept alive for the entity's lifetime.
     iface_sub: gpui::Subscription,
     _proto_sub: gpui::Subscription,
@@ -408,6 +420,7 @@ impl AppView {
             is_installing: false,
             update_available: None,
             update_dismissed: false,
+            settings: settings::Settings::load_or_default(),
             update_result_rx: update_rx,
             iface_sub,
             _proto_sub: proto_sub,
@@ -768,7 +781,26 @@ impl Render for AppView {
             // window has no chrome at all). On macOS the native
             // traffic lights overlay on top via
             // `traffic_light_position` in the WindowOptions.
-            .child(TitleBar::new().child(div().pl_2().text_sm().child("PortFinder")))
+            .child(
+                TitleBar::new()
+                    // Left: app name. Padded so it doesn't sit
+                    // flush against the macOS traffic lights.
+                    .child(div().pl_2().text_sm().child("PortFinder"))
+                    // Right: stretches to fill, right-aligns the
+                    // settings hamburger so it lands just inside
+                    // the window controls (or just inside the
+                    // right edge on macOS, where the traffic
+                    // lights are on the left).
+                    .child(
+                        div()
+                            .flex_1()
+                            .flex()
+                            .justify_end()
+                            .items_center()
+                            .pr_1()
+                            .child(self.render_settings_menu(cx)),
+                    ),
+            )
             .child(
                 // Body wrapper — sibling to TitleBar, holds the
                 // banner / cards / status / footer with the
@@ -1087,6 +1119,96 @@ impl AppView {
     /// the user dismissed the pill for this session). The text half
     /// opens the GitHub release page in the user's browser on
     /// click; the trailing ✕ dismisses without navigating away.
+    /// Title-bar hamburger button. Click → popover with the
+    /// `debug_log` toggle + an "Open log folder" shortcut. Default
+    /// state for the toggle is OFF — a fresh install never drops
+    /// a log file anywhere until the user explicitly enables it
+    /// from this menu. `init_logging` only reads the setting at
+    /// process start, so flipping the toggle mid-session sets a
+    /// `settings_dirty` flag that the popover surfaces as a
+    /// "restart to apply" hint underneath the switch.
+    fn render_settings_menu(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
+        let debug_log = self.settings.debug_log;
+        // Capture the AppView entity so the Switch's `on_click`
+        // closure can mutate `self.settings` from inside the
+        // popover's `.content(...)` callback. The popover renders
+        // in an overlay layer that sits outside the AppView's
+        // focus tree, so a `cx.dispatch_action` from in there
+        // doesn't bubble up to a listener on the root div —
+        // we use the explicit `entity.update(cx, ...)` form
+        // instead. `cx.entity()` is a cheap Arc clone.
+        let entity = cx.entity().clone();
+
+        Popover::new("settings-popover")
+            .trigger(
+                Button::new("settings-trigger")
+                    .icon(IconName::Menu)
+                    .ghost()
+                    .small(),
+            )
+            .content(move |_, _, _| {
+                let entity = entity.clone();
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .p_3()
+                    .w(px(260.0))
+                    // Row 1: label on the left, Switch on the right
+                    // — matches macOS System Settings' standard
+                    // row layout (justify_between + items_center).
+                    // Using a sibling label div rather than the
+                    // Switch widget's own .label() so the chip
+                    // stays right-aligned instead of riding next
+                    // to its label on the left edge.
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(div().text_sm().child("Write debug log"))
+                            .child(
+                                Switch::new("settings-debug-log")
+                                    .checked(debug_log)
+                                    .small()
+                                    .on_click(move |value: &bool, _window, cx| {
+                                        let new = *value;
+                                        entity.update(cx, |this, cx| {
+                                            this.settings.debug_log = new;
+                                            // Live on/off — drop or open
+                                            // the log file immediately. No
+                                            // restart needed.
+                                            settings::set_logging_enabled(new);
+                                            if let Err(e) = this.settings.save() {
+                                                eprintln!(
+                                                    "warning: settings save failed: {e}"
+                                                );
+                                            }
+                                            cx.notify();
+                                        });
+                                    }),
+                            ),
+                    )
+                    // Row 2: action button anchored bottom-right,
+                    // also macOS-System-Settings convention
+                    // ("Shortcuts…" / "Hot Corners…" on the
+                    // Mission Control panel sit this way).
+                    .child(
+                        div().flex().justify_end().child(
+                            Button::new("settings-open-log-folder")
+                                .label("Open log folder")
+                                .outline()
+                                .small()
+                                .on_click(|_, _window, _cx| {
+                                    settings::reveal_log_folder();
+                                }),
+                        ),
+                    )
+                    .into_any_element()
+            })
+            .into_any_element()
+    }
+
     fn render_update_pill(&mut self, cx: &mut Context<Self>) -> Option<gpui::AnyElement> {
         let info = self.update_available.clone()?;
         if self.update_dismissed {

@@ -4681,6 +4681,7 @@ name = "portfinder"
 version = "4.0.0"
 dependencies = [
  "clap",
+ "dirs",
  "embed-resource",
  "env_logger",
  "flume 0.12.0",

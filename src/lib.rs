@@ -46,6 +46,7 @@ pub mod app_view;
 pub mod capture;
 pub mod cli;
 pub mod privilege;
+pub mod settings;
 pub mod updater;
 
 use serde::{Deserialize, Serialize};
@@ -86,58 +87,42 @@ pub struct CaptureResult {
     pub switch_model: String,
 }
 
-/// Bring up env_logger with `info` as the default level and the
-/// output piped to `~/Desktop/portfinder-debug.log` (created /
-/// appended). The desktop target makes it trivial for testers to
-/// find the log without spelunking through Application Support, and
-/// the `RUST_LOG` env var still overrides everything for users who
-/// want to crank it up or down.
+/// Wire up `env_logger` once for the process. The actual on/off
+/// decision lives in the `settings::LogPipe` pipe + the
+/// `settings::set_logging_enabled` swap, not in this
+/// initialisation — env_logger can only be initialised once per
+/// process, so we always install the pipe and let the pipe drop
+/// or forward bytes based on whether a `File` is currently
+/// installed in the global `LOG_FILE`.
 ///
-/// Logging to a file rather than stderr matters in production: the
-/// GUI subsystem on Windows detaches from the console, and the
-/// .app bundle on macOS launches with no stderr stream you can read
-/// after the fact. A desktop file is the friendliest "always there,
-/// always inspectable" target.
+/// At startup we read `Settings::debug_log` and call
+/// `set_logging_enabled` with the persisted value. The in-app
+/// title-bar Switch then calls the same function on every flip
+/// for live on/off without a restart.
+///
+/// `RUST_LOG` is honoured for the filter level only (default
+/// `info`); the env var being set does NOT override the
+/// persisted on/off decision, since the pipe still discards when
+/// no file is installed.
 pub fn init_logging() {
     use env_logger::{Builder, Target};
-    use std::fs::OpenOptions;
 
     let mut builder = Builder::new();
-    // Honour RUST_LOG if it's set; otherwise default to `info`. This
-    // is what `Builder::from_env(Env::default().default_filter_or)`
-    // does inline.
     if let Ok(filter) = std::env::var("RUST_LOG") {
         builder.parse_filters(&filter);
     } else {
         builder.filter_level(log::LevelFilter::Info);
     }
-
-    if let Some(path) = desktop_log_path() {
-        if let Ok(file) = OpenOptions::new().create(true).append(true).open(&path) {
-            builder.target(Target::Pipe(Box::new(file)));
-        }
-    }
+    builder.target(Target::Pipe(Box::new(settings::LogPipe)));
     builder.init();
+
+    if settings::Settings::load_or_default().debug_log {
+        settings::set_logging_enabled(true);
+    }
 
     log::info!(
         "PortFinder v{} starting (target_os={})",
         env!("CARGO_PKG_VERSION"),
         std::env::consts::OS
     );
-}
-
-/// Resolve `~/Desktop/portfinder-debug.log` on macOS / Linux /
-/// Windows without pulling in a dirs crate. Returns None if neither
-/// `HOME` nor `USERPROFILE` is set — in that case the logger falls
-/// back to stderr (which still works for `cargo run`).
-pub fn desktop_log_path() -> Option<std::path::PathBuf> {
-    #[cfg(windows)]
-    let home = std::env::var("USERPROFILE").ok()?;
-    #[cfg(not(windows))]
-    let home = std::env::var("HOME").ok()?;
-    Some(
-        std::path::PathBuf::from(home)
-            .join("Desktop")
-            .join("portfinder-debug.log"),
-    )
 }
