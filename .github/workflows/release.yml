@@ -267,6 +267,19 @@ jobs:
           $config_obj | Add-Member -NotePropertyName version -NotePropertyValue $version -Force
           $config = $config_obj | ConvertTo-Json -Depth 10
 
+          # Disable thin LTO on aarch64-pc-windows-msvc only.
+          # rustc thin-LTO crashes deterministically with
+          # `STATUS_ACCESS_VIOLATION` (0xc0000005) when linking
+          # the gpui dep graph on Windows ARM64 — failed both
+          # cold-cache and warm-cache reruns on alpha.14. The
+          # binary doesn't need the small perf win LTO buys on
+          # an event-loop UI app, and dropping it is a net win
+          # over auto-rerun shenanigans. amd64 stays on
+          # `lto = "thin"` (no crash there).
+          if ("${{ matrix.arch }}" -eq "arm64") {
+            $env:CARGO_PROFILE_RELEASE_LTO = "false"
+          }
+
           # Stable amd64 also gets a WiX/MSI alongside NSIS. Two
           # separate cargo packager branches because PowerShell's
           # `.Split()` on an empty string returns `[""]` (one
