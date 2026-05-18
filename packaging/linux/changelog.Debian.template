@@ -1,0 +1,5 @@
+portfinder (${VERSION}) stable; urgency=low
+
+  * Release ${VERSION}. See https://github.com/packetThrower/PortFinder/blob/main/CHANGELOG.md for full notes.
+
+ -- Will Lehnertz <6597817+packetThrower@users.noreply.github.com>  ${DATE}

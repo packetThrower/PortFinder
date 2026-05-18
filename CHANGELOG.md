@@ -14,6 +14,25 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+### Fixed
+- **`.deb` lintian cleanups** for Ubuntu / Debian installers
+  (gdebi's "Lintian output" tab + `lintian PortFinder_*.deb`
+  now report none of these):
+  - `wrong-file-owner-uid-or-gid` on every payload entry —
+    cargo-packager's tar preserved the GitHub runner's uid/gid
+    (1001/1001) so `/usr/bin/PortFinder` installed owned by
+    whatever uid 1001 happened to be on the target. The .deb
+    post-process step now `chown -R 0:0` the unpacked tree
+    before re-packing.
+  - `malformed-contact Maintainer Will` — Maintainer field was
+    a bare name, now `Will Lehnertz <...>` RFC822 form.
+  - `missing-dependency-on-libc` — added `libc6` to Depends.
+  - `recommended-field Section` — added `Section: net`.
+  - `no-changelog` / `no-copyright-file` — package now ships
+    `/usr/share/doc/portfinder/copyright` (DEP-5 machine-
+    readable format) and `/usr/share/doc/portfinder/
+    changelog.Debian.gz`.
+
 ## [4.0.1] - 2026-05-18
 
 ### Added

@@ -410,7 +410,7 @@ jobs:
       # setcap on the installed binary. Without this, the first
       # capture attempt fails with EPERM and the user has to
       # manually `sudo setcap cap_net_raw+ep /usr/bin/PortFinder`.
-      - name: Inject .deb postinst (setcap CAP_NET_RAW)
+      - name: Patch .deb (postinst + lintian cleanups)
         run: |
           set -e
           DEB=$(find target/release -maxdepth 1 -name '*.deb' | head -1)
@@ -418,12 +418,13 @@ jobs:
             echo "no .deb produced by cargo-packager — nothing to patch"
             exit 0
           fi
-          echo "Patching $DEB with postinst hook"
+          echo "Patching $DEB"
 
           WORK=$(mktemp -d)
           dpkg-deb -R "$DEB" "$WORK"
           mkdir -p "$WORK/DEBIAN"
 
+          # ----- maintainer hooks ----------------------------------
           cp packaging/linux/portfinder-postinstall.sh "$WORK/DEBIAN/postinst"
           chmod 0755 "$WORK/DEBIAN/postinst"
 
@@ -434,8 +435,64 @@ jobs:
           cp packaging/linux/portfinder-preremove.sh "$WORK/DEBIAN/prerm"
           chmod 0755 "$WORK/DEBIAN/prerm"
 
+          # ----- root:root ownership -------------------------------
+          # cargo-packager's tar packer preserves the build user's
+          # uid/gid (1001/1001 on GitHub runners). dpkg installs
+          # files with their stored ownership, so on the target
+          # system any uid that happens to be 1001 ends up owning
+          # /usr/bin/PortFinder. Lintian flags this as
+          # `wrong-file-owner-uid-or-gid`. Fix by chowning the
+          # entire payload + DEBIAN dir to 0:0 before re-packing.
+          sudo chown -R 0:0 "$WORK"
+
+          # ----- control file fixes --------------------------------
+          # cargo-packager builds the control file from
+          # `[package.metadata.packager]` metadata. Three lintian
+          # complaints we can't fix from there:
+          #
+          #   - `malformed-contact Maintainer Will`: cargo-packager
+          #     emits whatever's in `authors[0]` verbatim, so a
+          #     bare name gives a malformed RFC822 contact. Force
+          #     the Name <email> form here.
+          #   - `recommended-field Section`: cargo-packager doesn't
+          #     emit a Section line at all. Add `Section: net`.
+          #   - `missing-dependency-on-libc`: the binary
+          #     dynamically links to libc6 (every Rust binary
+          #     does) but lintian wants it spelled in Depends.
+          #     Append libc6 to the existing Depends line.
+          CONTROL="$WORK/DEBIAN/control"
+          sudo sed -i \
+            -e 's|^Maintainer: .*$|Maintainer: Will Lehnertz <6597817+packetThrower@users.noreply.github.com>|' \
+            -e '/^Priority: /a Section: net' \
+            -e 's|^\(Depends: .*\)$|\1, libc6|' \
+            "$CONTROL"
+
+          # ----- /usr/share/doc/portfinder/ ------------------------
+          # Debian convention: every package ships a copyright file
+          # and a changelog.gz under /usr/share/doc/<pkg>/. lintian
+          # errors out without them. Source files live in
+          # `packaging/linux/` (copyright is static, changelog is
+          # a `${VERSION}/${DATE}`-templated stub pointing at the
+          # canonical CHANGELOG.md — full per-version Debian
+          # changelog entries would duplicate what the repo
+          # changelog already covers).
+          DOCDIR="$WORK/usr/share/doc/portfinder"
+          sudo mkdir -p "$DOCDIR"
+          sudo cp packaging/linux/copyright "$DOCDIR/copyright"
+
+          VERSION="${GITHUB_REF_NAME#v}"
+          DATE=$(date -R)
+          sudo env VERSION="$VERSION" DATE="$DATE" \
+            sh -c 'envsubst < packaging/linux/changelog.Debian.template > "$0/changelog.Debian"' \
+            "$DOCDIR"
+          sudo gzip -9n "$DOCDIR/changelog.Debian"
+
+          sudo chown -R 0:0 "$DOCDIR"
+          sudo chmod 0644 "$DOCDIR"/*
+
+          # ----- re-pack -------------------------------------------
           dpkg-deb -Z xz -b "$WORK" "$DEB"
-          rm -rf "$WORK"
+          sudo rm -rf "$WORK"
 
       - name: Build .rpm via fpm
         run: |
