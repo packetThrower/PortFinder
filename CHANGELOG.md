@@ -14,6 +14,33 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [4.1.0-beta.2] - 2026-05-18
+
+### Added
+- **Localised UI.** Seven languages ship out of the box —
+  English, German, Spanish, French, Italian, Portuguese, and
+  Japanese — covering ~80 user-facing strings (status text,
+  result-row labels, settings popover, history popover,
+  privilege banner, menu items, relative-time labels). The
+  active locale follows the OS at startup (`sys-locale` →
+  closest match against the shipped set, fallback English);
+  a new **Display language** row at the top of the settings
+  popover drills into a sub-page picker that switches
+  immediately (no relaunch) and persists across runs.
+  Translations are bundled into the binary by `rust-i18n`'s
+  `i18n!()` macro reading `locales/<code>.yml`; missing keys
+  in non-English locales fall through to the English source
+  of truth automatically.
+- **Docs site landing-page features grid.** The Astro
+  Starlight site picks up a "Beyond a one-shot capture" card
+  grid covering the history popover (opt-in persistence),
+  Copy as JSON / right-click copy, the Start/Stop keyboard
+  shortcut, and the log-level slider. Dev pages
+  (architecture, setup) catch up to the current `src/`
+  layout — `lib.rs` split, `settings.rs` + `updater.rs` as
+  their own modules, the `src/bin/portfinder-cli.rs` Windows
+  sibling, and the `--features windows-cli` build flag.
+
 ## [4.1.0-beta.1] - 2026-05-18
 
 ### Added
