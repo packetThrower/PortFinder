@@ -38,6 +38,71 @@ pub struct Settings {
     /// explicitly enables it via the in-app toggle.
     #[serde(default)]
     pub debug_log: bool,
+
+    /// Filter level applied via `log::set_max_level` at boot
+    /// and on every settings-popover slider change. The CLI's
+    /// `-v` / `-vv` / `-q` flags still override at runtime —
+    /// they call `set_max_level` after `apply_log_overrides`.
+    #[serde(default)]
+    pub log_level: LogLevel,
+}
+
+/// User-facing logging verbosity. Three options expose
+/// `log::LevelFilter` to the GUI without surfacing the rarely-
+/// useful `Off` (the Switch already covers that case) or
+/// `Error` / `Warn` (those alone strip all the lifecycle
+/// breadcrumbs that make a log file useful in the first place).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    /// Info-level — lifecycle events only (boot, capture
+    /// start/stop, update check, settings flips). The default.
+    #[default]
+    Normal,
+    /// Debug-level — adds per-event capture diagnostics
+    /// (interface picked, frame bytes, parser dispatch). Use
+    /// when "PortFinder isn't capturing" is the bug.
+    Verbose,
+    /// Trace-level — adds the per-pcap-tick (~20 Hz per
+    /// interface) timeout retries. Almost always overkill;
+    /// useful when chasing a libpcap-side timing question.
+    Trace,
+}
+
+impl LogLevel {
+    /// Map to `log::LevelFilter` for `log::set_max_level`.
+    pub fn to_max_level(self) -> log::LevelFilter {
+        match self {
+            Self::Normal => log::LevelFilter::Info,
+            Self::Verbose => log::LevelFilter::Debug,
+            Self::Trace => log::LevelFilter::Trace,
+        }
+    }
+
+    /// Position on the popover's 3-stop slider (0=Normal,
+    /// 1=Verbose, 2=Trace). The variant order matches the
+    /// slider direction left-to-right — moving an option
+    /// means updating both this and `from_stop_index`.
+    pub fn stop_index(self) -> usize {
+        match self {
+            Self::Normal => 0,
+            Self::Verbose => 1,
+            Self::Trace => 2,
+        }
+    }
+
+    /// Inverse of `stop_index`, for the slider's `Change`
+    /// subscription. Returns `Normal` for any out-of-range
+    /// index (shouldn't happen with `min=0, max=2, step=1`,
+    /// but defensive against the slider snapping past an
+    /// endpoint).
+    pub fn from_stop_index(ix: usize) -> Self {
+        match ix {
+            1 => Self::Verbose,
+            2 => Self::Trace,
+            _ => Self::Normal,
+        }
+    }
 }
 
 impl Settings {

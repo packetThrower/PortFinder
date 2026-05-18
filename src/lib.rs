@@ -124,15 +124,18 @@ pub fn init_logging() {
     builder.target(Target::Pipe(Box::new(settings::LogPipe)));
     builder.init();
 
-    // `RUST_LOG` already set our level. Otherwise, default cap is
-    // `Info` — the GUI's "Write debug log" toggle alone writes
-    // info-level lifecycle events; `cli -v` lowers to Debug,
-    // `cli -vv` to Trace, `cli -q` to Warn.
+    // `RUST_LOG` already set our level if present. Otherwise the
+    // persisted `log_level` setting from the popover RadioGroup
+    // takes the wheel — defaults to `Normal` (Info) on a fresh
+    // install. CLI `-v` / `-vv` / `-q` flags still override this
+    // at runtime; they call `set_max_level` after
+    // `apply_log_overrides`.
+    let settings = settings::Settings::load_or_default();
     if std::env::var("RUST_LOG").is_err() {
-        log::set_max_level(log::LevelFilter::Info);
+        log::set_max_level(settings.log_level.to_max_level());
     }
 
-    if settings::Settings::load_or_default().debug_log {
+    if settings.debug_log {
         settings::set_logging_enabled(true);
     }
 

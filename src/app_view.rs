@@ -20,16 +20,18 @@ use std::time::Duration;
 
 use flume::{Receiver, Sender};
 use gpui::{
-    actions, div, prelude::*, px, rgb, App, AppContext, Bounds, ClipboardItem, Context, Entity,
-    FocusHandle, Focusable, Hsla, IntoElement, KeyBinding, Menu, MenuItem, ParentElement, QuitMode,
-    Render, SharedString, Styled, Window, WindowBounds, WindowDecorations, WindowOptions,
+    actions, div, prelude::*, px, rgb, AnyView, App, AppContext, Bounds, ClipboardItem, Context,
+    Entity, FocusHandle, Focusable, Hsla, IntoElement, KeyBinding, Menu, MenuItem, ParentElement,
+    QuitMode, Render, SharedString, Styled, Window, WindowBounds, WindowDecorations, WindowOptions,
 };
 use gpui_component::{
     button::{Button, ButtonVariants},
     popover::Popover,
     select::{Select, SelectEvent, SelectItem, SelectState},
     skeleton::Skeleton,
+    slider::{Slider, SliderEvent, SliderState},
     switch::Switch,
+    tooltip::Tooltip,
     ActiveTheme, Disableable, IconName, IndexPath, Root, Sizable, Theme, ThemeMode, TitleBar,
 };
 use tokio::runtime::Handle as TokioHandle;
@@ -321,9 +323,23 @@ pub struct AppView {
     // apply" dance needed.
     settings: settings::Settings,
 
+    // Slider state for the title-bar settings popover's "Log
+    // level" row. 3 discrete stops (0=Normal, 1=Verbose,
+    // 2=Trace) matching `settings::LogLevel::stop_index`. The
+    // Slider widget needs a long-lived `SliderState` entity
+    // rather than a per-render value, so we keep it here and
+    // subscribe to `SliderEvent::Change` via `_log_level_sub`
+    // below — that listener mirrors the slider value back into
+    // `settings.log_level`, applies via `log::set_max_level`,
+    // and persists.
+    log_level_slider: Entity<SliderState>,
+
     // Subscriptions kept alive for the entity's lifetime.
     iface_sub: gpui::Subscription,
     _proto_sub: gpui::Subscription,
+    // Slider-change subscription. Held to keep the callback
+    // alive; drop = unsubscribe.
+    _log_level_sub: gpui::Subscription,
     // OS appearance observer. Fires on every system Light/Dark flip
     // (Control Center toggle, scheduled sunrise/sunset switch, etc.)
     // and reapplies the theme so the chrome tracks the OS without a
@@ -400,6 +416,61 @@ impl AppView {
             cx.refresh_windows();
         });
 
+        // Load settings once; cached in `view.settings` and used
+        // both to seed the slider's initial position and to feed
+        // `set_max_level` in the subscription handler below.
+        let settings_loaded = settings::Settings::load_or_default();
+        // Slider over 0..=2 (Normal / Verbose / Trace) with
+        // step=1. The widget snaps the *value* to integer stops
+        // internally, but its *thumb position* tracks the raw
+        // mouse percentage (a quirk of the gpui-component slider
+        // — see `update_value_by_position` in slider.rs: it
+        // writes `self.percentage = raw_percentage` while
+        // `self.value = snapped_value`, so the visual thumb
+        // floats anywhere along the bar). To get the macOS-style
+        // "snap to discrete stop" feel, the subscription below
+        // calls `set_value` back on the SliderState every change
+        // — that runs `update_thumb_pos`, which re-derives the
+        // percentage *from* the snapped value, pulling the
+        // thumb onto the nearest stop. `set_value` doesn't emit
+        // a Change event, so there's no echo loop.
+        let log_level_slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.0)
+                .max(2.0)
+                .step(1.0)
+                .default_value(settings_loaded.log_level.stop_index() as f32)
+        });
+        // `subscribe_in` (not `subscribe`) so the callback gets
+        // `&mut Window` — `SliderState::set_value`'s signature
+        // wants one even though its body ignores it. The window
+        // is captured from `AppView::new`'s arg.
+        let log_level_sub = cx.subscribe_in(
+            &log_level_slider,
+            window,
+            |this, slider, event: &SliderEvent, window, cx| {
+                let SliderEvent::Change(value) = event;
+                let ix = value.start().round() as usize;
+                // Always snap the thumb, even if the log level
+                // hasn't changed — the user may have dragged
+                // mid-segment and released; we want the visual
+                // to land on a stop.
+                slider.update(cx, |state, cx| {
+                    state.set_value(ix as f32, window, cx);
+                });
+                let new = settings::LogLevel::from_stop_index(ix);
+                if this.settings.log_level == new {
+                    return;
+                }
+                this.settings.log_level = new;
+                log::set_max_level(new.to_max_level());
+                if let Err(e) = this.settings.save() {
+                    log::warn!("settings save failed: {e}");
+                }
+                cx.notify();
+            },
+        );
+
         let mut view = Self {
             focus_handle: cx.focus_handle(),
             interfaces,
@@ -420,11 +491,13 @@ impl AppView {
             is_installing: false,
             update_available: None,
             update_dismissed: false,
-            settings: settings::Settings::load_or_default(),
+            settings: settings_loaded,
+            log_level_slider,
             update_result_rx: update_rx,
             iface_sub,
             _proto_sub: proto_sub,
             _appearance_sub: appearance_sub,
+            _log_level_sub: log_level_sub,
         };
         view.spawn_capture_listener(cx);
         view.spawn_update_listener(cx);
@@ -1133,14 +1206,26 @@ impl AppView {
     fn render_settings_menu(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let debug_log = self.settings.debug_log;
         // Capture the AppView entity so the Switch's `on_click`
-        // closure can mutate `self.settings` from inside the
-        // popover's `.content(...)` callback. The popover renders
-        // in an overlay layer that sits outside the AppView's
-        // focus tree, so a `cx.dispatch_action` from in there
-        // doesn't bubble up to a listener on the root div —
-        // we use the explicit `entity.update(cx, ...)` form
-        // instead. `cx.entity()` is a cheap Arc clone.
+        // can mutate `self.settings` from inside the popover's
+        // `.content(...)` callback. The popover renders in an
+        // overlay layer that sits outside the AppView's focus
+        // tree, so a `cx.dispatch_action` from in there doesn't
+        // bubble up to a listener on the root div — we use the
+        // explicit `entity.update(cx, ...)` form instead.
+        // `cx.entity()` is a cheap Arc clone.
+        //
+        // The log-level Slider doesn't need a similar capture
+        // because `SliderState::Change` is delivered via the
+        // `cx.subscribe(&log_level_slider, ...)` we set up in
+        // `AppView::new` — that handler already has `&mut self`
+        // and writes through to settings + `log::set_max_level`
+        // + disk.
         let entity = cx.entity().clone();
+        let log_level_slider = self.log_level_slider.clone();
+        // 280 px is enough for the Switch row and the slider
+        // with its endpoint labels — the slider stretches to
+        // fill, so we don't need to widen for label fit.
+        let panel_width = px(280.0);
 
         Popover::new("settings-popover")
             .trigger(
@@ -1149,21 +1234,19 @@ impl AppView {
                     .ghost()
                     .small(),
             )
-            .content(move |_, _, _| {
-                let entity = entity.clone();
+            .content(move |_, _, cx| {
+                let entity_for_switch = entity.clone();
+                let muted = cx.theme().muted_foreground;
                 div()
                     .flex()
                     .flex_col()
                     .gap_3()
                     .p_3()
-                    .w(px(260.0))
-                    // Row 1: label on the left, Switch on the right
-                    // — matches macOS System Settings' standard
-                    // row layout (justify_between + items_center).
-                    // Using a sibling label div rather than the
-                    // Switch widget's own .label() so the chip
-                    // stays right-aligned instead of riding next
-                    // to its label on the left edge.
+                    .w(panel_width)
+                    // Row 1: "Write debug log" label + Switch.
+                    // macOS System-Settings layout convention —
+                    // label left, control right, full-width
+                    // justify_between.
                     .child(
                         div()
                             .flex()
@@ -1176,7 +1259,7 @@ impl AppView {
                                     .small()
                                     .on_click(move |value: &bool, _window, cx| {
                                         let new = *value;
-                                        entity.update(cx, |this, cx| {
+                                        entity_for_switch.update(cx, |this, cx| {
                                             this.settings.debug_log = new;
                                             // Live on/off — drop or open
                                             // the log file immediately. No
@@ -1190,7 +1273,96 @@ impl AppView {
                                     }),
                             ),
                     )
-                    // Row 2: action button anchored bottom-right,
+                    // Row 2: "Log level" section. Header above a
+                    // 3-stop horizontal slider (0=Normal,
+                    // 1=Verbose, 2=Trace) with endpoint/midpoint
+                    // labels underneath. macOS-style "Double-
+                    // Click Speed" pattern: continuous-looking
+                    // control with discrete steps and labels
+                    // showing what each stop means.
+                    //
+                    // Drag changes hit `SliderState::Change`,
+                    // which our `_log_level_sub` subscription
+                    // routes into `settings.log_level` +
+                    // `log::set_max_level` + disk. The slider
+                    // stays interactive regardless of the
+                    // Switch above — the level applies to any
+                    // active logger (e.g. when a parallel
+                    // `portfinder-cli --log-file ...` is reading
+                    // the same settings).
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(div().text_sm().child("Log level"))
+                            .child(Slider::new(&log_level_slider))
+                            // Tick row: three 2x4 px notches at
+                            // the slider's 0% / 50% / 100% stops.
+                            // `justify_between` puts the first
+                            // child flush left, the last flush
+                            // right, the middle centered — which
+                            // matches where the slider snaps. The
+                            // notches are the only visual cue
+                            // that the bar has discrete stops
+                            // (the bar itself is continuous).
+                            .child(
+                                div()
+                                    .flex()
+                                    .justify_between()
+                                    .child(div().w(px(2.0)).h(px(4.0)).bg(muted))
+                                    .child(div().w(px(2.0)).h(px(4.0)).bg(muted))
+                                    .child(div().w(px(2.0)).h(px(4.0)).bg(muted)),
+                            )
+                            // Labels under each stop. Each is
+                            // hoverable with a tooltip describing
+                            // what that level captures — the
+                            // discoverability the radio-with-
+                            // tooltip design had, kept here with
+                            // a slider control.
+                            //
+                            // Tooltip content is wrapped in a
+                            // fixed-width `div` rather than
+                            // passed as a bare string: gpui-
+                            // component's `Tooltip::new(text)`
+                            // renders the text inline inside an
+                            // `h_flex`, where intrinsic content
+                            // width wins over `max_w` — so the
+                            // tooltip box stretches to fit one
+                            // long line and overflows the
+                            // popover. A `div().w(220px)` child
+                            // pins the wrap point and forces the
+                            // text to flow vertically.
+                            .child(
+                                div()
+                                    .flex()
+                                    .justify_between()
+                                    .text_xs()
+                                    .text_color(muted)
+                                    .child(log_level_label(
+                                        "log-level-label-normal",
+                                        "Normal",
+                                        "Lifecycle events only — boot, \
+                                         capture start/stop, settings \
+                                         flips. The default.",
+                                    ))
+                                    .child(log_level_label(
+                                        "log-level-label-verbose",
+                                        "Verbose",
+                                        "Adds per-event capture diagnostics. \
+                                         Use when \"PortFinder isn't capturing\" \
+                                         is the bug you're chasing.",
+                                    ))
+                                    .child(log_level_label(
+                                        "log-level-label-trace",
+                                        "Trace",
+                                        "Adds per-pcap-tick noise (~20 Hz per \
+                                         interface). Almost always overkill — \
+                                         useful for libpcap timing questions.",
+                                    )),
+                            ),
+                    )
+                    // Row 3: action button anchored bottom-right,
                     // also macOS-System-Settings convention
                     // ("Shortcuts…" / "Hot Corners…" on the
                     // Mission Control panel sit this way).
@@ -1407,6 +1579,27 @@ fn protocol_opts() -> Vec<Opt> {
         Opt::new("CDP", "CDP"),
         Opt::new("MNDP", "MNDP"),
     ]
+}
+
+/// One "Normal" / "Verbose" / "Trace" label under the log-level
+/// slider, paired with a hover tooltip describing what that level
+/// captures.
+///
+/// Tooltip content is built via `Tooltip::element` and wrapped in a
+/// fixed-width `div` so the text wraps. `Tooltip::new(text)` puts
+/// the string directly inside `h_flex`, where the intrinsic
+/// single-line width wins over any `max_w` we set on the tooltip
+/// itself — the box stretches and overflows the popover. A `div`
+/// with `.w(220px)` pins the line-break boundary.
+fn log_level_label(
+    id: &'static str,
+    label: &'static str,
+    description: &'static str,
+) -> gpui::Stateful<gpui::Div> {
+    div().id(id).child(label).tooltip(move |window, cx| -> AnyView {
+        Tooltip::element(move |_, _| div().w(px(220.0)).text_sm().child(description))
+            .build(window, cx)
+    })
 }
 
 /// Main GUI entrypoint. Starts gpui, opens the PortFinder window,
