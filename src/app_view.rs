@@ -33,7 +33,7 @@ use gpui_component::{
     slider::{Slider, SliderEvent, SliderState},
     switch::Switch,
     tooltip::Tooltip,
-    ActiveTheme, Disableable, IconName, IndexPath, Root, Sizable, Theme, ThemeMode, TitleBar,
+    ActiveTheme, Disableable, Icon, IconName, IndexPath, Root, Sizable, Theme, ThemeMode, TitleBar,
 };
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle as TokioHandle;
@@ -368,6 +368,18 @@ pub struct AppView {
     // see `HistoryEntry` for the persistence-deferred note.
     history: VecDeque<HistoryEntry>,
 
+    // Settings-popover UI state. When true, the popover
+    // shows the About page (version / repo / license /
+    // capture-privilege rows) with a "← Back" header instead
+    // of the regular settings list. Lets the popover stay
+    // short in both states — gpui-component's Popover
+    // anchors to the trigger's top-left and doesn't shift
+    // down on overflow (its `resolved_corner` has no "below
+    // the trigger" case), so a tall popover gets clipped at
+    // the window bottom. Not persisted; reverts to the
+    // settings-list view on relaunch.
+    settings_view_about: bool,
+
     // Privileges + helper install.
     priv_status: Option<privilege::PrivilegeStatus>,
     is_installing: bool,
@@ -572,6 +584,7 @@ impl AppView {
             } else {
                 VecDeque::with_capacity(HISTORY_MAX)
             },
+            settings_view_about: false,
             priv_status,
             is_installing: false,
             update_available: None,
@@ -1672,6 +1685,7 @@ impl AppView {
     fn render_settings_menu(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let debug_log = self.settings.debug_log;
         let persist_history = self.settings.persist_history;
+        let view_about = self.settings_view_about;
         // Capture the AppView entity so the Switch's `on_click`
         // can mutate `self.settings` from inside the popover's
         // `.content(...)` callback. The popover renders in an
@@ -1714,120 +1728,83 @@ impl AppView {
             .content(move |_, _, cx| {
                 let entity_for_history = entity.clone();
                 let entity_for_switch = entity.clone();
+                let entity_for_about = entity.clone();
                 let muted = cx.theme().muted_foreground;
                 let border = cx.theme().border;
-                div()
+
+                // -- Capture section --------------------------
+                // Just the "Save capture history" switch for
+                // now; sized as a labelled section so the
+                // future is open (export-on-capture, max-
+                // history-N, etc.).
+                let capture_section = div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(settings_section_header("Capture", muted))
+                    .child(settings_switch_row(
+                        "persist-history",
+                        IconName::Inbox,
+                        "Save capture history",
+                        persist_history,
+                        muted,
+                        move |new, cx| {
+                            entity_for_history.update(cx, |this, cx| {
+                                this.settings.persist_history = new;
+                                if new {
+                                    if let Err(e) = settings::save_history(&this.history) {
+                                        log::warn!("save history failed: {e}");
+                                    }
+                                } else {
+                                    settings::clear_history_file();
+                                }
+                                if let Err(e) = this.settings.save() {
+                                    log::warn!("settings save failed: {e}");
+                                }
+                                cx.notify();
+                            });
+                        },
+                    ));
+
+                // -- Logging section --------------------------
+                // Log level comes before "Write debug log"
+                // because the level controls verbosity for
+                // EVERY logger output, not just the on-disk
+                // file — a parallel `portfinder-cli` run
+                // honours `settings.log_level` whether the GUI
+                // toggle is on or off.
+                let logging_section = div()
                     .flex()
                     .flex_col()
                     .gap_3()
-                    .p_3()
-                    .w(panel_width)
-                    // Row 1: "Save capture history" label +
-                    // Switch. Sits above the logging rows
-                    // because it gates a separate concern (the
-                    // persistent history popover next to the
-                    // result card) and the user has asked for
-                    // it to lead. Flipping ON snapshots the
-                    // current in-memory deque to disk
-                    // immediately so the user can quit the app
-                    // and find their data on relaunch; OFF
-                    // deletes `history.json` (the in-memory
-                    // deque stays for the rest of the session).
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_between()
-                            .child(div().text_sm().child("Save capture history"))
-                            .child(
-                                Switch::new("settings-persist-history")
-                                    .checked(persist_history)
-                                    .small()
-                                    .on_click(move |value: &bool, _window, cx| {
-                                        let new = *value;
-                                        entity_for_history.update(cx, |this, cx| {
-                                            this.settings.persist_history = new;
-                                            if new {
-                                                if let Err(e) =
-                                                    settings::save_history(&this.history)
-                                                {
-                                                    log::warn!("save history failed: {e}");
-                                                }
-                                            } else {
-                                                settings::clear_history_file();
-                                            }
-                                            if let Err(e) = this.settings.save() {
-                                                log::warn!("settings save failed: {e}");
-                                            }
-                                            cx.notify();
-                                        });
-                                    }),
-                            ),
-                    )
-                    // Row 2: "Write debug log" label + Switch.
-                    // macOS System-Settings layout convention —
-                    // label left, control right, full-width
-                    // justify_between.
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_between()
-                            .child(div().text_sm().child("Write debug log"))
-                            .child(
-                                Switch::new("settings-debug-log")
-                                    .checked(debug_log)
-                                    .small()
-                                    .on_click(move |value: &bool, _window, cx| {
-                                        let new = *value;
-                                        entity_for_switch.update(cx, |this, cx| {
-                                            this.settings.debug_log = new;
-                                            // Live on/off — drop or open
-                                            // the log file immediately. No
-                                            // restart needed.
-                                            settings::set_logging_enabled(new);
-                                            if let Err(e) = this.settings.save() {
-                                                log::warn!("settings save failed: {e}");
-                                            }
-                                            cx.notify();
-                                        });
-                                    }),
-                            ),
-                    )
-                    // Row 2: "Log level" section. Header above a
-                    // 3-stop horizontal slider (0=Normal,
-                    // 1=Verbose, 2=Trace) with endpoint/midpoint
-                    // labels underneath. macOS-style "Double-
-                    // Click Speed" pattern: continuous-looking
-                    // control with discrete steps and labels
-                    // showing what each stop means.
-                    //
-                    // Drag changes hit `SliderState::Change`,
-                    // which our `_log_level_sub` subscription
-                    // routes into `settings.log_level` +
-                    // `log::set_max_level` + disk. The slider
-                    // stays interactive regardless of the
-                    // Switch above — the level applies to any
-                    // active logger (e.g. when a parallel
-                    // `portfinder-cli --log-file ...` is reading
-                    // the same settings).
+                    .pt_3()
+                    .border_t_1()
+                    .border_color(border)
+                    .child(settings_section_header("Logging", muted))
+                    // Log level: icon + label header row, then
+                    // the slider, then ticks + labels. Slider
+                    // change events are routed via the
+                    // `_log_level_sub` subscription in
+                    // `AppView::new` — that handler snaps the
+                    // thumb to a stop and persists.
                     .child(
                         div()
                             .flex()
                             .flex_col()
                             .gap_1()
-                            .child(div().text_sm().child("Log level"))
+                            .child(settings_row_header(
+                                IconName::Settings2,
+                                "Log level",
+                                muted,
+                            ))
                             .child(Slider::new(&log_level_slider))
-                            // Tick row: three 2x4 px notches at
-                            // the slider's 0% / 50% / 100% stops.
-                            // `justify_between` puts the first
-                            // child flush left, the last flush
-                            // right, the middle centered — which
-                            // matches where the slider snaps. The
-                            // notches are the only visual cue
-                            // that the bar has discrete stops
-                            // (the bar itself is continuous).
                             .child(
+                                // Tick row: three 2x4 px
+                                // notches at 0% / 50% / 100% of
+                                // the bar, the only visual cue
+                                // that the slider has discrete
+                                // stops (the bar itself is
+                                // continuous).
                                 div()
                                     .flex()
                                     .justify_between()
@@ -1835,25 +1812,6 @@ impl AppView {
                                     .child(div().w(px(2.0)).h(px(4.0)).bg(muted))
                                     .child(div().w(px(2.0)).h(px(4.0)).bg(muted)),
                             )
-                            // Labels under each stop. Each is
-                            // hoverable with a tooltip describing
-                            // what that level captures — the
-                            // discoverability the radio-with-
-                            // tooltip design had, kept here with
-                            // a slider control.
-                            //
-                            // Tooltip content is wrapped in a
-                            // fixed-width `div` rather than
-                            // passed as a bare string: gpui-
-                            // component's `Tooltip::new(text)`
-                            // renders the text inline inside an
-                            // `h_flex`, where intrinsic content
-                            // width wins over `max_w` — so the
-                            // tooltip box stretches to fit one
-                            // long line and overflows the
-                            // popover. A `div().w(220px)` child
-                            // pins the wrap point and forces the
-                            // text to flow vertically.
                             .child(
                                 div()
                                     .flex()
@@ -1883,114 +1841,202 @@ impl AppView {
                                     )),
                             ),
                     )
-                    // Row 3: About. Section heading + version,
-                    // GitHub + license link rows, and a
-                    // platform-specific capture-privilege status
-                    // row. macOS users see "BPF helper", Windows
-                    // users see "Npcap", Linux users see the
-                    // generic "Capture access" — matching the
-                    // language the privilege banner uses for the
-                    // same condition. The banner already handles
-                    // installation when access is missing, so this
-                    // row is read-only status. Top border + extra
-                    // top padding visually separates About from
-                    // the logging rows above.
+                    .child(settings_switch_row(
+                        "debug-log",
+                        IconName::SquareTerminal,
+                        "Write debug log",
+                        debug_log,
+                        muted,
+                        move |new, cx| {
+                            entity_for_switch.update(cx, |this, cx| {
+                                this.settings.debug_log = new;
+                                // Live on/off — drop or open
+                                // the log file immediately, no
+                                // restart needed.
+                                settings::set_logging_enabled(new);
+                                if let Err(e) = this.settings.save() {
+                                    log::warn!("settings save failed: {e}");
+                                }
+                                cx.notify();
+                            });
+                        },
+                    ));
+
+                // -- About row --------------------------------
+                // Drill-down entry to the About page rather
+                // than an inline expandable section — gpui-
+                // component's Popover doesn't open below the
+                // trigger (its `resolved_corner` math has no
+                // "below the trigger" anchor), so a tall
+                // settings list gets clipped at the window
+                // bottom. Splitting About into its own page
+                // inside the same popover keeps both views
+                // short. Click sets `settings_view_about =
+                // true`, which the outer `if view_about`
+                // below swaps in the About page.
+                let entity_for_about_open = entity_for_about.clone();
+                let about_row = div()
+                    .id("settings-about-row")
+                    .cursor_pointer()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .pt_3()
+                    .border_t_1()
+                    .border_color(border)
+                    .child(settings_row_header(IconName::Info, "About", muted))
+                    .child(Icon::new(IconName::ChevronRight).text_color(muted))
+                    .on_click(move |_, _window, cx| {
+                        entity_for_about_open.update(cx, |this, cx| {
+                            this.settings_view_about = true;
+                            cx.notify();
+                        });
+                    });
+
+                // -- Folders row ------------------------------
+                // Two outline buttons, gap_2, right-aligned —
+                // macOS-System-Settings convention for the
+                // trailing action(s) on a panel ("Shortcuts…"
+                // / "Hot Corners…" sit this way). Order is
+                // "config first, output second" — `settings.json`
+                // + `history.json` live in the first dir;
+                // `portfinder.log` in the second.
+                let folders_row = div()
+                    .flex()
+                    .justify_end()
+                    .gap_2()
+                    .pt_3()
+                    .border_t_1()
+                    .border_color(border)
                     .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_2()
-                            .pt_3()
-                            .border_t_1()
-                            .border_color(border)
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(muted)
-                                    .child("About"),
-                            )
-                            .child(about_row(
-                                "Version",
-                                div()
-                                    .text_sm()
-                                    .text_color(muted)
-                                    .child(format!("v{}", version))
-                                    .into_any_element(),
-                            ))
-                            .child(about_row(
-                                "Repository",
-                                Button::new("about-github")
-                                    .label("GitHub ↗")
-                                    .ghost()
-                                    .small()
-                                    .on_click(|_, _window, cx| {
-                                        cx.open_url(
-                                            "https://github.com/packetThrower/PortFinder",
-                                        );
-                                    })
-                                    .into_any_element(),
-                            ))
-                            .child(about_row(
-                                "License",
-                                Button::new("about-license")
-                                    .label("GPL-3.0-or-later ↗")
-                                    .ghost()
-                                    .small()
-                                    .on_click(|_, _window, cx| {
-                                        cx.open_url(
-                                            "https://github.com/packetThrower/PortFinder/\
-                                             blob/main/LICENSE",
-                                        );
-                                    })
-                                    .into_any_element(),
-                            ))
-                            .when_some(privilege_label, |this, (label, status)| {
-                                this.child(about_row(
-                                    label,
+                        Button::new("settings-open-settings-folder")
+                            .icon(IconName::FolderOpen)
+                            .label("Settings folder")
+                            .outline()
+                            .small()
+                            .on_click(|_, _window, _cx| {
+                                settings::reveal_settings_folder();
+                            }),
+                    )
+                    .child(
+                        Button::new("settings-open-log-folder")
+                            .icon(IconName::FolderOpen)
+                            .label("Log folder")
+                            .outline()
+                            .small()
+                            .on_click(|_, _window, _cx| {
+                                settings::reveal_log_folder();
+                            }),
+                    );
+
+                if view_about {
+                    // -- About page (drill-down view) --------
+                    // Replaces the settings list with the
+                    // About content + a "← Back" header. Same
+                    // popover, just different content; the
+                    // user's click on Back flips
+                    // `settings_view_about` off and the next
+                    // render returns to the settings list.
+                    let entity_for_back = entity.clone();
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_2()
+                        .p_3()
+                        .w(panel_width)
+                        .child(
+                            div()
+                                .id("settings-about-back")
+                                .cursor_pointer()
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .pb_1()
+                                .child(Icon::new(IconName::ChevronLeft).text_color(muted))
+                                .child(div().text_sm().child("About"))
+                                .on_click(move |_, _window, cx| {
+                                    entity_for_back.update(cx, |this, cx| {
+                                        this.settings_view_about = false;
+                                        cx.notify();
+                                    });
+                                }),
+                        )
+                        .child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .gap_2()
+                                .pt_2()
+                                .border_t_1()
+                                .border_color(border)
+                                .child(about_row_with_icon(
+                                    IconName::Info,
+                                    "Version",
                                     div()
                                         .text_sm()
                                         .text_color(muted)
-                                        .child(status)
+                                        .child(format!("v{}", version))
                                         .into_any_element(),
+                                    muted,
                                 ))
-                            }),
-                    )
-                    // Row 4: action buttons anchored bottom-
-                    // right. macOS-System-Settings convention
-                    // for the trailing action(s) on a panel
-                    // ("Shortcuts…" / "Hot Corners…" on the
-                    // Mission Control panel sit this way).
-                    // Two buttons share the row: "Settings"
-                    // first (where the JSON files live —
-                    // `settings.json`, `history.json`), then
-                    // "Logs" (where `portfinder.log` lives
-                    // when the toggle above is on). Ordering
-                    // follows "config first, output second."
-                    .child(
-                        div()
-                            .flex()
-                            .justify_end()
-                            .gap_2()
-                            .child(
-                                Button::new("settings-open-settings-folder")
-                                    .label("Settings folder")
-                                    .outline()
-                                    .small()
-                                    .on_click(|_, _window, _cx| {
-                                        settings::reveal_settings_folder();
-                                    }),
-                            )
-                            .child(
-                                Button::new("settings-open-log-folder")
-                                    .label("Log folder")
-                                    .outline()
-                                    .small()
-                                    .on_click(|_, _window, _cx| {
-                                        settings::reveal_log_folder();
-                                    }),
-                            ),
-                    )
-                    .into_any_element()
+                                .child(about_row_with_icon(
+                                    IconName::Github,
+                                    "Repository",
+                                    Button::new("about-github")
+                                        .label("GitHub ↗")
+                                        .ghost()
+                                        .small()
+                                        .on_click(|_, _window, cx| {
+                                            cx.open_url(
+                                                "https://github.com/packetThrower/PortFinder",
+                                            );
+                                        })
+                                        .into_any_element(),
+                                    muted,
+                                ))
+                                .child(about_row_with_icon(
+                                    IconName::ExternalLink,
+                                    "License",
+                                    Button::new("about-license")
+                                        .label("GPL-3.0-or-later ↗")
+                                        .ghost()
+                                        .small()
+                                        .on_click(|_, _window, cx| {
+                                            cx.open_url(
+                                                "https://github.com/packetThrower/PortFinder/\
+                                                 blob/main/LICENSE",
+                                            );
+                                        })
+                                        .into_any_element(),
+                                    muted,
+                                ))
+                                .when_some(privilege_label, |this, (label, status)| {
+                                    this.child(about_row_with_icon(
+                                        IconName::Network,
+                                        label,
+                                        div()
+                                            .text_sm()
+                                            .text_color(muted)
+                                            .child(status)
+                                            .into_any_element(),
+                                        muted,
+                                    ))
+                                }),
+                        )
+                        .into_any_element()
+                } else {
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_3()
+                        .p_3()
+                        .w(panel_width)
+                        .child(capture_section)
+                        .child(logging_section)
+                        .child(about_row)
+                        .child(folders_row)
+                        .into_any_element()
+                }
             })
             .into_any_element()
     }
@@ -2255,17 +2301,75 @@ fn log_level_label(
     })
 }
 
-/// One row in the settings-popover "About" section. macOS
-/// System-Settings convention: small text label on the left,
-/// value or control flush right, full-width `justify_between`.
-/// The value column accepts any `AnyElement` so it can be a
-/// muted text label (version, status) or a `Button` (link).
-fn about_row(label: &'static str, value: gpui::AnyElement) -> gpui::Div {
+/// Small "section heading" label for the settings popover —
+/// a single `text_xs` muted-tone line above each group of
+/// rows ("Capture", "Logging", "About"). Lowercase letter-
+/// spacing isn't macOS-System-Settings (those use Bold caps);
+/// staying with plain xs muted keeps the popover legible
+/// against gpui-component's default theme without bringing
+/// in a custom font weight.
+fn settings_section_header(label: &'static str, muted: Hsla) -> gpui::Div {
+    div().text_xs().text_color(muted).child(label)
+}
+
+/// Leading icon + label for a settings row that doesn't have
+/// a `justify_between` shape — currently just the Log level
+/// slider's header line, which sits above a full-width
+/// Slider. Icon is rendered in the muted-tone since the
+/// label colour drives the row's hierarchy, not the icon.
+fn settings_row_header(icon: IconName, label: &'static str, muted: Hsla) -> gpui::Div {
+    div()
+        .flex()
+        .items_center()
+        .gap_2()
+        .child(Icon::new(icon).text_color(muted))
+        .child(div().text_sm().child(label))
+}
+
+/// Standard "icon + label on the left, Switch on the right"
+/// settings-popover row. Used by Capture/Save-history and
+/// Logging/Write-debug-log; the `on_click` closure carries
+/// the row's persistence + side-effect logic so this helper
+/// stays generic.
+fn settings_switch_row(
+    id: &'static str,
+    icon: IconName,
+    label: &'static str,
+    checked: bool,
+    muted: Hsla,
+    on_click: impl Fn(bool, &mut App) + 'static,
+) -> gpui::Div {
     div()
         .flex()
         .items_center()
         .justify_between()
-        .child(div().text_sm().child(label))
+        .child(settings_row_header(icon, label, muted))
+        .child(
+            Switch::new(SharedString::from(format!("settings-switch-{id}")))
+                .checked(checked)
+                .small()
+                .on_click(move |value: &bool, _window, cx| on_click(*value, cx)),
+        )
+}
+
+/// One row in the settings-popover "About" section. Leading
+/// icon, label, then a value-or-control column flush right.
+/// macOS System-Settings convention: full-width
+/// `justify_between` so the value/control hangs against the
+/// trailing edge regardless of label length. The value
+/// column accepts any `AnyElement` so it can be a muted text
+/// label (version, status) or a `Button` (link).
+fn about_row_with_icon(
+    icon: IconName,
+    label: &'static str,
+    value: gpui::AnyElement,
+    muted: Hsla,
+) -> gpui::Div {
+    div()
+        .flex()
+        .items_center()
+        .justify_between()
+        .child(settings_row_header(icon, label, muted))
         .child(value)
 }
 
