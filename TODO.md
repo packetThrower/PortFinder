@@ -72,19 +72,9 @@ All landed in 4.0.2 (see CHANGELOG `[Unreleased]`).
 
 ## Polish / discoverability
 
-- [ ] **About dialog.** Settings menu's a natural home for an
-  "About" item — version, GPL-3.0 link, GitHub link, BPF helper
-  status / install button. Right now the version sits in the
-  footer pill, which is fine but isn't where users look.
-- [ ] **Keyboard shortcut for Start / Stop.** Cmd+R or Space.
-  Currently capture only starts via the button.
-- [ ] **Export results.** "Copy as JSON" button next to the
-  result card would let users paste capture data into a ticket
-  / Slack without screenshotting. The CLI already supports
-  `--json`; mirror the format in the GUI clipboard.
-- [ ] **History.** Last N capture results in a scrollable list
-  (in-memory or on-disk). Useful when bouncing between switches
-  or comparing two cables.
+All landed in 4.0.2 (see CHANGELOG `[Unreleased]`). The history
+feature additionally supports opt-in disk persistence via a
+toggle in the settings popover.
 
 ## Cross-distro packaging
 

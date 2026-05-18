@@ -29,6 +29,38 @@ Each major version line is a different implementation:
   `capture_blocking`, and `open_capture` now log per-event
   diagnostics at debug + trace levels — useful for "I'm
   capturing but seeing no packets" bug reports.
+- **Log-level slider** in the settings popover. Three stops —
+  Normal (info), Verbose (debug), Trace — with hover-tooltip
+  descriptions for each level. Applies live via
+  `log::set_max_level` and persists across restarts. CLI
+  `-v` / `-vv` / `-q` still override at runtime.
+- **About section** in the settings popover. Version,
+  Repository (GitHub), License (GPL-3.0), and a platform-
+  specific capture-privilege row ("BPF helper" on macOS,
+  "Npcap" on Windows, "Capture access" on Linux).
+- **Start / Stop keyboard shortcut.** `Cmd+R` on macOS,
+  `Ctrl+R` on Linux / Windows, scoped to the AppView so it
+  doesn't fire while a popover is open. PortFinder app menu
+  gains a matching "Start/Stop Capture" entry; Start and Stop
+  buttons show the bound keystroke in their hover tooltips.
+- **Copy as JSON button** on the result card. Right-aligned
+  below the seven value rows; serializes the result with the
+  same `serde_json::to_string_pretty` shape the CLI's
+  `--json` flag produces. Flashes "Copied" for 1.2 s.
+- **Capture history popover** next to the Copy as JSON
+  button. Last 10 successful captures with relative
+  timestamps ("2m ago · LLDP on en0 · Gi1/0/24") and the
+  switch name + IP. Left-click restores an entry to the
+  result card; right-click silently copies it as JSON.
+- **Opt-in disk persistence for history.** New "Save capture
+  history" Switch at the top of the settings popover (default
+  off). When on, history is written to `history.json`
+  alongside `settings.json` and reloaded on startup. Flipping
+  it off deletes the file; the in-memory deque stays for the
+  rest of the session.
+- **"Settings folder" button** in the settings popover, next
+  to (renamed) "Log folder". Reveals the config directory
+  where `settings.json` and `history.json` live.
 
 ### Changed
 - **Log levels audited.** `render: resize` events moved from
@@ -41,6 +73,14 @@ Each major version line is a different implementation:
   rather than `init_logging`, so the first line of every log
   file is the boot banner regardless of which enable path
   triggered it (persisted setting, CLI flag, UI toggle).
+- **Main window is no longer resizable.** AppView already
+  drives its own size via `window.resize` whenever the
+  privilege banner or result card toggles state; a user-
+  dragged corner used to snap back to the programmatic
+  height on the next render, visible as a bounce. Disabling
+  the resize handles outright (`is_resizable: false` in
+  `WindowOptions`) removes the snap-back path entirely.
+  Window stays movable / minimisable / closeable as normal.
 
 ### Removed
 - **Stale `~/Desktop/portfinder-debug.log` from alpha installs**
