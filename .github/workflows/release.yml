@@ -255,7 +255,18 @@ jobs:
       - name: Build .exe (NSIS) + .msi (stable amd64 only)
         shell: pwsh
         run: |
-          $config = Get-Content packaging/windows/Packager.json -Raw
+          # Inject the version from the tag into the packager
+          # JSON. cargo-packager normally auto-fills `version`
+          # from the cargo workspace's metadata, but `--config`
+          # with raw JSON skips that path entirely — without the
+          # explicit `version` field cargo-packager bails with
+          # `empty string, expected a semver version`. Parse,
+          # add the field, re-serialise.
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $config_obj = Get-Content packaging/windows/Packager.json -Raw | ConvertFrom-Json
+          $config_obj | Add-Member -NotePropertyName version -NotePropertyValue $version -Force
+          $config = $config_obj | ConvertTo-Json -Depth 10
+
           # Stable amd64 also gets a WiX/MSI alongside NSIS. Two
           # separate cargo packager branches because PowerShell's
           # `.Split()` on an empty string returns `[""]` (one

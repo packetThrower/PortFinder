@@ -63,7 +63,7 @@ on Windows.
    The resulting `target/release/PortFinder.app/Contents/MacOS/`
    should contain both `PortFinder` and `portfinder-cli`.
 
-## cargo-packager 0.11.8 quirk
+## cargo-packager 0.11.8 quirks
 
 `--config` accepts either a file path or a raw JSON string.
 The file-path form is broken in 0.11.8 — it errors with
@@ -71,6 +71,26 @@ The file-path form is broken in 0.11.8 — it errors with
 the file contents through (`"$(cat …)"` on bash,
 `Get-Content -Raw` on PowerShell). The release workflow does
 the latter; update both if the bug is fixed upstream.
+
+The `--config` path also **skips cargo workspace metadata
+entirely** — that's the path that normally auto-fills
+`version` from `Cargo.toml`'s `[package].version`. Without an
+explicit `version` in this JSON, cargo-packager errors out
+with `empty string, expected a semver version`. We don't
+hardcode the version here (it's per-release); the release
+workflow injects it dynamically via PowerShell:
+
+```powershell
+$version = "${{ github.ref_name }}" -replace '^v', ''
+$config_obj = Get-Content packaging/windows/Packager.json -Raw | ConvertFrom-Json
+$config_obj | Add-Member -NotePropertyName version -NotePropertyValue $version -Force
+$config = $config_obj | ConvertTo-Json -Depth 10
+cargo packager … --config $config …
+```
+
+If you ever build this locally from a checked-out tag, do the
+analogous injection or pass `--config` with a hand-crafted
+JSON that includes `"version": "..."`.
 
 ## Why `--out-dir` and `--binaries-dir` are explicit
 
