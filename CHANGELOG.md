@@ -14,7 +14,13 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
-## [4.1.0-beta.2] - 2026-05-18
+## [4.1.0] - 2026-05-18
+
+Consolidates the work shipped through `4.1.0-beta.1` and
+`4.1.0-beta.2`. Highlights: capture-history popover with opt-in
+disk persistence, three-stop log-level slider, Start/Stop
+keyboard shortcut, Copy as JSON, About sub-page, seven shipped
+UI locales, and a Linux .deb that finally passes lintian clean.
 
 ### Added
 - **Localised UI.** Seven languages ship out of the box —
@@ -31,19 +37,6 @@ Each major version line is a different implementation:
   `i18n!()` macro reading `locales/<code>.yml`; missing keys
   in non-English locales fall through to the English source
   of truth automatically.
-- **Docs site landing-page features grid.** The Astro
-  Starlight site picks up a "Beyond a one-shot capture" card
-  grid covering the history popover (opt-in persistence),
-  Copy as JSON / right-click copy, the Start/Stop keyboard
-  shortcut, and the log-level slider. Dev pages
-  (architecture, setup) catch up to the current `src/`
-  layout — `lib.rs` split, `settings.rs` + `updater.rs` as
-  their own modules, the `src/bin/portfinder-cli.rs` Windows
-  sibling, and the `--features windows-cli` build flag.
-
-## [4.1.0-beta.1] - 2026-05-18
-
-### Added
 - **CLI logging flags.** `portfinder-cli` now accepts `-v` (debug
   level), `-vv` (trace), `-q` (warnings + errors only), and
   `--log-file <PATH>` (override the platform-default log path
