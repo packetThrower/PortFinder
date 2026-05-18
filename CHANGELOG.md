@@ -14,6 +14,40 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+### Added
+- **CLI logging flags.** `portfinder-cli` now accepts `-v` (debug
+  level), `-vv` (trace), `-q` (warnings + errors only), and
+  `--log-file <PATH>` (override the platform-default log path
+  for this invocation). All four are global args, so they work
+  alongside any subcommand.
+- **Size-based log rotation.** When the debug log is enabled
+  and the existing file is over 1 MiB, it's renamed to
+  `portfinder.log.1` before the new session appends. Rotation
+  happens at enable time (process start, UI toggle, CLI
+  `--log-file`), not per-write.
+- **Debug-level capture instrumentation.** `capture::run`,
+  `capture_blocking`, and `open_capture` now log per-event
+  diagnostics at debug + trace levels — useful for "I'm
+  capturing but seeing no packets" bug reports.
+
+### Changed
+- **Log levels audited.** `render: resize` events moved from
+  info to debug (per-frame render-tick noise was the bulk of
+  the log file). Settings-save failures and parser
+  non-UTF-8-fallback warnings switched from `eprintln!` to
+  `log::warn!` so they obey the in-app logger toggle instead
+  of always hitting stderr.
+- **Log startup banner** now emits from `set_logging_enabled`
+  rather than `init_logging`, so the first line of every log
+  file is the boot banner regardless of which enable path
+  triggered it (persisted setting, CLI flag, UI toggle).
+
+### Removed
+- **Stale `~/Desktop/portfinder-debug.log` from alpha installs**
+  is auto-deleted on first launch of 4.0.2+ (capped at 10 MiB
+  and gated to regular files only, so we don't trash anything
+  unrelated that happened to land at that path).
+
 ### Fixed
 - **`.deb` lintian cleanups** for Ubuntu / Debian installers
   (gdebi's "Lintian output" tab + `lintian PortFinder_*.deb`

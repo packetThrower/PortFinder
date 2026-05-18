@@ -8,36 +8,7 @@ a tracked issue.
 
 ## Logging
 
-- [ ] **Audit what we actually log.** Walk every `log::info!` /
-  `log::warn!` / `eprintln!` call site and decide if it's at the
-  right level. Current behaviour is "everything is `info`", which
-  means turning on the debug logger writes a noisy file but
-  still misses anything sub-info (state transitions, individual
-  pcap reads). Targets:
-  - `debug` for per-frame parser diagnostics and per-tick
-    capture-loop state — useful for "I'm not capturing anything"
-    bug reports
-  - `info` for lifecycle (boot, capture start/stop, update check
-    result, settings flips)
-  - `warn` for recoverable issues (parser fell back to
-    `from_utf8_lossy`, settings save failed)
-  - `error` for things that fail the user-visible action
-- [ ] **CLI logging flags.** Add to clap:
-  - `--verbose` / `-v` → bump to debug level for this invocation
-  - `-vv` → trace level
-  - `--log-file <path>` → override the settings-file location for
-    a one-shot run (useful for `portfinder-cli --log-file
-    /tmp/repro.log capture --protocol lldp`)
-  - `--quiet` → suppress info, warn-and-up only
-- [ ] **Log rotation.** The current append-forever pattern grows
-  the log file unbounded. `env_logger` doesn't ship a rotator;
-  switch to `flexi_logger` or implement size-based rollover
-  (`portfinder.log` → `portfinder.log.1` at 1 MiB).
-- [ ] **Clean up stale `~/Desktop/portfinder-debug.log` from
-  alpha installs.** First-launch one-shot: if the file exists
-  and is owned by us, delete it (with a `log::info!` noting the
-  cleanup). Skip if logging is enabled and the path happens to
-  match (paranoid corner case).
+All landed in 4.0.2 (see CHANGELOG `[Unreleased]`).
 
 ## Known open items from the 4.0 cycle
 
