@@ -424,6 +424,19 @@ jobs:
           dpkg-deb -R "$DEB" "$WORK"
           mkdir -p "$WORK/DEBIAN"
 
+          # All intermediate steps below run as the runner user
+          # against runner-owned files (dpkg-deb -R extracts with
+          # the build runner's uid:gid, which matches the current
+          # runner user, so no chown needed yet). The single
+          # `sudo chown -R 0:0` to make the .deb's archive
+          # entries root:root happens at the very end, right
+          # before `dpkg-deb -b` re-packs. Earlier versions of
+          # this step chowned to root up front and then needed
+          # `sudo` on every subsequent file op — and glob
+          # expansion in the calling shell (still the runner
+          # user) broke on root-owned dirs because mktemp -d
+          # gives mode 700, so the runner couldn't read them.
+
           # ----- maintainer hooks ----------------------------------
           cp packaging/linux/portfinder-postinstall.sh "$WORK/DEBIAN/postinst"
           chmod 0755 "$WORK/DEBIAN/postinst"
@@ -434,16 +447,6 @@ jobs:
           # `apt purge` leaves a dangling link behind.
           cp packaging/linux/portfinder-preremove.sh "$WORK/DEBIAN/prerm"
           chmod 0755 "$WORK/DEBIAN/prerm"
-
-          # ----- root:root ownership -------------------------------
-          # cargo-packager's tar packer preserves the build user's
-          # uid/gid (1001/1001 on GitHub runners). dpkg installs
-          # files with their stored ownership, so on the target
-          # system any uid that happens to be 1001 ends up owning
-          # /usr/bin/PortFinder. Lintian flags this as
-          # `wrong-file-owner-uid-or-gid`. Fix by chowning the
-          # entire payload + DEBIAN dir to 0:0 before re-packing.
-          sudo chown -R 0:0 "$WORK"
 
           # ----- control file fixes --------------------------------
           # cargo-packager builds the control file from
@@ -461,7 +464,7 @@ jobs:
           #     does) but lintian wants it spelled in Depends.
           #     Append libc6 to the existing Depends line.
           CONTROL="$WORK/DEBIAN/control"
-          sudo sed -i \
+          sed -i \
             -e 's|^Maintainer: .*$|Maintainer: Will Lehnertz <6597817+packetThrower@users.noreply.github.com>|' \
             -e '/^Priority: /a Section: net' \
             -e 's|^\(Depends: .*\)$|\1, libc6|' \
@@ -477,21 +480,35 @@ jobs:
           # changelog entries would duplicate what the repo
           # changelog already covers).
           DOCDIR="$WORK/usr/share/doc/portfinder"
-          sudo mkdir -p "$DOCDIR"
-          sudo cp packaging/linux/copyright "$DOCDIR/copyright"
+          mkdir -p "$DOCDIR"
+          cp packaging/linux/copyright "$DOCDIR/copyright"
 
           VERSION="${GITHUB_REF_NAME#v}"
           DATE=$(date -R)
-          sudo env VERSION="$VERSION" DATE="$DATE" \
-            sh -c 'envsubst < packaging/linux/changelog.Debian.template > "$0/changelog.Debian"' \
-            "$DOCDIR"
-          sudo gzip -9n "$DOCDIR/changelog.Debian"
+          VERSION="$VERSION" DATE="$DATE" \
+            envsubst < packaging/linux/changelog.Debian.template \
+            > "$DOCDIR/changelog.Debian"
+          gzip -9n "$DOCDIR/changelog.Debian"
+          chmod 0644 "$DOCDIR"/*
 
-          sudo chown -R 0:0 "$DOCDIR"
-          sudo chmod 0644 "$DOCDIR"/*
+          # ----- root:root ownership -------------------------------
+          # cargo-packager's tar packer preserves the build user's
+          # uid/gid (1001/1001 on GitHub runners). dpkg installs
+          # files with their stored ownership, so on the target
+          # system any uid that happens to be 1001 ends up owning
+          # /usr/bin/PortFinder. Lintian flags this as
+          # `wrong-file-owner-uid-or-gid`. Fix by chowning the
+          # entire payload + DEBIAN dir to 0:0 right before the
+          # re-pack — `dpkg-deb -b` records the on-disk uid/gid
+          # into the .deb's archive entries.
 
           # ----- re-pack -------------------------------------------
-          dpkg-deb -Z xz -b "$WORK" "$DEB"
+          # `dpkg-deb -b` (and the `rm -rf` below it) need sudo
+          # because the `chown -R 0:0` above made the tree
+          # unreadable to the runner user (mktemp -d gives mode
+          # 700; chown only flips the owner so the mode stays).
+          sudo chown -R 0:0 "$WORK"
+          sudo dpkg-deb -Z xz -b "$WORK" "$DEB"
           sudo rm -rf "$WORK"
 
       - name: Build .rpm via fpm
