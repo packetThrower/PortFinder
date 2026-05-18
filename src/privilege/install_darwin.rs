@@ -2,6 +2,7 @@ use std::io::{Read, Write};
 use std::os::unix::fs::PermissionsExt;
 
 use security_framework::authorization::{Authorization, AuthorizationItemSetBuilder, Flags};
+use tempfile::NamedTempFile;
 
 // Single shell script that:
 //   1. Removes the legacy `coop.otec.portfinder.ChmodBPF` daemon + helper
@@ -116,30 +117,51 @@ fi
 "#;
 
 pub fn install() -> Result<(), String> {
-    // Write the script to a temp file the elevated shell will read.
-    // The script itself is identical to the legacy osascript path —
-    // only the elevation mechanism is different.
-    let dir = std::env::temp_dir();
-    let path = dir.join(format!("portfinder-bpf-{}.sh", std::process::id()));
-    {
-        let mut f = std::fs::File::create(&path)
-            .map_err(|e| format!("failed to create temp script: {e}"))?;
-        f.write_all(INSTALL_SCRIPT.as_bytes())
-            .map_err(|e| format!("failed to write install script: {e}"))?;
-        let mut perms = f
-            .metadata()
-            .map_err(|e| format!("failed to stat temp script: {e}"))?
-            .permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&path, perms)
-            .map_err(|e| format!("failed to chmod temp script: {e}"))?;
-    }
+    // Write the bootstrap script to a temp file the elevated shell
+    // will read. The path must be unguessable + atomically created
+    // because the elevated `/bin/sh` will open whatever path we
+    // hand it, as root. Previously this code constructed the path
+    // manually as `/tmp/portfinder-bpf-<pid>.sh` and called
+    // `File::create` (no O_EXCL, follows symlinks); a local
+    // unprivileged user could pre-symlink the predictable path
+    // anywhere they liked and the elevated shell would happily run
+    // that target as root.
+    //
+    // `tempfile::NamedTempFile` uses `mkstemp` underneath:
+    //   - O_CREAT | O_EXCL — fails if the path already exists, so
+    //     a pre-placed symlink can't win the race
+    //   - random 6-byte suffix — path is unguessable to other
+    //     local users
+    //   - inherits umask, so the file ends up 0600 owned by us
+    //
+    // We don't need to `chmod 0755` to run it: the elevated
+    // `/bin/sh` runs as root and bypasses owner/group/mode checks,
+    // so 0600 is plenty. Keeping it owner-only also means no other
+    // local user can read the script contents while it's on disk.
+    let mut tmp = NamedTempFile::with_prefix("portfinder-bpf-")
+        .map_err(|e| format!("failed to create temp script: {e}"))?;
+    tmp.write_all(INSTALL_SCRIPT.as_bytes())
+        .map_err(|e| format!("failed to write install script: {e}"))?;
+    let mut perms = tmp
+        .as_file()
+        .metadata()
+        .map_err(|e| format!("failed to stat temp script: {e}"))?
+        .permissions();
+    // Belt-and-braces — explicit 0600 in case the inherited umask
+    // would have been laxer. fchmod via `set_permissions` on the
+    // open file handle, no path-resolution race.
+    perms.set_mode(0o600);
+    tmp.as_file()
+        .set_permissions(perms)
+        .map_err(|e| format!("failed to chmod temp script: {e}"))?;
 
-    let path_str = path.to_string_lossy().into_owned();
+    let path_str = tmp.path().to_string_lossy().into_owned();
     let result = run_with_admin_privileges(&path_str);
 
-    // Clean up the temp script regardless of how the run went.
-    let _ = std::fs::remove_file(&path);
+    // `NamedTempFile`'s Drop unlinks the file. Explicit close
+    // makes the cleanup happen here rather than later in this
+    // function's stack unwind.
+    drop(tmp);
 
     result
 }

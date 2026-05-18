@@ -138,6 +138,16 @@ security-framework = "3"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSImage", "NSGraphics", "NSGraphicsContext"] }
 objc2-foundation = { version = "0.3", features = ["NSString", "NSGeometry"] }
+# `mkstemp`-based atomic temp-file creation for the BPF helper
+# installer's bootstrap script (O_EXCL + random suffix). The
+# pre-4.0 code built the path manually as `/tmp/portfinder-bpf-
+# <pid>.sh` and used `File::create` (no O_EXCL, follows
+# symlinks) — a local user could pre-symlink the predictable
+# path and race the auth-dialog Allow click to land arbitrary
+# script execution as root. Already in the transitive dep
+# graph; declaring directly so we're not at the mercy of an
+# upstream feature flip dropping it.
+tempfile = "3"
 
 [build-dependencies]
 # Build-time embed of resources/icons/icon.ico into the PortFinder.exe
