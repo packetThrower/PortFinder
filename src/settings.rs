@@ -45,6 +45,17 @@ pub struct Settings {
     /// they call `set_max_level` after `apply_log_overrides`.
     #[serde(default)]
     pub log_level: LogLevel,
+
+    /// When true, `history.json` is written alongside
+    /// `settings.json` on each successful capture and hydrated
+    /// back into the History popover on startup. Default
+    /// false: opt-in keeps a fresh install from quietly
+    /// accumulating a record of which switches the user
+    /// probed. Flipping the toggle ON snapshots the current
+    /// in-memory history to disk; flipping OFF deletes the
+    /// file (in-memory stays for the rest of the session).
+    #[serde(default)]
+    pub persist_history: bool,
 }
 
 /// User-facing logging verbosity. Three options expose
@@ -133,6 +144,67 @@ impl Settings {
 /// on macOS, %APPDATA% on Windows, XDG_CONFIG_HOME on Linux).
 fn settings_path() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("PortFinder").join("settings.json"))
+}
+
+/// `<config_dir>/PortFinder/history.json`. Same directory as
+/// `settings.json` so the "Open settings folder" reveal shows
+/// both in the file manager. Stored as JSON (rather than a
+/// binary format) so a curious user can grep / `jq` past
+/// captures without re-launching the app.
+pub fn history_path() -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join("PortFinder").join("history.json"))
+}
+
+/// Read the persisted capture history. Missing / malformed
+/// files return an empty `Vec` — same forgiveness `Settings`
+/// has, since a corrupt history file should not block the
+/// app from booting. Callers convert to `VecDeque` at the use
+/// site (gpui's `AppView::new`).
+///
+/// Generic over the deserialised type so the helper doesn't
+/// have to know about `HistoryEntry`'s shape (which lives in
+/// `app_view.rs` because it references `Protocol`, which is
+/// also UI-side). The `T: DeserializeOwned + Default` bound
+/// keeps the fallback safe even if `T` ever stops being
+/// `Vec<...>`.
+pub fn load_history<T: serde::de::DeserializeOwned + Default>() -> T {
+    let Some(path) = history_path() else {
+        return T::default();
+    };
+    let Ok(bytes) = std::fs::read(&path) else {
+        return T::default();
+    };
+    serde_json::from_slice(&bytes).unwrap_or_default()
+}
+
+/// Delete `history.json` if present. Called when the user
+/// flips the "Save capture history" toggle OFF — "off" means
+/// "no record on disk," so the file goes with the toggle.
+/// Silent on missing file: deleting a file that isn't there
+/// is the same end state as deleting one that was, and the
+/// caller doesn't need to distinguish.
+pub fn clear_history_file() {
+    let Some(path) = history_path() else { return };
+    match std::fs::remove_file(&path) {
+        Ok(()) => log::info!("cleared history file {}", path.display()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        Err(e) => log::warn!("clear history failed: {e}"),
+    }
+}
+
+/// Write the capture history JSON. Generic for the same
+/// reason as `load_history`. Failures bubble up so the GUI
+/// can log them; the in-memory deque stays authoritative
+/// whether the write succeeds or not.
+pub fn save_history<T: serde::Serialize>(history: &T) -> Result<(), String> {
+    let path = history_path().ok_or("no config dir on this platform")?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("create config dir {}: {e}", parent.display()))?;
+    }
+    let json = serde_json::to_vec_pretty(history).map_err(|e| format!("serialise: {e}"))?;
+    std::fs::write(&path, &json).map_err(|e| format!("write {}: {e}", path.display()))?;
+    Ok(())
 }
 
 /// Where the debug log lives when `debug_log` is true. Logs go to
@@ -339,8 +411,29 @@ pub fn try_remove_legacy_desktop_log() {
 pub fn reveal_log_folder() {
     let Some(log_path) = log_file_path() else { return };
     let Some(dir) = log_path.parent() else { return };
-    let _ = std::fs::create_dir_all(dir);
+    reveal_dir(dir);
+}
 
+/// Sibling to `reveal_log_folder` for the config directory
+/// (`settings.json` + `history.json` live here). Wired to the
+/// settings popover's "Open settings folder" button. Same
+/// best-effort policy: create the directory first so the
+/// reveal lands somewhere even on a fresh install before any
+/// setting has been saved.
+pub fn reveal_settings_folder() {
+    let Some(path) = settings_path() else { return };
+    let Some(dir) = path.parent() else { return };
+    reveal_dir(dir);
+}
+
+/// Shared "make sure dir exists, then ask the OS to open it"
+/// implementation. macOS hands the path to `open`, Windows to
+/// `explorer`, everything else to `xdg-open`. The spawn is
+/// fire-and-forget — we don't await the child or surface its
+/// exit code; the user noticing the file manager not opening
+/// is feedback enough.
+fn reveal_dir(dir: &std::path::Path) {
+    let _ = std::fs::create_dir_all(dir);
     let (cmd, args): (&str, Vec<&str>) = if cfg!(target_os = "macos") {
         ("open", vec![])
     } else if cfg!(target_os = "windows") {

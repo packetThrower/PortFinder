@@ -17,7 +17,7 @@
 
 use std::collections::VecDeque;
 use std::sync::OnceLock;
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use flume::{Receiver, Sender};
 use gpui::{
@@ -35,6 +35,7 @@ use gpui_component::{
     tooltip::Tooltip,
     ActiveTheme, Disableable, IconName, IndexPath, Root, Sizable, Theme, ThemeMode, TitleBar,
 };
+use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle as TokioHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -220,7 +221,14 @@ fn tokio_handle() -> &'static TokioHandle {
 /// Discovery protocol the capture engine looks for. Local mirror of
 /// the string-based wire protocol — easier to round-trip into
 /// `CaptureRequest.protocol` on the way out.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+///
+/// `Serialize` / `Deserialize` are for the persistent-history
+/// file (`history.json`) round-trip — each `HistoryEntry`
+/// carries the protocol used. `lowercase` rename keeps the JSON
+/// readable to a human poking at the file ("lldp" / "cdp" /
+/// "mndp" rather than "Lldp" / "Cdp" / "Mndp").
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 enum Protocol {
     Lldp,
     Cdp,
@@ -292,29 +300,33 @@ struct ResultKey(&'static str);
 /// "Copied" next to the JSON button vs next to a row's value.
 const RESULT_KEY_JSON: ResultKey = ResultKey("json");
 
-/// One entry in the in-memory capture history. Captured on
+/// One entry in the persisted capture history. Captured on
 /// successful capture completion (`on_capture_done` with
 /// `Ok`); failures, cancellations, and "Not advertised"-on-
 /// every-field cases do still land here (a result with all
 /// `"N/A"` fields can still be the answer to "is this port
 /// even patched"). Stored in `AppView::history` as a
-/// `VecDeque` with `HISTORY_MAX` cap, oldest evicted first.
+/// `VecDeque` with `HISTORY_MAX` cap, oldest evicted first;
+/// the deque is serialized to `history.json` alongside
+/// `settings.json` on each push and reloaded on startup.
 ///
-/// In-memory only — discarded on app close. Persistence is a
-/// follow-up the TODO file flags; for now the use case the
-/// in-app history needs to cover is "I just captured port A
-/// then port B and want to compare them," which fits the
-/// session-scoped shape.
-#[derive(Clone)]
+/// `captured_at` is wall-clock seconds since UNIX_EPOCH (not
+/// `Instant`, which is process-local and can't survive a
+/// restart). `format_ago` does `now - captured_at` against
+/// `SystemTime::now()` to render the relative timestamp. Wall
+/// clock CAN move backwards (DST, NTP), but only the relative
+/// display would briefly disagree — `saturating_sub` keeps
+/// the format from underflowing in that case.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct HistoryEntry {
     result: CaptureResult,
     protocol: Protocol,
     interface_name: String,
-    /// Wall-clock-independent — `Instant` is monotonic and
-    /// can't go backwards across DST flips or NTP slews. The
-    /// history list renders relative ("2m ago") rather than
-    /// absolute, so the lack of a wall-clock anchor is fine.
-    captured_at: Instant,
+    /// Seconds since UNIX_EPOCH at the moment the capture
+    /// landed in `on_capture_done`. `u64` (not `i64`) — we
+    /// never read history written before 1970-01-01.
+    captured_at_epoch_secs: u64,
 }
 
 /// Cap on `AppView::history`. Past this many captures the
@@ -543,7 +555,23 @@ impl AppView {
             error: String::new(),
             status_text: "Ready".into(),
             copied_key: None,
-            history: VecDeque::with_capacity(HISTORY_MAX),
+            // Hydrate from `history.json` only when the
+            // user has opted in via the popover toggle —
+            // otherwise the file (which may exist from a
+            // prior opted-in session) is ignored, not
+            // deleted. Cap to `HISTORY_MAX` on load too, in
+            // case a previous version wrote more entries or
+            // the file was hand-edited.
+            history: if settings_loaded.persist_history {
+                let mut deque: VecDeque<HistoryEntry> =
+                    settings::load_history::<Vec<HistoryEntry>>().into();
+                while deque.len() > HISTORY_MAX {
+                    deque.pop_front();
+                }
+                deque
+            } else {
+                VecDeque::with_capacity(HISTORY_MAX)
+            },
             priv_status,
             is_installing: false,
             update_available: None,
@@ -697,8 +725,20 @@ impl AppView {
                     result: r.clone(),
                     protocol: self.protocol,
                     interface_name: self.selected_interface_name.clone(),
-                    captured_at: Instant::now(),
+                    captured_at_epoch_secs: now_epoch_secs(),
                 });
+                // Persist after every push, but only when the
+                // user has opted in via the popover toggle.
+                // The file is tiny (<5 KB for the max-10
+                // deque), so syncing on each push is cheap;
+                // failures are logged and ignored — in-memory
+                // state is the source of truth, disk is a
+                // best-effort mirror.
+                if self.settings.persist_history {
+                    if let Err(e) = settings::save_history(&self.history) {
+                        log::warn!("save history failed: {e}");
+                    }
+                }
                 self.result = Some(r);
                 self.status_text = "Complete".into();
             }
@@ -1486,7 +1526,7 @@ impl AppView {
                         };
                         let meta = format!(
                             "{} · {} on {}{}",
-                            format_ago(entry.captured_at),
+                            format_ago(entry.captured_at_epoch_secs),
                             entry.protocol.as_str(),
                             iface,
                             port_segment,
@@ -1610,7 +1650,7 @@ impl AppView {
             } else {
                 &entry.interface_name
             },
-            format_ago(entry.captured_at),
+            format_ago(entry.captured_at_epoch_secs),
         )
         .into();
         cx.notify();
@@ -1631,6 +1671,7 @@ impl AppView {
     /// "restart to apply" hint underneath the switch.
     fn render_settings_menu(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let debug_log = self.settings.debug_log;
+        let persist_history = self.settings.persist_history;
         // Capture the AppView entity so the Switch's `on_click`
         // can mutate `self.settings` from inside the popover's
         // `.content(...)` callback. The popover renders in an
@@ -1671,6 +1712,7 @@ impl AppView {
                     .small(),
             )
             .content(move |_, _, cx| {
+                let entity_for_history = entity.clone();
                 let entity_for_switch = entity.clone();
                 let muted = cx.theme().muted_foreground;
                 let border = cx.theme().border;
@@ -1680,7 +1722,49 @@ impl AppView {
                     .gap_3()
                     .p_3()
                     .w(panel_width)
-                    // Row 1: "Write debug log" label + Switch.
+                    // Row 1: "Save capture history" label +
+                    // Switch. Sits above the logging rows
+                    // because it gates a separate concern (the
+                    // persistent history popover next to the
+                    // result card) and the user has asked for
+                    // it to lead. Flipping ON snapshots the
+                    // current in-memory deque to disk
+                    // immediately so the user can quit the app
+                    // and find their data on relaunch; OFF
+                    // deletes `history.json` (the in-memory
+                    // deque stays for the rest of the session).
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(div().text_sm().child("Save capture history"))
+                            .child(
+                                Switch::new("settings-persist-history")
+                                    .checked(persist_history)
+                                    .small()
+                                    .on_click(move |value: &bool, _window, cx| {
+                                        let new = *value;
+                                        entity_for_history.update(cx, |this, cx| {
+                                            this.settings.persist_history = new;
+                                            if new {
+                                                if let Err(e) =
+                                                    settings::save_history(&this.history)
+                                                {
+                                                    log::warn!("save history failed: {e}");
+                                                }
+                                            } else {
+                                                settings::clear_history_file();
+                                            }
+                                            if let Err(e) = this.settings.save() {
+                                                log::warn!("settings save failed: {e}");
+                                            }
+                                            cx.notify();
+                                        });
+                                    }),
+                            ),
+                    )
+                    // Row 2: "Write debug log" label + Switch.
                     // macOS System-Settings layout convention —
                     // label left, control right, full-width
                     // justify_between.
@@ -1871,20 +1955,40 @@ impl AppView {
                                 ))
                             }),
                     )
-                    // Row 4: action button anchored bottom-right,
-                    // also macOS-System-Settings convention
+                    // Row 4: action buttons anchored bottom-
+                    // right. macOS-System-Settings convention
+                    // for the trailing action(s) on a panel
                     // ("Shortcuts…" / "Hot Corners…" on the
                     // Mission Control panel sit this way).
+                    // Two buttons share the row: "Settings"
+                    // first (where the JSON files live —
+                    // `settings.json`, `history.json`), then
+                    // "Logs" (where `portfinder.log` lives
+                    // when the toggle above is on). Ordering
+                    // follows "config first, output second."
                     .child(
-                        div().flex().justify_end().child(
-                            Button::new("settings-open-log-folder")
-                                .label("Open log folder")
-                                .outline()
-                                .small()
-                                .on_click(|_, _window, _cx| {
-                                    settings::reveal_log_folder();
-                                }),
-                        ),
+                        div()
+                            .flex()
+                            .justify_end()
+                            .gap_2()
+                            .child(
+                                Button::new("settings-open-settings-folder")
+                                    .label("Settings folder")
+                                    .outline()
+                                    .small()
+                                    .on_click(|_, _window, _cx| {
+                                        settings::reveal_settings_folder();
+                                    }),
+                            )
+                            .child(
+                                Button::new("settings-open-log-folder")
+                                    .label("Log folder")
+                                    .outline()
+                                    .small()
+                                    .on_click(|_, _window, _cx| {
+                                        settings::reveal_log_folder();
+                                    }),
+                            ),
                     )
                     .into_any_element()
             })
@@ -2100,23 +2204,44 @@ fn protocol_opts() -> Vec<Opt> {
 /// single-line width wins over any `max_w` we set on the tooltip
 /// itself — the box stretches and overflows the popover. A `div`
 /// with `.w(220px)` pins the line-break boundary.
-/// "2m ago" / "1h ago" style relative timestamp for the
-/// History popover. Resolution drops to whole units —
-/// granularity isn't useful for "did I capture this before
-/// or after that other port" reasoning, just "roughly when."
-/// `Instant` is monotonic, so this is robust against wall-
-/// clock jumps (DST, NTP slews) — see `HistoryEntry.captured_at`.
-fn format_ago(t: Instant) -> String {
-    let secs = t.elapsed().as_secs();
+/// "2m ago" / "1h ago" / "3d ago" style relative timestamp
+/// for the History popover. Resolution drops to whole units —
+/// granularity isn't useful for "did I capture this before or
+/// after that other port" reasoning, just "roughly when."
+/// Day-level rollover is here for persisted entries that
+/// survive past midnight; session-only history never makes
+/// it that far.
+///
+/// Input is wall-clock seconds since UNIX_EPOCH (see
+/// `HistoryEntry.captured_at_epoch_secs`). `saturating_sub`
+/// guards against a system-clock jump that would put `now`
+/// before the entry's stamp — we'd briefly render "just now"
+/// rather than panic on an arithmetic underflow.
+fn format_ago(captured_at_epoch_secs: u64) -> String {
+    let secs = now_epoch_secs().saturating_sub(captured_at_epoch_secs);
     if secs < 5 {
         "just now".to_string()
     } else if secs < 60 {
         format!("{secs}s ago")
     } else if secs < 3600 {
         format!("{}m ago", secs / 60)
-    } else {
+    } else if secs < 86_400 {
         format!("{}h ago", secs / 3600)
+    } else {
+        format!("{}d ago", secs / 86_400)
     }
+}
+
+/// Seconds since UNIX_EPOCH right now, as a `u64`. Defaults
+/// to 0 (i.e., 1970-01-01) if the system clock somehow
+/// pre-dates UNIX_EPOCH; the relative-time math gracefully
+/// degrades to "just now" via `saturating_sub` rather than
+/// blowing up.
+fn now_epoch_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 fn log_level_label(

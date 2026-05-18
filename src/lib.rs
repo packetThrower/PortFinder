@@ -75,8 +75,15 @@ pub struct CaptureRequest {
 /// One CDP / LLDP / MNDP packet's worth of decoded switch info.
 /// Parser modules fill missing fields with the literal `"N/A"`
 /// sentinel; the GUI renders that as a faded "not advertised" cell.
-#[derive(Serialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
+///
+/// `Deserialize` is for the persistent history file
+/// (`history.json`) round-trip — load reads a JSON file that
+/// `save_history` wrote, which means every field that lives in
+/// `CaptureResult` needs to deserialize. `#[serde(default)]`
+/// keeps the load forward-compatible: a field added in a future
+/// version just deserializes as `""` for older entries on disk.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct CaptureResult {
     pub switch_name: String,
     pub switch_ip: String,
