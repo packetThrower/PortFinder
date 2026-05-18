@@ -12,6 +12,15 @@ use tokio_util::sync::CancellationToken;
 #[derive(Parser)]
 #[command(
     name = "portfinder",
+    // `bin_name` overrides clap's default of using `argv[0]` for the
+    // `Usage:` header. Without this the Windows help output leaks
+    // the inner `portfinder-cli.exe` name when Scoop's shim spawns
+    // the binary (shimexe passes the target binary's path as
+    // `argv[0]` rather than the shim alias the user typed). Setting
+    // a fixed `bin_name` keeps the help output consistent with
+    // what we document as the user-facing command name on every
+    // platform.
+    bin_name = "portfinder",
     version,
     about = "Network switch port discovery tool"
 )]
