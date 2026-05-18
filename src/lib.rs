@@ -108,21 +108,46 @@ pub fn init_logging() {
     use env_logger::{Builder, Target};
 
     let mut builder = Builder::new();
+    // env_logger applies an internal filter *before* writes
+    // reach our `LogPipe`, and that filter is locked in at
+    // `init()` time. Setting it to `Trace` here means env_logger
+    // never gates on level — the real gate is `log::set_max_level`,
+    // which we can adjust at runtime from the CLI's `-v` / `-q`
+    // flags. `RUST_LOG` still wins if set (advanced users get the
+    // standard env-var control over both level and per-module
+    // filters).
     if let Ok(filter) = std::env::var("RUST_LOG") {
         builder.parse_filters(&filter);
     } else {
-        builder.filter_level(log::LevelFilter::Info);
+        builder.filter_level(log::LevelFilter::Trace);
     }
     builder.target(Target::Pipe(Box::new(settings::LogPipe)));
     builder.init();
+
+    // `RUST_LOG` already set our level. Otherwise, default cap is
+    // `Info` — the GUI's "Write debug log" toggle alone writes
+    // info-level lifecycle events; `cli -v` lowers to Debug,
+    // `cli -vv` to Trace, `cli -q` to Warn.
+    if std::env::var("RUST_LOG").is_err() {
+        log::set_max_level(log::LevelFilter::Info);
+    }
 
     if settings::Settings::load_or_default().debug_log {
         settings::set_logging_enabled(true);
     }
 
-    log::info!(
-        "PortFinder v{} starting (target_os={})",
-        env!("CARGO_PKG_VERSION"),
-        std::env::consts::OS
-    );
+    // One-shot cleanup of `~/Desktop/portfinder-debug.log` from
+    // alpha builds (every release through 4.0.0 wrote there
+    // unconditionally; 4.0.1+ doesn't, but the existing file
+    // persists). Runs after `set_logging_enabled` so the
+    // `log::info!` inside the helper actually lands in the file
+    // when debug_log is on.
+    settings::try_remove_legacy_desktop_log();
+
+    // The startup banner used to live here, but it would drop on
+    // the floor for the CLI `--log-file` path (file isn't open
+    // yet — that happens later in `cli::apply_log_overrides`).
+    // `set_logging_enabled` now emits the banner whenever it
+    // successfully opens a log file, so every enable path
+    // (settings, CLI flag, UI toggle) gets the same first line.
 }

@@ -5,8 +5,9 @@
 //! user runs `portfinder` with no subcommand, main.rs launches the GUI
 //! instead.
 
-use crate::{capture, privilege, CaptureRequest, CaptureResult, InterfaceInfo};
+use crate::{capture, privilege, settings, CaptureRequest, CaptureResult, InterfaceInfo};
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Parser)]
@@ -25,6 +26,30 @@ use tokio_util::sync::CancellationToken;
     about = "Network switch port discovery tool"
 )]
 pub struct Cli {
+    /// Increase log verbosity. `-v` enables debug-level output
+    /// (per-frame capture diagnostics, settings flips); `-vv`
+    /// enables trace (per-pcap-tick noise, mostly useful for
+    /// reproducing "I get no packets" bug reports). Without the
+    /// flag, only info-level lifecycle events reach the log
+    /// (matching the GUI's default once `Write debug log` is
+    /// enabled in the settings popover).
+    #[arg(short, long, action = clap::ArgAction::Count, global = true)]
+    pub verbose: u8,
+
+    /// Suppress info-level output; only warnings and errors reach
+    /// the log. Mutually exclusive with `--verbose`.
+    #[arg(short, long, conflicts_with = "verbose", global = true)]
+    pub quiet: bool,
+
+    /// Write log output to this file for the duration of the
+    /// invocation, overriding the persisted settings.json path.
+    /// Implies logging is on (so `portfinder-cli --log-file
+    /// /tmp/repro.log capture --protocol lldp` always writes,
+    /// regardless of whether the GUI's `Write debug log` toggle
+    /// is enabled). The file is opened in append mode.
+    #[arg(long, global = true, value_name = "PATH")]
+    pub log_file: Option<PathBuf>,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -70,6 +95,8 @@ pub enum Commands {
 
 /// Returns process exit code: 0 on success, 1 on error.
 pub fn run(cli: Cli) -> i32 {
+    apply_log_overrides(&cli);
+
     let runtime = match tokio::runtime::Runtime::new() {
         Ok(r) => r,
         Err(e) => {
@@ -106,6 +133,44 @@ pub fn run(cli: Cli) -> i32 {
             eprintln!("error: {msg}");
             1
         }
+    }
+}
+
+/// Apply the `-v` / `-q` / `--log-file` flags on top of the
+/// already-initialised logger. `init_logging` ran before clap
+/// parsed (env_logger only inits once per process), so we adjust
+/// what we can post-init:
+///
+/// - **Level** via `log::set_max_level`. env_logger's
+///   pre-registered filter respects this — log calls above the
+///   threshold are filtered before they hit our `LogPipe`.
+/// - **Destination** via `settings::override_log_path` +
+///   `settings::set_logging_enabled(true)`. The pipe's
+///   `RwLock<Option<File>>` gets the new handle and starts
+///   forwarding immediately. Override is for the duration of
+///   this process — the persisted setting on disk isn't
+///   touched.
+///
+/// `RUST_LOG` (read at `init_logging` time) still wins if set;
+/// these flags are the "I want a one-shot debug log without
+/// digging through env vars" path.
+fn apply_log_overrides(cli: &Cli) {
+    use log::LevelFilter;
+
+    let level = if cli.quiet {
+        LevelFilter::Warn
+    } else {
+        match cli.verbose {
+            0 => LevelFilter::Info,
+            1 => LevelFilter::Debug,
+            _ => LevelFilter::Trace,
+        }
+    };
+    log::set_max_level(level);
+
+    if let Some(path) = &cli.log_file {
+        settings::override_log_path(path.clone());
+        settings::set_logging_enabled(true);
     }
 }
 

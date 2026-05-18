@@ -103,6 +103,15 @@ pub fn log_file_path() -> Option<PathBuf> {
 /// change on their next write.
 static LOG_FILE: RwLock<Option<File>> = RwLock::new(None);
 
+/// One-shot path override for `set_logging_enabled`. When `Some`,
+/// the next (and subsequent) `set_logging_enabled(true)` calls
+/// open this path instead of the persisted-settings default.
+/// Used by the CLI's `--log-file` flag: the override is
+/// process-scoped, never written back to disk. `RwLock` rather
+/// than `Mutex` because the read-hot path is `set_logging_enabled`
+/// (called once per startup + once per UI toggle).
+static LOG_FILE_OVERRIDE: RwLock<Option<PathBuf>> = RwLock::new(None);
+
 /// `io::Write` implementation handed to `env_logger` at startup
 /// via `Target::Pipe`. Forwards each write to the currently
 /// installed file in `LOG_FILE`, or silently discards when no
@@ -157,14 +166,102 @@ pub fn set_logging_enabled(enabled: bool) {
         *guard = None;
         return;
     }
-    let Some(path) = log_file_path() else {
+    // CLI `--log-file <path>` override takes precedence over the
+    // persisted-settings default. Held in a separate static so
+    // the override is process-scoped and never written back to
+    // disk.
+    let path = LOG_FILE_OVERRIDE
+        .read()
+        .ok()
+        .and_then(|g| g.clone())
+        .or_else(log_file_path);
+    let Some(path) = path else {
         return;
     };
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
+    // Size-based rotation: if the existing log is over 1 MiB,
+    // move it aside before opening the append handle so the
+    // file doesn't grow without bound. One backup generation
+    // (`<name>.log.1`) is enough for the "I want to see what
+    // happened in the last session" case; users who need more
+    // history can chain `cp` via cron.
+    //
+    // Rotation happens here (at enable time) rather than per-
+    // write to avoid the syscall cost on every log line. Enable
+    // fires at process start + on every UI toggle flip, which
+    // is the right cadence — a single run that fills 1 MiB
+    // probably has bigger problems than its log size.
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if meta.len() > 1_048_576 {
+            let backup = path.with_extension("log.1");
+            let _ = std::fs::rename(&path, &backup);
+        }
+    }
     if let Ok(file) = OpenOptions::new().create(true).append(true).open(&path) {
         *guard = Some(file);
+        // Drop the lock before logging — log macros take the same
+        // lock via `LogPipe::write`, and we'd self-deadlock if it
+        // were held here.
+        drop(guard);
+        log::info!(
+            "PortFinder v{} log session started (target_os={})",
+            env!("CARGO_PKG_VERSION"),
+            std::env::consts::OS
+        );
+    }
+}
+
+/// Process-scoped log path override. Used by the CLI's
+/// `--log-file <path>` flag — the next `set_logging_enabled(true)`
+/// (which the same flag call also triggers) opens this path
+/// instead of the platform default from `log_file_path`. Doesn't
+/// touch the on-disk settings.json.
+pub fn override_log_path(path: PathBuf) {
+    if let Ok(mut guard) = LOG_FILE_OVERRIDE.write() {
+        *guard = Some(path);
+    }
+}
+
+/// One-shot cleanup of the legacy `~/Desktop/portfinder-debug.log`
+/// that alpha-era builds (every release up to and including
+/// `4.0.0`) wrote unconditionally on every launch. The 4.0.1
+/// opt-in logger never writes there, but the *file* persists for
+/// anyone who installed an alpha — it shows up as a stray file on
+/// their desktop until they delete it manually.
+///
+/// This deletes the file if:
+///   - it exists at the expected path, AND
+///   - it's a regular file (not a symlink — somebody might have
+///     pointed it elsewhere on purpose), AND
+///   - it's under 10 MiB (limits blast radius if a user happened
+///     to drop a same-named but unrelated file there).
+///
+/// The check runs on every launch; the cost is one `stat()` per
+/// startup once the file is gone, which is irrelevant. We don't
+/// gate on a "did this once" flag because we don't want a settings
+/// schema bump for a single-shot cleanup, and the operation is
+/// idempotent.
+pub fn try_remove_legacy_desktop_log() {
+    let Some(home) = dirs::home_dir() else {
+        return;
+    };
+    let path = home.join("Desktop").join("portfinder-debug.log");
+    let Ok(meta) = std::fs::symlink_metadata(&path) else {
+        return;
+    };
+    if !meta.file_type().is_file() {
+        return;
+    }
+    if meta.len() > 10 * 1024 * 1024 {
+        return;
+    }
+    if std::fs::remove_file(&path).is_ok() {
+        log::info!(
+            "removed legacy alpha-era debug log at {}",
+            path.display()
+        );
     }
 }
 
