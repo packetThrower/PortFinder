@@ -72,6 +72,18 @@ pub fn check_for_update(current: &str) -> Option<UpdateInfo> {
         let Ok(ver) = Version::parse(tag) else {
             continue;
         };
+        // Legacy-tag filter. Pre-4.x releases on this repo used a
+        // calendar-style version (`v2026.4.26-1`) that parses as a
+        // valid SemVer with `major = 2026`. SemVer's numeric
+        // ordering means that comparison wins against any honest
+        // `4.x.y` build — so without this guard the footer pill
+        // perma-suggests "Update v2026.4.26 available". The
+        // threshold needs to be high enough to leave room for
+        // real future major bumps (5, 6, …) but low enough to
+        // catch year-style tags; 1000 is well clear of both.
+        if ver.major >= 1000 {
+            continue;
+        }
         // Channel-policy gate (see module docs).
         if !include_prerelease && !ver.pre.is_empty() {
             continue;
