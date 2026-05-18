@@ -35,8 +35,8 @@ pub(crate) fn decode_string(label: &str, bytes: &[u8]) -> String {
     let cow = String::from_utf8_lossy(bytes);
     if matches!(cow, std::borrow::Cow::Owned(_)) {
         let hex: Vec<String> = bytes.iter().map(|b| format!("{b:02x}")).collect();
-        eprintln!(
-            "warning: {label} contained non-UTF-8 bytes (raw: {}); decoded with substitutions",
+        log::warn!(
+            "{label} contained non-UTF-8 bytes (raw: {}); decoded with substitutions",
             hex.join(" ")
         );
     }
@@ -116,12 +116,23 @@ pub async fn run(req: CaptureRequest, cancel: CancellationToken) -> Result<Captu
             .filter(|d| !interfaces::is_loopback(d))
             .map(|d| d.name)
             .collect();
+        log::debug!(
+            "capture::run: protocol={} mode=sniff-all interfaces={:?}",
+            req.protocol,
+            names
+        );
         race_first(names, cancel.clone(), capture).await?
     } else {
         let name = req.interface_name.clone();
+        log::debug!(
+            "capture::run: protocol={} mode=single interface={}",
+            req.protocol,
+            name
+        );
         capture_one(cancel.clone(), move || capture(name, cancel)).await?
     };
 
+    log::debug!("capture::run: parsing {}-byte frame", frame.len());
     protocol.parse(&frame)
 }
 
@@ -188,17 +199,31 @@ fn capture_blocking(
     cap.filter(protocol.filter(), true)
         .map_err(|e| format!("filter on {iface}: {e}"))?;
 
+    log::debug!("capture_blocking: opened {iface} for protocol {protocol:?}");
     loop {
         if cancel.is_cancelled() {
             return Err("capture cancelled".into());
         }
         match cap.next_packet() {
-            Ok(packet) => return Ok(packet.data.to_vec()),
+            Ok(packet) => {
+                log::debug!("capture_blocking: got {}-byte frame on {iface}", packet.data.len());
+                return Ok(packet.data.to_vec());
+            }
             Err(pcap::Error::TimeoutExpired) => {
+                // Most-common pcap return — the per-read timeout
+                // expired without a matching packet. `trace` (not
+                // `debug`) because at PCAP_TIMEOUT_MS=50 this
+                // fires 20 times per second per interface and
+                // would drown out everything else even at
+                // `debug` level.
+                log::trace!("capture_blocking: timeout on {iface}, retrying");
                 std::thread::sleep(Duration::from_millis(10));
                 continue;
             }
-            Err(e) => return Err(format!("read on {iface}: {e}")),
+            Err(e) => {
+                log::warn!("capture_blocking: read on {iface} failed: {e}");
+                return Err(format!("read on {iface}: {e}"));
+            }
         }
     }
 }
@@ -229,6 +254,10 @@ fn open_capture(iface: &str) -> Result<pcap::Capture<pcap::Active>, String> {
                 || msg.contains("Operation not supported")
                 || msg.contains("not supported on")
             {
+                log::debug!(
+                    "open_capture: {iface} rejected promiscuous mode ({msg}); \
+                     retrying non-promiscuous"
+                );
                 try_open(false).map_err(|e| format!("open {iface}: {e}"))
             } else {
                 Err(format!("open {iface}: {e}"))

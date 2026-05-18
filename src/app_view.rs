@@ -697,13 +697,16 @@ impl Render for AppView {
         // cross-platform-consistent.
         let current = window.viewport_size().height;
         if (current - desired).abs() > px(1.0) {
-            // Log resize events to the desktop debug log. Only fires
-            // on actual mismatch — animation-driven re-renders (the
+            // Log resize events to the debug log. Only fires on
+            // actual mismatch — animation-driven re-renders (the
             // skeleton pulse) shouldn't spam the log because the
-            // desired stays constant while pulsing. Useful for the
-            // Windows-specific "did the resize actually take effect"
-            // diagnosis.
-            log::info!(
+            // desired stays constant while pulsing. `debug` level
+            // because resize is a per-frame render-tick concern,
+            // not a lifecycle event — only useful when debugging
+            // the Windows / Wayland "did the resize actually take
+            // effect" question; not what you want filling the log
+            // file on every banner state change.
+            log::debug!(
                 "render: resize viewport.h={} -> desired={} (scale={}, capturing={}, result={}, banner_visible={})",
                 current,
                 desired,
@@ -1180,9 +1183,7 @@ impl AppView {
                                             // restart needed.
                                             settings::set_logging_enabled(new);
                                             if let Err(e) = this.settings.save() {
-                                                eprintln!(
-                                                    "warning: settings save failed: {e}"
-                                                );
+                                                log::warn!("settings save failed: {e}");
                                             }
                                             cx.notify();
                                         });
