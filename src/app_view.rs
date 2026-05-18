@@ -127,12 +127,12 @@ const HEIGHT_BANNER: f32 = 145.0;
 /// switch info here.") plus padding.
 const HEIGHT_RESULT_EMPTY: f32 = 40.0;
 /// Populated result card — seven key/value rows with the standard
-/// row gap, plus card padding. Same height whether or not a field
-/// is "absent"; the absent rows still occupy their slot. 210 px
-/// was too tight (clipped the version footer); 230 leaves the
-/// version line visible with the same comfortable bottom inset
-/// the empty-state baseline gives.
-const HEIGHT_RESULT_FILLED: f32 = 230.0;
+/// row gap, plus the "Copy as JSON" footer row (~28 px: small
+/// button + pt_1 gap), plus card padding. Same height whether or
+/// not a field is "absent"; the absent rows still occupy their
+/// slot. Was 230 before the JSON footer was added; bumped by the
+/// footer row height so the version line still clears the card.
+const HEIGHT_RESULT_FILLED: f32 = 258.0;
 /// Capturing-state result card — same seven skeleton rows but at
 /// their actual rendered content size (7 × 24 px rows + 6 × 4 px
 /// gaps + 24 px card padding ≈ 216 px). `HEIGHT_RESULT_FILLED`
@@ -281,6 +281,14 @@ enum CaptureEvent {
 /// "copied!" only on the row the user actually clicked.
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct ResultKey(&'static str);
+
+/// Reserved `ResultKey` for the result card's "Copy as JSON"
+/// footer button. Shares the `copied_key` state field with the
+/// per-row value buttons, which is why we need a sentinel
+/// distinct from the seven row keys (`"switch"`, `"ip"`, etc.)
+/// — used by `render_result_card` to know when to flash
+/// "Copied" next to the JSON button vs next to a row's value.
+const RESULT_KEY_JSON: ResultKey = ResultKey("json");
 
 pub struct AppView {
     focus_handle: FocusHandle,
@@ -1191,19 +1199,68 @@ impl AppView {
         };
 
         let rows: [(ResultKey, &'static str, String); 7] = [
-            (ResultKey("switch"), "Switch Name", result.switch_name),
-            (ResultKey("ip"), "Switch IP", result.switch_ip),
-            (ResultKey("port"), "Switch Port", result.switch_port),
-            (ResultKey("vlan"), "VLAN", result.native_vlan),
-            (ResultKey("voiceVlan"), "Voice VLAN", result.voice_vlan),
-            (ResultKey("mtu"), "MTU", result.mtu),
-            (ResultKey("model"), "Switch Model", result.switch_model),
+            (ResultKey("switch"), "Switch Name", result.switch_name.clone()),
+            (ResultKey("ip"), "Switch IP", result.switch_ip.clone()),
+            (ResultKey("port"), "Switch Port", result.switch_port.clone()),
+            (ResultKey("vlan"), "VLAN", result.native_vlan.clone()),
+            (ResultKey("voiceVlan"), "Voice VLAN", result.voice_vlan.clone()),
+            (ResultKey("mtu"), "MTU", result.mtu.clone()),
+            (ResultKey("model"), "Switch Model", result.switch_model.clone()),
         ];
 
+        let json_copied = self.copied_key == Some(RESULT_KEY_JSON);
+        let success = cx.theme().success;
+        let muted = cx.theme().muted_foreground;
         let mut col = div().flex().flex_col().gap_1();
         for (key, label, raw) in rows {
             col = col.child(self.render_result_row(key, label, raw, cx));
         }
+        // "Copy as JSON" footer. Right-aligned, below the seven
+        // value rows. Mirrors the CLI's `--json` output format
+        // (same `serde_json::to_string_pretty` on the same
+        // `CaptureResult` struct), so a value pasted from the
+        // GUI is byte-identical to what `portfinder-cli capture
+        // --json` would have produced. Pressing the button puts
+        // the JSON on the system clipboard and flashes "Copied"
+        // for 1.2 s via the existing `copy_value` → `copied_key`
+        // → timer pattern that the per-row value buttons use —
+        // the row state and this state share the same field, so
+        // copying a row value cancels the "Copied" indicator
+        // here and vice versa. Acceptable: only one copy can
+        // realistically be in flight at a time anyway.
+        col = col.child(
+            div()
+                .flex()
+                .items_center()
+                .justify_end()
+                .gap_2()
+                .pt_1()
+                .when(json_copied, |this| {
+                    this.child(div().text_xs().text_color(success).child("Copied"))
+                })
+                .child(
+                    Button::new("copy-result-json")
+                        .label("Copy as JSON")
+                        .ghost()
+                        .small()
+                        .tooltip(
+                            "Copy the full capture result as JSON \
+                             (matches the CLI's --json output).",
+                        )
+                        .on_click(cx.listener(move |this, _, _window, cx| {
+                            let Some(r) = this.result.as_ref() else { return };
+                            let json = match serde_json::to_string_pretty(r) {
+                                Ok(s) => s,
+                                Err(e) => {
+                                    log::warn!("copy result as json failed: {e}");
+                                    return;
+                                }
+                            };
+                            this.copy_value(RESULT_KEY_JSON, json, cx);
+                        })),
+                )
+                .text_color(muted),
+        );
         col.into_any_element()
     }
 
