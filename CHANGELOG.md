@@ -14,6 +14,8 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [4.1.0-beta.1] - 2026-05-18
+
 ### Added
 - **CLI logging flags.** `portfinder-cli` now accepts `-v` (debug
   level), `-vv` (trace), `-q` (warnings + errors only), and
@@ -84,7 +86,7 @@ Each major version line is a different implementation:
 
 ### Removed
 - **Stale `~/Desktop/portfinder-debug.log` from alpha installs**
-  is auto-deleted on first launch of 4.0.2+ (capped at 10 MiB
+  is auto-deleted on first launch of 4.1.0+ (capped at 10 MiB
   and gated to regular files only, so we don't trash anything
   unrelated that happened to land at that path).
 

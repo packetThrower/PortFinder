@@ -8,7 +8,7 @@ a tracked issue.
 
 ## Logging
 
-All landed in 4.0.2 (see CHANGELOG `[Unreleased]`).
+All landed in 4.1.0 (see CHANGELOG).
 
 ## Known open items from the 4.0 cycle
 
@@ -72,7 +72,7 @@ All landed in 4.0.2 (see CHANGELOG `[Unreleased]`).
 
 ## Polish / discoverability
 
-All landed in 4.0.2 (see CHANGELOG `[Unreleased]`). The history
+All landed in 4.1.0 (see CHANGELOG). The history
 feature additionally supports opt-in disk persistence via a
 toggle in the settings popover.
 
