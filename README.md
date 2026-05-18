@@ -31,11 +31,11 @@ Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol), LLD
 
 📖 **Docs:** <https://packetthrower.github.io/PortFinder/> · 📝 [**Changelog**](CHANGELOG.md)
 
-> **Heads up — 4.x is a pure-Rust rewrite.** The Tauri 2 + Svelte 5
-> stack (3.x) is preserved on the `tauri-version` branch. 4.x uses
-> Zed's [gpui](https://www.gpui.rs/) for the UI; the capture engine
-> (CDP / LLDP / MNDP parsers, BPF helper, pcap orchestration) ports
-> across unchanged.
+> **4.x is the pure-Rust rewrite.** Zed's [gpui](https://www.gpui.rs/)
+> replaces the Tauri 2 + Svelte 5 stack from the 3.x line, which is
+> preserved on the [`tauri-version`](https://github.com/packetThrower/PortFinder/tree/tauri-version)
+> branch. The capture engine (CDP / LLDP / MNDP parsers, BPF helper,
+> pcap orchestration) ports across unchanged.
 
 ## What it does
 
@@ -46,7 +46,7 @@ Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol), LLD
 
 ## CLI
 
-The same binary works headless. Run with no args to launch the GUI; pass a subcommand to use the CLI.
+The headless CLI shares the capture engine with the GUI. Run with no args to launch the GUI; pass a subcommand to use the CLI.
 
 ```bash
 portfinder capture --interface en0 --protocol LLDP        # capture and print
@@ -56,7 +56,7 @@ portfinder privileges                                      # diagnose access
 portfinder --help                                          # see all options
 ```
 
-Press Ctrl+C to interrupt a running capture. On macOS, the BPF helper installer drops a `portfinder` symlink in `/usr/local/bin`; without it, run the binary directly: `/Applications/PortFinder.app/Contents/MacOS/PortFinder capture ...`. On Windows, `PortFinder.exe` attaches to the parent console automatically when invoked from cmd / PowerShell.
+Press Ctrl+C to interrupt a running capture; a second press force-exits. The Homebrew cask, Scoop manifest, and Linux `.deb` / `.rpm` / `pacman` packages all expose `portfinder` on `PATH` so the commands above work from any shell on every platform.
 
 ## Install
 
@@ -81,7 +81,7 @@ scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket
 scoop install portfinder
 ```
 
-Installs `PortFinder.exe` and exposes `portfinder` on your `PATH`. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. You'll still need [Npcap](https://npcap.com/#download) installed for packet capture.
+Installs PortFinder and exposes `portfinder` on your `PATH` so `portfinder capture …` works from PowerShell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. You'll still need [Npcap](https://npcap.com/#download) installed for packet capture.
 
 ### All platforms — release artifacts
 

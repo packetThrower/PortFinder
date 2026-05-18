@@ -50,27 +50,26 @@ This drops `PortFinder Alpha.app` into `/Applications` and exposes the CLI as `p
 <details>
 <summary>Manual DMG (no Homebrew)</summary>
 
-Download `PortFinder_<version>_universal.dmg` from the [Releases page](https://github.com/packetThrower/PortFinder/releases), mount it, and drag PortFinder into `/Applications`.
+Download the arch-matching `.dmg` from the [Releases page](https://github.com/packetThrower/PortFinder/releases) — `PortFinder_<version>_arm64.dmg` for Apple Silicon, `PortFinder_<version>_amd64.dmg` for Intel — mount it, and drag PortFinder into `/Applications`.
 
-For non-root capture and a `portfinder` CLI on your `PATH`, also install the BPF helper:
+For non-root capture, also install the BPF helper:
 
 1. Download `PortFinder-BPF-<version>.pkg` from the same release.
 2. Double-click to install. macOS will prompt for your password.
-3. Click **Install BPF Helper** in the app the first time you run it (or re-run the `.pkg`).
 
-The BPF helper drops a symlink at `/usr/local/bin/portfinder` so the [CLI](/PortFinder/usage/cli/) is callable from any shell.
+After install, the helper appears in *System Settings → General → Login Items & Extensions* as **PortFinder BPF Helper**.
 </details>
 
 <details>
-<summary>Just the CLI symlink (no BPF)</summary>
+<summary>CLI symlink without Homebrew</summary>
 
-If you don't need the BPF helper (e.g. you already have Wireshark's, or you're fine running with `sudo`) but you do want `portfinder` on your `PATH`:
+The Homebrew cask creates a `portfinder` shim on your `PATH` automatically. If you installed manually and want the same shortcut:
 
 ```bash
 sudo ln -sf /Applications/PortFinder.app/Contents/MacOS/PortFinder /usr/local/bin/portfinder
 ```
 
-`PortFinder-BPF-<version>.pkg` from the release assets drops the same symlink as part of the install. The standalone `install-cli.sh` / `uninstall-cli.sh` scripts that shipped with 3.x are gone in 4.x — the symlink isn't worth its own bespoke installer.
+Without the symlink, the binary's full path inside the bundle works too — `/Applications/PortFinder.app/Contents/MacOS/PortFinder capture …`. The standalone `install-cli.sh` / `uninstall-cli.sh` scripts that shipped with 3.x are gone in 4.x.
 </details>
 
 ## Windows
@@ -82,7 +81,7 @@ scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket
 scoop install portfinder
 ```
 
-This installs `PortFinder.exe`, drops a Start menu shortcut, and exposes the headless CLI on your `PATH` so [`portfinder`](/PortFinder/usage/cli/) works from any shell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. The bucket source lives at [packetThrower/scoop-bucket](https://github.com/packetThrower/scoop-bucket).
+This installs PortFinder, drops a Start menu shortcut, and exposes the [CLI](/PortFinder/usage/cli/) on your `PATH` so `portfinder capture …` works from PowerShell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. The bucket source lives at [packetThrower/scoop-bucket](https://github.com/packetThrower/scoop-bucket).
 
 You still need [Npcap](https://npcap.com/#download) for packet capture — Scoop can't bundle the kernel driver.
 

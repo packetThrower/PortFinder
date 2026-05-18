@@ -3,11 +3,9 @@ title: CLI
 description: The same binary works headless. Capture, list, or diagnose privileges.
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
-
 ![portfinder running in a terminal](/PortFinder/screenshots/cli.png)
 
-The same binary works headless — pass a subcommand to use the CLI, run with no args to launch the GUI.
+The CLI shares the capture engine with the GUI. Pass a subcommand to use the CLI; run with no args to launch the GUI.
 
 ```bash
 portfinder --help
@@ -29,7 +27,7 @@ portfinder capture --interface en0 --protocol LLDP
 | `-p`, `--protocol` | `LLDP` | `CDP`, `LLDP`, or `MNDP` |
 | `--json` | off | machine-readable output |
 
-Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to interrupt a running capture.
+Press <kbd>Ctrl</kbd>+<kbd>C</kbd> to interrupt a running capture. A second press force-exits if a blocking pcap read is wedged.
 
 ### `list`
 
@@ -49,31 +47,7 @@ portfinder privileges
 portfinder privileges --json
 ```
 
-## Where the binary lives
-
-<Tabs>
-<TabItem label="macOS">
-
-Once the BPF helper has run (either via the in-app *Install BPF Helper* button or by installing `PortFinder-BPF-*.pkg`), a symlink at `/usr/local/bin/portfinder` is created automatically — `portfinder` works from any shell.
-
-Without that step, the binary lives inside the app bundle:
-
-```bash
-/Applications/PortFinder.app/Contents/MacOS/portfinder capture ...
-```
-
-</TabItem>
-<TabItem label="Linux">
-
-Installed to `/usr/bin/portfinder` by the `.deb` / `.rpm` package. Already on your `PATH`.
-
-</TabItem>
-<TabItem label="Windows">
-
-Installed to `C:\Program Files\PortFinder\PortFinder.exe`. The NSIS installer adds it to `PATH`.
-
-</TabItem>
-</Tabs>
+The Homebrew cask, Scoop manifest, and Linux `.deb` / `.rpm` / `pacman` packages each expose `portfinder` on `PATH` so the commands above work from any shell on every platform. Without a package manager, run the binary directly: `/Applications/PortFinder.app/Contents/MacOS/PortFinder capture …` on macOS, the NSIS installer's `Program Files\PortFinder\` directory on Windows, or the AppImage on Linux.
 
 ## Scripting examples
 

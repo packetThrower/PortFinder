@@ -14,6 +14,122 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-05-17
+
+Graduates the gpui rewrite to stable. The major architectural
+shift landed in `4.0.0-alpha.1` (Tauri + Svelte → pure Rust +
+Zed gpui); this release captures the polish, cross-platform
+fixes, and packaging work done across 16 alphas to make the
+rewrite ship-ready. Per-alpha history is on the
+[Releases page](https://github.com/packetThrower/PortFinder/releases).
+
+### Added
+- **Dynamic window sizing.** The gpui window auto-resizes to fit
+  the current state — `~310` px tall in the idle state, growing
+  for the privilege-warning banner, the result card, and the
+  in-flight capture skeleton. Replaces the static `420×560` from
+  alpha.1.
+- **Live system theme follow.** macOS / GNOME / KDE Light↔Dark
+  flips re-apply the brand palette without a relaunch via
+  `observe_window_appearance`.
+- **"Update available" footer pill.** Boot-time GitHub Releases
+  poll surfaces a one-line pill in the window footer when a
+  newer version is published. Click → opens the release page;
+  ✕ → dismisses for the session. Respects channel policy
+  (alpha builds see newer alphas; stable sees stable). Legacy
+  calendar-style tags (`v2026.4.26` from the pre-4.x era) are
+  filtered out so they don't perma-suggest as "newer".
+- **Native macOS auth prompt for the BPF helper install.**
+  AuthorizationServices via `security-framework` replaces the
+  3.x `osascript`-shellout. Dialog shows "PortFinder wants to
+  make changes" with the app icon instead of "osascript wants
+  to make changes".
+- **Cmd+Q and red-traffic-light both quit on macOS.** Explicit
+  `QuitMode::LastWindowClosed` + a wired-up Application menu
+  with a Quit action. gpui's macOS default leaves the app
+  running in the Dock after the last window closes; PortFinder
+  is single-window so this matches user expectation.
+- **Windows console-subsystem CLI sibling.** `portfinder-cli.exe`
+  ships alongside `PortFinder.exe` in the NSIS installer.
+  PowerShell now waits for `portfinder-cli capture …` to exit
+  and stdio routes correctly. PE subsystem byte is fixed at
+  link time so a single binary can be GUI-friendly OR CLI-
+  friendly but not both — two binaries is the only clean
+  answer (wezterm + Zed land at the same shape).
+- **AppStream metainfo on Linux.** GNOME Software now shows
+  "PortFinder / packetThrower / GPL-3.0-or-later" in the
+  installed-apps view instead of falling back to filename
+  parsing ("PortFinder-4 / Unknown author / unknown").
+- **Lowercase `/usr/bin/portfinder` symlink** on Linux
+  (.deb / .rpm / pacman) so the command matches the project
+  name everyone types. The capitalised `PortFinder` binary is
+  kept for the .desktop / dock label / process name.
+- **CDP / LLDP / MNDP test-mode reproducibility.** 20 capture-
+  parser tests covering fixture frames for all three protocols.
+
+### Changed
+- **Window decorations:** `WindowDecorations::Client` requested
+  via xdg-decoration so KDE Plasma's KWin doesn't draw a
+  server-side title bar on top of our in-window gpui-component
+  TitleBar widget. GNOME (Mutter) was already CSD-only so the
+  bug was invisible there.
+- **macOS .dmg builds via cross-compile** from a single Apple
+  Silicon CI runner. The retired `macos-15-intel` runner had a
+  small / scarce pool and slower CPU — release wall-clock cut
+  by ~20 minutes per tag.
+- **Linux .rpm libpcap SONAME.** `patchelf --replace-needed
+  libpcap.so.0.8 libpcap.so.1` rewrites the Ubuntu-build-time
+  SONAME to what Fedora / RHEL / openSUSE / Arch actually
+  ship. Without this the binary couldn't load libpcap on
+  Fedora — same bug existed in the 3.x .rpm but went
+  unnoticed.
+- **Linux launcher icon** ships once (was duplicated as both
+  `PortFinder.desktop` and `portfinder.desktop` in the .deb).
+- **CI matrix** retired the `macos-15-intel` runner from both
+  lint/test and build. Cross-compile on `macos-26` is the
+  Intel verification path now.
+- **Release profile** uses `lto = "thin"` + `codegen-units = 16`
+  on every target except `aarch64-pc-windows-msvc` (LTO disabled
+  there — rustc thin-LTO crashes deterministically with
+  `STATUS_ACCESS_VIOLATION` linking the gpui dep graph on
+  Windows ARM64).
+
+### Fixed
+- **Fedora `dnf install ./PortFinder-*.rpm` actually runs the
+  GUI now.** Was failing with `libpcap.so.0.8: cannot open
+  shared object file` regardless of whether libpcap was
+  installed.
+- **Ctrl+C from `portfinder capture` exits.** First press
+  cancels gracefully, any subsequent press calls
+  `process::exit(130)`. Without the second-press escape hatch
+  a wedged blocking pcap read made the process unkillable
+  short of SIGKILL.
+- **CSD content area on Wayland.** Mutter reserves ~24 px for
+  shadow + resize handles that aren't subtracted from
+  `viewport_size()` — adding `HEIGHT_CSD_PADDING` keeps the
+  version footer from clipping on GNOME.
+- **Win arm64 release builds no longer require a re-run.**
+  See "Release profile" above.
+- **macOS .dmg actually attaches to the GitHub Release.**
+  Earlier alpha CI uploaded the `macos-package` artifact
+  correctly but the release job's `softprops/action-gh-release`
+  step listed the old per-arch paths — silently dropped the
+  macOS files. Hashes still showed up in SHA256SUMS because
+  the SHA step globbed every artifact dir. Fixed in
+  alpha.16's pipeline.
+
+### Removed
+- The argv-dispatch CLI path through `PortFinder.exe` on
+  Windows is documented as ugly-but-still-works rather than
+  the recommended CLI route. Use `portfinder-cli.exe` instead.
+- The unsafe AttachConsole-without-stdio-reopen workaround is
+  no longer the primary CLI path on Windows. (Modern Rust
+  stdio doesn't actually cache handles per
+  [rust-lang/rust#40490](https://github.com/rust-lang/rust/pull/40490)
+  so the workaround was always less broken than folklore
+  claimed — the real issue was the async-shell-prompt UX
+  inherent to `windows_subsystem = "windows"`.)
+
 ## [4.0.0-alpha.1] - 2026-05-16
 
 Major-version rewrite to pure Rust. Same product (still captures
