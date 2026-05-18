@@ -1,0 +1,128 @@
+# PortFinder TODO
+
+Running list of follow-up work. Loosely ordered by "value /
+effort". GitHub Issues is still the right place for anything that
+needs discussion or that an outside contributor might want to
+pick up — this file is for ideas / notes that don't yet warrant
+a tracked issue.
+
+## Logging
+
+- [ ] **Audit what we actually log.** Walk every `log::info!` /
+  `log::warn!` / `eprintln!` call site and decide if it's at the
+  right level. Current behaviour is "everything is `info`", which
+  means turning on the debug logger writes a noisy file but
+  still misses anything sub-info (state transitions, individual
+  pcap reads). Targets:
+  - `debug` for per-frame parser diagnostics and per-tick
+    capture-loop state — useful for "I'm not capturing anything"
+    bug reports
+  - `info` for lifecycle (boot, capture start/stop, update check
+    result, settings flips)
+  - `warn` for recoverable issues (parser fell back to
+    `from_utf8_lossy`, settings save failed)
+  - `error` for things that fail the user-visible action
+- [ ] **CLI logging flags.** Add to clap:
+  - `--verbose` / `-v` → bump to debug level for this invocation
+  - `-vv` → trace level
+  - `--log-file <path>` → override the settings-file location for
+    a one-shot run (useful for `portfinder-cli --log-file
+    /tmp/repro.log capture --protocol lldp`)
+  - `--quiet` → suppress info, warn-and-up only
+- [ ] **Log rotation.** The current append-forever pattern grows
+  the log file unbounded. `env_logger` doesn't ship a rotator;
+  switch to `flexi_logger` or implement size-based rollover
+  (`portfinder.log` → `portfinder.log.1` at 1 MiB).
+- [ ] **Clean up stale `~/Desktop/portfinder-debug.log` from
+  alpha installs.** First-launch one-shot: if the file exists
+  and is owned by us, delete it (with a `log::info!` noting the
+  cleanup). Skip if logging is enabled and the path happens to
+  match (paranoid corner case).
+
+## Known open items from the 4.0 cycle
+
+- [ ] **macOS notarization + Windows code signing**
+  ([#13](https://github.com/packetThrower/PortFinder/issues/13)).
+  Blocked on a paid Apple Developer account ($99/yr) and a
+  Windows code-signing cert. Until then the macOS .dmg ships
+  ad-hoc signed (Gatekeeper "unidentified developer", right-
+  click → Open workaround) and Windows users get a SmartScreen
+  prompt on first run.
+- [ ] **Real in-app updater.** Today the "Update available" pill
+  opens the GitHub release page; the user manually downloads +
+  installs. A proper updater (Sparkle on macOS, custom on
+  Windows + Linux) downloads, verifies signature, swaps in the
+  new binary, prompts for restart. Significant feature, gated on
+  notarization above for macOS.
+- [ ] **Refresh screenshots.** Docs site + README still reference
+  3.x-era PNGs. Take fresh ones from 4.0.x on each platform
+  (macos.png, windows.png, linux.png, cli.png).
+- [ ] **i18n.** 3.x had Spanish / French / German translations;
+  the 4.0 rewrite dropped them. Bring them back as Rust string
+  tables if there's contributor bandwidth.
+
+## CI / build
+
+- [ ] **Auto-rerun-on-flake.** The Win arm64 rustc thin-LTO crash
+  is currently mitigated by disabling LTO for that target. If a
+  similar flake pops up on a different runner, we'd want a
+  retry loop in `release.yml` rather than manually clicking
+  rerun. GitHub Actions has `actions/retry` but it's better as
+  a workflow-level retry on the build step than wrapping the
+  whole job.
+- [ ] **Stable `gpui` commit pin.** Currently `gpui = { git =
+  "..." }` with no `rev`, relying on `Cargo.lock` for
+  reproducibility. A `cargo update -p gpui` could silently
+  pick up a breaking change. Pin to a specific rev with a
+  comment + a process for deliberate bumps.
+- [ ] **Cargo profile per Windows arch.** The thin-LTO crash
+  workaround lives in `release.yml`'s `CARGO_PROFILE_RELEASE_LTO`
+  env override. Cleaner home for it: a `profile.release.windows-
+  arm64` table in `Cargo.toml` once Cargo supports per-target
+  profile fields, or a custom `release-no-lto` profile invoked
+  only for the affected matrix entry.
+
+## Test coverage
+
+- [ ] **Beyond parsers.** All 20 existing tests cover the CDP /
+  LLDP / MNDP parsers. `cli`, `privilege`, `updater`, `settings`,
+  and the capture-orchestration `race_first` / `capture_one`
+  paths have zero coverage. Worth adding at least:
+  - `cli::run` with a fake `capture::run` that returns a known
+    `CaptureResult` (need a trait abstraction first)
+  - `settings::Settings` round-trip (load → toggle → save → load)
+  - `updater::check_for_update` against a fake `ureq` response
+    (legacy-tag filter, prefix allowlist, channel policy)
+- [ ] **A property test or two on the parsers.** Fuzz random
+  byte sequences through `cdp::parse` / `lldp::parse` /
+  `mndp::parse` and assert they never panic. We already do
+  bounds-checks but a `proptest` harness would catch any
+  arithmetic-overflow regression future-us introduces.
+
+## Polish / discoverability
+
+- [ ] **About dialog.** Settings menu's a natural home for an
+  "About" item — version, GPL-3.0 link, GitHub link, BPF helper
+  status / install button. Right now the version sits in the
+  footer pill, which is fine but isn't where users look.
+- [ ] **Keyboard shortcut for Start / Stop.** Cmd+R or Space.
+  Currently capture only starts via the button.
+- [ ] **Export results.** "Copy as JSON" button next to the
+  result card would let users paste capture data into a ticket
+  / Slack without screenshotting. The CLI already supports
+  `--json`; mirror the format in the GUI clipboard.
+- [ ] **History.** Last N capture results in a scrollable list
+  (in-memory or on-disk). Useful when bouncing between switches
+  or comparing two cables.
+
+## Cross-distro packaging
+
+- [ ] **openSUSE-friendly .rpm.** Our libpcap dep is
+  `libpcap.so.1()(64bit)` — works on Fedora; on openSUSE the
+  package is `libpcap1`. Verify the SONAME alone is enough or
+  add a `(libpcap1 or libpcap)` rich-dep alternative.
+- [ ] **Flatpak / Snap.** Sandboxed Linux distribution. Packet
+  capture under either is tricky (Flatpak's permission model
+  doesn't have a "raw network" portal yet); might require
+  shipping outside the sandbox via `--filesystem=host-os` or
+  similar.
