@@ -21,8 +21,8 @@ use std::time::Duration;
 use flume::{Receiver, Sender};
 use gpui::{
     actions, div, prelude::*, px, rgb, App, AppContext, Bounds, ClipboardItem, Context, Entity,
-    FocusHandle, Focusable, Hsla, IntoElement, KeyBinding, Menu, MenuItem, ParentElement, Render,
-    SharedString, Styled, Window, WindowBounds, WindowDecorations, WindowOptions,
+    FocusHandle, Focusable, Hsla, IntoElement, KeyBinding, Menu, MenuItem, ParentElement, QuitMode,
+    Render, SharedString, Styled, Window, WindowBounds, WindowDecorations, WindowOptions,
 };
 use gpui_component::{
     button::{Button, ButtonVariants},
@@ -1301,7 +1301,19 @@ pub fn run() {
     // registers gpui-component's bundled icon SVGs as the app's
     // asset source so any `IconName::*` referenced by widget code
     // resolves to a real glyph.
-    let app = gpui_platform::application().with_assets(gpui_component_assets::Assets);
+    // `QuitMode::LastWindowClosed` makes the red-traffic-light close
+    // (or any other "last window dismissed" path) terminate the
+    // process. gpui's default on macOS is `Explicit` — modelled
+    // after Zed and other multi-window apps where the menu bar stays
+    // alive after the last window closes. PortFinder is single-
+    // window: nobody expects it to linger in the Dock after they
+    // close it, and the matching dock-icon + ⌘+Q wiring would feel
+    // pointless if the close button didn't also exit. Behaviour on
+    // Linux / Windows is unchanged (`LastWindowClosed` was already
+    // the default there).
+    let app = gpui_platform::application()
+        .with_assets(gpui_component_assets::Assets)
+        .with_quit_mode(QuitMode::LastWindowClosed);
     app.run(move |cx: &mut App| {
         // gpui-component widgets (Input, Form, Select, Switch, …)
         // require the Theme global to be installed before the first
