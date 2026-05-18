@@ -1715,11 +1715,24 @@ pub fn run() {
         // only styles the in-window widget; it doesn't touch
         // `window_decorations` (gpui-component's own example apps
         // pair the two settings explicitly).
+        // `is_resizable: false`: AppView drives its own size via
+        // `window.resize` whenever the privilege banner or result
+        // card appears / collapses (see `desired_height` +
+        // `apply_size`), and gpui snaps the user-dragged bounds
+        // back to those programmatic values on the next render —
+        // visually the corner just snaps back as if it bounced.
+        // The window is the wrong shape for free resizing
+        // anyway: a single-column form with no horizontal
+        // overflow and explicit per-state heights. Lock it so
+        // the resize handles don't appear in the first place
+        // and the snap-back can't happen. The window stays
+        // movable / minimisable / closeable as normal.
         let opts = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(bounds)),
             titlebar: Some(TitleBar::title_bar_options()),
             window_decorations: Some(WindowDecorations::Client),
             app_id: Some("portfinder".into()),
+            is_resizable: false,
             ..Default::default()
         };
 
