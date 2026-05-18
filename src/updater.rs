@@ -15,6 +15,19 @@ use std::time::Duration;
 
 const RELEASES_URL: &str =
     "https://api.github.com/repos/packetThrower/PortFinder/releases";
+// Allowlist for the `html_url` field on each release. The footer
+// pill click handler passes that string straight to `cx.open_url`,
+// which on macOS hands it to NSWorkspace and on Linux to xdg-open
+// — both honour any URL scheme they know about, so a malformed
+// `html_url` could in principle ship `file:///etc/passwd` or
+// `javascript:` (in old browsers) into the user's default handler.
+// HTTPS + rustls cert validation makes a network-level MITM
+// implausible, but a GitHub supply-chain compromise wouldn't be
+// caught at the transport layer. Pin the prefix as defence in
+// depth: any release whose `html_url` doesn't start with this is
+// dropped before it can reach the UI.
+const RELEASES_HTML_PREFIX: &str =
+    "https://github.com/packetThrower/PortFinder/releases/";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// What `check_for_update` returns when a newer release is found.
@@ -66,6 +79,13 @@ pub fn check_for_update(current: &str) -> Option<UpdateInfo> {
     let mut best: Option<(Version, &Release)> = None;
     for release in &releases {
         if release.draft || release.tag_name.is_empty() {
+            continue;
+        }
+        // URL-prefix allowlist — see `RELEASES_HTML_PREFIX` for the
+        // threat model. The check is at the start of the loop so a
+        // bogus `html_url` can't even win the `best` slot, let alone
+        // make it out to `cx.open_url`.
+        if !release.html_url.starts_with(RELEASES_HTML_PREFIX) {
             continue;
         }
         let tag = release.tag_name.trim_start_matches('v');
