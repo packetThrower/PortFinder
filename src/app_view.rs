@@ -45,9 +45,16 @@ use tokio_util::sync::CancellationToken;
 // app has no handler — the menu item is also missing entirely
 // (gpui doesn't install a default Application menu) so the user
 // has no visible way to quit other than red-light-clicking the
-// window. Quit is the priority; Cmd+W close-window can come
-// later if anyone asks.
-actions!(portfinder, [Quit]);
+// window.
+//
+// `Quit` is an app-level action — handled via `cx.on_action` in
+// `run()` and bound globally. `StartOrStop` is view-level: the
+// handler needs `&mut AppView` to flip `is_capturing` and kick
+// the tokio task, so it's wired via `.on_action` on the AppView
+// root div in `render` and the keybinding is scoped to the
+// "AppView" key_context so it doesn't fire when a child Popover
+// or modal is up.
+actions!(portfinder, [Quit, StartOrStop]);
 
 use crate::{
     capture, privilege, settings, updater, CaptureRequest, CaptureResult, InterfaceInfo,
@@ -842,6 +849,25 @@ impl Render for AppView {
         div()
             .id("portfinder-app")
             .track_focus(&self.focus_handle)
+            // Matches `Some("AppView")` on the `StartOrStop`
+            // keybinding in `run()`. gpui only routes that
+            // action to the `on_action` handler below when an
+            // element in the focus chain carries this context —
+            // popovers / modals stacked over the AppView don't
+            // (their own key_context wins), so the shortcut is
+            // automatically inert while a popover is open.
+            .key_context("AppView")
+            .on_action(cx.listener(|this, _: &StartOrStop, _window, cx| {
+                // Toggle: capturing → stop, idle → start. Mirrors
+                // what the two Start / Stop buttons in
+                // `render_controls` do; the buttons stay enabled
+                // alongside the shortcut.
+                if this.is_capturing {
+                    this.stop_capture(cx);
+                } else {
+                    this.start_capture(cx);
+                }
+            }))
             .size_full()
             .flex()
             .flex_col()
@@ -1108,11 +1134,25 @@ impl AppView {
                     .flex()
                     .gap_2()
                     .child(
+                        // `tooltip_with_action` renders the bound
+                        // keystroke as a kbd glyph in the tooltip
+                        // ("⌘R" on macOS, "Ctrl+R" elsewhere).
+                        // The context must match the keymap scope
+                        // we set in `run()` ("AppView") — that's
+                        // the same context attached via
+                        // `.key_context("AppView")` on the AppView
+                        // root div, so gpui can resolve which
+                        // binding to display.
                         Button::new("start-capture")
                             .label("Start")
                             .primary()
                             .small()
                             .disabled(is_capturing)
+                            .tooltip_with_action(
+                                "Start capture",
+                                &StartOrStop,
+                                Some("AppView"),
+                            )
                             .on_click(cx.listener(|this, _, _window, cx| this.start_capture(cx))),
                     )
                     .child(
@@ -1120,6 +1160,11 @@ impl AppView {
                             .label("Stop")
                             .small()
                             .disabled(!is_capturing)
+                            .tooltip_with_action(
+                                "Stop capture",
+                                &StartOrStop,
+                                Some("AppView"),
+                            )
                             .on_click(cx.listener(|this, _, _window, cx| this.stop_capture(cx))),
                     ),
             )
@@ -1222,9 +1267,19 @@ impl AppView {
         // + disk.
         let entity = cx.entity().clone();
         let log_level_slider = self.log_level_slider.clone();
-        // 280 px is enough for the Switch row and the slider
-        // with its endpoint labels — the slider stretches to
-        // fill, so we don't need to widen for label fit.
+        // About-section snapshots. Captured here (not inside the
+        // popover closure) because `priv_status` lives on
+        // `AppView` and we want a stable value for the lifetime
+        // of this popover render. `privilege_label` is the
+        // platform-specific (label, status) tuple the BPF /
+        // Npcap / CAP_NET_RAW row should show; `None` means we
+        // haven't probed yet and the row gets skipped.
+        let version = env!("CARGO_PKG_VERSION");
+        let privilege_label = self.priv_status.as_ref().map(privilege_label_for);
+        // 280 px is enough for the Switch row, the slider with
+        // its endpoint labels, and the About rows below — the
+        // slider stretches to fill, so we don't need to widen
+        // for label fit.
         let panel_width = px(280.0);
 
         Popover::new("settings-popover")
@@ -1237,6 +1292,7 @@ impl AppView {
             .content(move |_, _, cx| {
                 let entity_for_switch = entity.clone();
                 let muted = cx.theme().muted_foreground;
+                let border = cx.theme().border;
                 div()
                     .flex()
                     .flex_col()
@@ -1362,7 +1418,79 @@ impl AppView {
                                     )),
                             ),
                     )
-                    // Row 3: action button anchored bottom-right,
+                    // Row 3: About. Section heading + version,
+                    // GitHub + license link rows, and a
+                    // platform-specific capture-privilege status
+                    // row. macOS users see "BPF helper", Windows
+                    // users see "Npcap", Linux users see the
+                    // generic "Capture access" — matching the
+                    // language the privilege banner uses for the
+                    // same condition. The banner already handles
+                    // installation when access is missing, so this
+                    // row is read-only status. Top border + extra
+                    // top padding visually separates About from
+                    // the logging rows above.
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_2()
+                            .pt_3()
+                            .border_t_1()
+                            .border_color(border)
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(muted)
+                                    .child("About"),
+                            )
+                            .child(about_row(
+                                "Version",
+                                div()
+                                    .text_sm()
+                                    .text_color(muted)
+                                    .child(format!("v{}", version))
+                                    .into_any_element(),
+                            ))
+                            .child(about_row(
+                                "Repository",
+                                Button::new("about-github")
+                                    .label("GitHub ↗")
+                                    .ghost()
+                                    .small()
+                                    .on_click(|_, _window, cx| {
+                                        cx.open_url(
+                                            "https://github.com/packetThrower/PortFinder",
+                                        );
+                                    })
+                                    .into_any_element(),
+                            ))
+                            .child(about_row(
+                                "License",
+                                Button::new("about-license")
+                                    .label("GPL-3.0-or-later ↗")
+                                    .ghost()
+                                    .small()
+                                    .on_click(|_, _window, cx| {
+                                        cx.open_url(
+                                            "https://github.com/packetThrower/PortFinder/\
+                                             blob/main/LICENSE",
+                                        );
+                                    })
+                                    .into_any_element(),
+                            ))
+                            .when_some(privilege_label, |this, (label, status)| {
+                                this.child(about_row(
+                                    label,
+                                    div()
+                                        .text_sm()
+                                        .text_color(muted)
+                                        .child(status)
+                                        .into_any_element(),
+                                ))
+                            }),
+                    )
+                    // Row 4: action button anchored bottom-right,
                     // also macOS-System-Settings convention
                     // ("Shortcuts…" / "Hot Corners…" on the
                     // Mission Control panel sit this way).
@@ -1602,6 +1730,59 @@ fn log_level_label(
     })
 }
 
+/// One row in the settings-popover "About" section. macOS
+/// System-Settings convention: small text label on the left,
+/// value or control flush right, full-width `justify_between`.
+/// The value column accepts any `AnyElement` so it can be a
+/// muted text label (version, status) or a `Button` (link).
+fn about_row(label: &'static str, value: gpui::AnyElement) -> gpui::Div {
+    div()
+        .flex()
+        .items_center()
+        .justify_between()
+        .child(div().text_sm().child(label))
+        .child(value)
+}
+
+/// Maps `PrivilegeStatus` to the (row label, status text) the
+/// "About" section's capture-privilege row should display. The
+/// label is platform-specific so it matches the terminology the
+/// privilege banner already uses for the same condition — macOS
+/// users hear "BPF helper", Windows users "Npcap", and Linux
+/// users get the generic "Capture access" (no single named
+/// component to point at — it's `setcap` on the binary, set by
+/// the .deb / .rpm postinstall).
+fn privilege_label_for(status: &privilege::PrivilegeStatus) -> (&'static str, &'static str) {
+    if cfg!(target_os = "macos") {
+        (
+            "BPF helper",
+            if status.helper_installed {
+                "Installed"
+            } else {
+                "Not installed"
+            },
+        )
+    } else if cfg!(target_os = "windows") {
+        (
+            "Npcap",
+            if status.npcap_installed {
+                "Installed"
+            } else {
+                "Not installed"
+            },
+        )
+    } else {
+        (
+            "Capture access",
+            if status.has_access {
+                "Available"
+            } else {
+                "Unavailable"
+            },
+        )
+    }
+}
+
 /// Main GUI entrypoint. Starts gpui, opens the PortFinder window,
 /// and runs until the user closes it. Spawned by `main.rs` when no
 /// CLI args were passed.
@@ -1648,10 +1829,29 @@ pub fn run() {
         //      menu bar shows nothing app-specific).
         //   3. The handler that actually exits — `cx.quit()` runs
         //      any `on_app_quit` callbacks before tearing down.
-        cx.bind_keys([KeyBinding::new("cmd-q", Quit, None)]);
+        cx.bind_keys([
+            KeyBinding::new("cmd-q", Quit, None),
+            // `secondary-r` is Cmd+R on macOS and Ctrl+R on Linux
+            // / Windows — the standard "primary modifier" alias
+            // gpui exposes for cross-platform shortcuts. Scoped
+            // to `Some("AppView")` so the binding only fires when
+            // the AppView root div is in the focus chain;
+            // popovers and modals that don't carry the AppView
+            // key_context get to keep their own key handling
+            // (notably the settings popover's slider, which uses
+            // arrow keys).
+            KeyBinding::new("secondary-r", StartOrStop, Some("AppView")),
+        ]);
         cx.set_menus(vec![Menu {
             name: "PortFinder".into(),
-            items: vec![MenuItem::action("Quit PortFinder", Quit)],
+            items: vec![
+                // gpui derives the keystroke shown next to the
+                // menu label from the bound keybinding above —
+                // we don't pass the keystroke string here.
+                MenuItem::action("Start/Stop Capture", StartOrStop),
+                MenuItem::separator(),
+                MenuItem::action("Quit PortFinder", Quit),
+            ],
             disabled: false,
         }]);
         cx.on_action(|_: &Quit, cx: &mut App| cx.quit());
