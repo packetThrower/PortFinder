@@ -95,6 +95,32 @@ rewrite ship-ready. Per-alpha history is on the
   Windows ARM64).
 
 ### Fixed
+- **Local privilege escalation in the macOS BPF helper
+  installer.** The pre-stable code wrote the bootstrap shell
+  script to a predictable `/tmp/portfinder-bpf-<pid>.sh`
+  using `File::create` (no `O_EXCL`, follows symlinks) and
+  then ran it as root via AuthorizationServices. A local
+  unprivileged user able to predict the pid could pre-symlink
+  the path and race the auth-dialog Allow click to land
+  arbitrary script execution as root. Switched to
+  `tempfile::NamedTempFile` (`mkstemp` underneath:
+  `O_CREAT | O_EXCL`, random suffix, owner-only mode). Reported
+  internally during the 4.0.0 security pass.
+- **Updater pill URL is allowlisted** before being passed to
+  the OS URL handler. The GitHub Releases JSON's `html_url`
+  field could in principle smuggle a non-`https://github.com/
+  packetThrower/PortFinder/releases/` URL through to
+  `cx.open_url`; any release whose `html_url` doesn't match
+  the prefix is now dropped. Defence in depth — HTTPS + rustls
+  rules out network MITM, but this also covers a hypothetical
+  supply-chain compromise of the JSON itself.
+- **Help-text `Usage:` line is consistent across platforms.**
+  Without an explicit `bin_name`, clap derived the program
+  name from `argv[0]`, which on Windows became
+  `portfinder-cli.exe` even when the user typed `portfinder`
+  through a Scoop shim. Pinned `bin_name = "portfinder"` so
+  the displayed command name matches what the docs tell users
+  to type.
 - **Fedora `dnf install ./PortFinder-*.rpm` actually runs the
   GUI now.** Was failing with `libpcap.so.0.8: cannot open
   shared object file` regardless of whether libpcap was
