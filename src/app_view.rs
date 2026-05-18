@@ -20,9 +20,9 @@ use std::time::Duration;
 
 use flume::{Receiver, Sender};
 use gpui::{
-    div, prelude::*, px, rgb, App, AppContext, Bounds, ClipboardItem, Context, Entity, FocusHandle,
-    Focusable, Hsla, IntoElement, ParentElement, Render, SharedString, Styled, Window, WindowBounds,
-    WindowDecorations, WindowOptions,
+    actions, div, prelude::*, px, rgb, App, AppContext, Bounds, ClipboardItem, Context, Entity,
+    FocusHandle, Focusable, Hsla, IntoElement, KeyBinding, Menu, MenuItem, ParentElement, Render,
+    SharedString, Styled, Window, WindowBounds, WindowDecorations, WindowOptions,
 };
 use gpui_component::{
     button::{Button, ButtonVariants},
@@ -33,6 +33,18 @@ use gpui_component::{
 };
 use tokio::runtime::Handle as TokioHandle;
 use tokio_util::sync::CancellationToken;
+
+// gpui's standard application-action pattern: declare actions via
+// `actions!(namespace, [...])` which expands into one zero-sized
+// struct per name, then wire them to keybindings + menu items in
+// `run()` and to a handler via `cx.on_action`. Without the
+// keybinding registration, Cmd+Q on macOS reaches the OS but the
+// app has no handler — the menu item is also missing entirely
+// (gpui doesn't install a default Application menu) so the user
+// has no visible way to quit other than red-light-clicking the
+// window. Quit is the priority; Cmd+W close-window can come
+// later if anyone asks.
+actions!(portfinder, [Quit]);
 
 use crate::{capture, privilege, updater, CaptureRequest, CaptureResult, InterfaceInfo};
 
@@ -1296,6 +1308,25 @@ pub fn run() {
         // render — without this, the very first `Select::new` panics
         // looking for `Theme`.
         gpui_component::init(cx);
+
+        // Wire Cmd+Q. Three pieces:
+        //   1. The keybinding (`cmd-q` works across macOS / Linux /
+        //      Windows — gpui maps `cmd` to the platform's primary
+        //      modifier).
+        //   2. The Application menu so macOS shows "Quit PortFinder
+        //      ⌘Q" under the app's menu-bar entry (matches every
+        //      Mac user's muscle memory; without a `cx.set_menus`
+        //      call gpui doesn't install any menu at all and the
+        //      menu bar shows nothing app-specific).
+        //   3. The handler that actually exits — `cx.quit()` runs
+        //      any `on_app_quit` callbacks before tearing down.
+        cx.bind_keys([KeyBinding::new("cmd-q", Quit, None)]);
+        cx.set_menus(vec![Menu {
+            name: "PortFinder".into(),
+            items: vec![MenuItem::action("Quit PortFinder", Quit)],
+            disabled: false,
+        }]);
+        cx.on_action(|_: &Quit, cx: &mut App| cx.quit());
 
         // Boot palette follows the system appearance. AppView
         // installs an `observe_window_appearance` subscription
