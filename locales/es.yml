@@ -1,0 +1,121 @@
+_version: 1
+
+# Spanish (Español). Translations cover the high-visibility UI
+# surface; less-visible strings (tooltips, long banner copy) fall
+# back to en.yml automatically via rust-i18n's fallback chain.
+
+app:
+  title: PortFinder
+
+status:
+  ready: Listo
+  capturing: "Capturando %{protocol}…"
+  complete: Completado
+  stopping: "Deteniendo…"
+  stopped: Detenido
+  error: Error
+  installing_helper: "Instalando ayudante…"
+  bpf_helper_installed: Ayudante BPF instalado
+  restored_from_history: "Restaurado del historial · %{protocol} en %{iface} · %{ago}"
+
+controls:
+  interface_label: Interfaz
+  protocol_label: Protocolo
+  only_with_ips: Mostrar solo interfaces con IP
+  sniff_all: Capturar todas las interfaces
+  refresh_interfaces_tooltip: Actualizar lista de interfaces
+
+button:
+  start: Iniciar
+  stop: Detener
+  start_tooltip: Iniciar captura
+  stop_tooltip: Detener captura
+  copy_as_json: Copiar como JSON
+  copy_as_json_tooltip: "Copia el resultado completo como JSON (idéntico a la salida --json del CLI)."
+  copied: Copiado
+  download_npcap: Descargar Npcap
+  download_npcap_tooltip: Abre npcap.com para descargar el instalador.
+  install_bpf_helper: Instalar ayudante BPF
+  install_bpf_helper_installing: "Instalando…"
+  install_bpf_helper_tooltip: Instalación única. Permite capturar sin sudo.
+  settings_folder: Carpeta de ajustes
+  log_folder: Carpeta de registros
+
+result:
+  empty_placeholder: Ejecuta una captura para ver la información del switch.
+  not_advertised: No anunciado
+  row:
+    switch_name: Nombre del switch
+    switch_ip: IP del switch
+    switch_port: Puerto del switch
+    vlan: VLAN
+    voice_vlan: VLAN de voz
+    mtu: MTU
+    switch_model: Modelo del switch
+
+history:
+  button: "Historial (%{count})"
+  button_tooltip: Mostrar capturas recientes (esta sesión).
+  header: "Capturas recientes (%{count})"
+  no_switch_name: "(sin nombre de switch)"
+  ip_unknown: "—"
+  iface_all: todas
+  row_tooltip: "Clic para restaurar · clic derecho para copiar como JSON"
+
+settings:
+  section:
+    language: Idioma
+    capture: Captura
+    logging: Registros
+  language_row: Idioma de la interfaz
+  save_capture_history: Guardar historial de capturas
+  log_level: Nivel de registro
+  write_debug_log: Escribir registro de depuración
+  about_row: Acerca de
+  about_back: Acerca de
+
+log_level:
+  normal: Normal
+  verbose: Detallado
+  trace: Traza
+
+about:
+  version: Versión
+  repository: Repositorio
+  license: Licencia
+  bpf_helper: Ayudante BPF
+  npcap: Npcap
+  capture_access: Acceso de captura
+  installed: Instalado
+  not_installed: No instalado
+  available: Disponible
+  unavailable: No disponible
+
+update:
+  available: "Actualización v%{version} disponible"
+  tooltip: Haz clic para ver esta versión en GitHub.
+
+privilege:
+  needs_capture_privilege: PortFinder necesita privilegios elevados para capturar paquetes.
+  npcap_needed: PortFinder necesita Npcap para capturar paquetes en Windows.
+  npcap_relaunch: "Después de instalar, reinicia PortFinder."
+
+format:
+  just_now: ahora mismo
+  seconds_ago: "hace %{n}s"
+  minutes_ago: "hace %{n}min"
+  hours_ago: "hace %{n}h"
+  days_ago: "hace %{n}d"
+
+menu:
+  quit: Salir de PortFinder
+  start_or_stop: Iniciar/Detener captura
+
+language:
+  en: English
+  es: Español
+  fr: Français
+  de: Deutsch
+  it: Italiano
+  pt: Português
+  ja: 日本語

@@ -1,0 +1,136 @@
+_version: 1
+
+# Application title / wide labels --------------------------------
+app:
+  title: PortFinder
+
+# Status text shown above the version footer ---------------------
+status:
+  ready: Ready
+  capturing: "Capturing %{protocol}…"
+  complete: Complete
+  stopping: "Stopping…"
+  stopped: Stopped
+  error: Error
+  installing_helper: "Installing helper…"
+  bpf_helper_installed: BPF helper installed
+  restored_from_history: "Restored from history · %{protocol} on %{iface} · %{ago}"
+
+# Capture controls card ------------------------------------------
+controls:
+  interface_label: Interface
+  protocol_label: Protocol
+  only_with_ips: Only show interfaces with IPs
+  sniff_all: Sniff all Interfaces
+  refresh_interfaces_tooltip: Refresh interface list
+
+# Start / Stop buttons -------------------------------------------
+button:
+  start: Start
+  stop: Stop
+  start_tooltip: Start capture
+  stop_tooltip: Stop capture
+  copy_as_json: Copy as JSON
+  copy_as_json_tooltip: "Copy the full capture result as JSON (matches the CLI's --json output)."
+  copied: Copied
+  download_npcap: Download Npcap
+  download_npcap_tooltip: Opens npcap.com to download the installer.
+  install_bpf_helper: Install BPF Helper
+  install_bpf_helper_installing: "Installing…"
+  install_bpf_helper_tooltip: One-time install. Lets PortFinder capture without sudo.
+  settings_folder: Settings folder
+  log_folder: Log folder
+
+# Result card -----------------------------------------------------
+result:
+  empty_placeholder: Run a capture to see switch info here.
+  not_advertised: Not advertised
+  row:
+    switch_name: Switch Name
+    switch_ip: Switch IP
+    switch_port: Switch Port
+    vlan: VLAN
+    voice_vlan: Voice VLAN
+    mtu: MTU
+    switch_model: Switch Model
+
+# History popover -------------------------------------------------
+history:
+  button: "History (%{count})"
+  button_tooltip: Show recent capture results (this session).
+  header: "Recent captures (%{count})"
+  no_switch_name: "(no switch name)"
+  ip_unknown: "—"
+  iface_all: all
+  row_tooltip: "Click to restore this capture · right-click to copy as JSON"
+
+# Settings popover ------------------------------------------------
+settings:
+  section:
+    language: Language
+    capture: Capture
+    logging: Logging
+  language_row: Display language
+  save_capture_history: Save capture history
+  log_level: Log level
+  write_debug_log: Write debug log
+  about_row: About
+  about_back: About
+
+# Log-level slider stops + descriptions --------------------------
+log_level:
+  normal: Normal
+  verbose: Verbose
+  trace: Trace
+  normal_description: "Lifecycle events only — boot, capture start/stop, settings flips. The default."
+  verbose_description: "Adds per-event capture diagnostics. Use when \"PortFinder isn't capturing\" is the bug you're chasing."
+  trace_description: "Adds per-pcap-tick noise (~20 Hz per interface). Almost always overkill — useful for libpcap timing questions."
+
+# About sub-page rows --------------------------------------------
+about:
+  version: Version
+  repository: Repository
+  license: License
+  bpf_helper: BPF helper
+  npcap: Npcap
+  capture_access: Capture access
+  installed: Installed
+  not_installed: Not installed
+  available: Available
+  unavailable: Unavailable
+
+# Update-available footer pill -----------------------------------
+update:
+  available: "Update v%{version} available"
+  tooltip: Click to view this release on GitHub.
+
+# Privilege banner ------------------------------------------------
+privilege:
+  needs_capture_privilege: PortFinder needs elevated privileges to capture packets.
+  npcap_needed: PortFinder needs Npcap to capture packets on Windows.
+  npcap_relaunch: "After installing, relaunch PortFinder."
+
+# Relative time labels for the History list ----------------------
+format:
+  just_now: just now
+  seconds_ago: "%{n}s ago"
+  minutes_ago: "%{n}m ago"
+  hours_ago: "%{n}h ago"
+  days_ago: "%{n}d ago"
+
+# macOS menu items ------------------------------------------------
+menu:
+  quit: Quit PortFinder
+  start_or_stop: Start/Stop Capture
+
+# Language picker — display names for each shipped locale --------
+# Each language is named in its OWN tongue (endonym) so the picker
+# is readable to a user who's already in the wrong locale.
+language:
+  en: English
+  es: Español
+  fr: Français
+  de: Deutsch
+  it: Italiano
+  pt: Português
+  ja: 日本語

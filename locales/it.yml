@@ -1,0 +1,120 @@
+_version: 1
+
+# Italian (Italiano). Translations cover the high-visibility UI
+# surface; less-visible strings fall back to en.yml via rust-i18n.
+
+app:
+  title: PortFinder
+
+status:
+  ready: Pronto
+  capturing: "Acquisizione %{protocol}…"
+  complete: Completato
+  stopping: "Arresto…"
+  stopped: Arrestato
+  error: Errore
+  installing_helper: "Installazione dell'helper…"
+  bpf_helper_installed: Helper BPF installato
+  restored_from_history: "Ripristinato dalla cronologia · %{protocol} su %{iface} · %{ago}"
+
+controls:
+  interface_label: Interfaccia
+  protocol_label: Protocollo
+  only_with_ips: Mostra solo interfacce con IP
+  sniff_all: Acquisisci tutte le interfacce
+  refresh_interfaces_tooltip: Aggiorna elenco interfacce
+
+button:
+  start: Avvia
+  stop: Ferma
+  start_tooltip: Avvia acquisizione
+  stop_tooltip: Ferma acquisizione
+  copy_as_json: Copia come JSON
+  copy_as_json_tooltip: "Copia il risultato completo come JSON (identico all'output --json della CLI)."
+  copied: Copiato
+  download_npcap: Scarica Npcap
+  download_npcap_tooltip: Apre npcap.com per scaricare l'installer.
+  install_bpf_helper: Installa helper BPF
+  install_bpf_helper_installing: "Installazione…"
+  install_bpf_helper_tooltip: Installazione una tantum. Permette l'acquisizione senza sudo.
+  settings_folder: Cartella impostazioni
+  log_folder: Cartella log
+
+result:
+  empty_placeholder: Esegui un'acquisizione per vedere le informazioni dello switch.
+  not_advertised: Non annunciato
+  row:
+    switch_name: Nome switch
+    switch_ip: IP switch
+    switch_port: Porta switch
+    vlan: VLAN
+    voice_vlan: VLAN voce
+    mtu: MTU
+    switch_model: Modello switch
+
+history:
+  button: "Cronologia (%{count})"
+  button_tooltip: Mostra acquisizioni recenti (questa sessione).
+  header: "Acquisizioni recenti (%{count})"
+  no_switch_name: "(nessun nome switch)"
+  ip_unknown: "—"
+  iface_all: tutte
+  row_tooltip: "Clic per ripristinare · clic destro per copiare come JSON"
+
+settings:
+  section:
+    language: Lingua
+    capture: Acquisizione
+    logging: Log
+  language_row: Lingua dell'interfaccia
+  save_capture_history: Salva cronologia delle acquisizioni
+  log_level: Livello di log
+  write_debug_log: Scrivi log di debug
+  about_row: Informazioni
+  about_back: Informazioni
+
+log_level:
+  normal: Normale
+  verbose: Dettagliato
+  trace: Traccia
+
+about:
+  version: Versione
+  repository: Repository
+  license: Licenza
+  bpf_helper: Helper BPF
+  npcap: Npcap
+  capture_access: Accesso di acquisizione
+  installed: Installato
+  not_installed: Non installato
+  available: Disponibile
+  unavailable: Non disponibile
+
+update:
+  available: "Aggiornamento v%{version} disponibile"
+  tooltip: Clicca per vedere questa versione su GitHub.
+
+privilege:
+  needs_capture_privilege: PortFinder richiede privilegi elevati per acquisire pacchetti.
+  npcap_needed: PortFinder richiede Npcap per acquisire pacchetti su Windows.
+  npcap_relaunch: "Dopo l'installazione, riavvia PortFinder."
+
+format:
+  just_now: ora
+  seconds_ago: "%{n}s fa"
+  minutes_ago: "%{n}min fa"
+  hours_ago: "%{n}h fa"
+  days_ago: "%{n}g fa"
+
+menu:
+  quit: Esci da PortFinder
+  start_or_stop: Avvia/Ferma acquisizione
+
+language:
+  en: English
+  es: Español
+  fr: Français
+  de: Deutsch
+  it: Italiano
+  pt: Português
+  ja: 日本語

@@ -35,6 +35,7 @@ use gpui_component::{
     tooltip::Tooltip,
     ActiveTheme, Disableable, Icon, IconName, IndexPath, Root, Sizable, Theme, ThemeMode, TitleBar,
 };
+use rust_i18n::t;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle as TokioHandle;
 use tokio_util::sync::CancellationToken;
@@ -337,6 +338,18 @@ struct HistoryEntry {
 /// short-term-memory window.
 const HISTORY_MAX: usize = 10;
 
+/// Which page of the settings popover is currently visible.
+/// `Main` is the regular settings list with the section rows;
+/// the other two are drill-down sub-pages reachable via their
+/// respective rows in `Main` and dismissable via a "← Back"
+/// header on the sub-page itself.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum SettingsView {
+    Main,
+    About,
+    Language,
+}
+
 pub struct AppView {
     focus_handle: FocusHandle,
 
@@ -368,17 +381,16 @@ pub struct AppView {
     // see `HistoryEntry` for the persistence-deferred note.
     history: VecDeque<HistoryEntry>,
 
-    // Settings-popover UI state. When true, the popover
-    // shows the About page (version / repo / license /
-    // capture-privilege rows) with a "← Back" header instead
-    // of the regular settings list. Lets the popover stay
-    // short in both states — gpui-component's Popover
-    // anchors to the trigger's top-left and doesn't shift
-    // down on overflow (its `resolved_corner` has no "below
-    // the trigger" case), so a tall popover gets clipped at
-    // the window bottom. Not persisted; reverts to the
-    // settings-list view on relaunch.
-    settings_view_about: bool,
+    // Which page of the settings popover is showing. The
+    // popover is drilled-into rather than long-scrolling
+    // because gpui-component's Popover anchors to the
+    // trigger's top-left and doesn't shift down on overflow
+    // (its `resolved_corner` has no "below the trigger"
+    // case), so a tall popover gets clipped at the window
+    // bottom. Each sub-page renders a "← Back" header and
+    // returns here when dismissed. Not persisted; reverts
+    // to `Main` on relaunch.
+    settings_view: SettingsView,
 
     // Privileges + helper install.
     priv_status: Option<privilege::PrivilegeStatus>,
@@ -565,7 +577,7 @@ impl AppView {
             capture_result_rx: rx,
             result: None,
             error: String::new(),
-            status_text: "Ready".into(),
+            status_text: t!("status.ready").into_owned().into(),
             copied_key: None,
             // Hydrate from `history.json` only when the
             // user has opted in via the popover toggle —
@@ -584,7 +596,7 @@ impl AppView {
             } else {
                 VecDeque::with_capacity(HISTORY_MAX)
             },
-            settings_view_about: false,
+            settings_view: SettingsView::Main,
             priv_status,
             is_installing: false,
             update_available: None,
@@ -684,7 +696,8 @@ impl AppView {
         self.is_capturing = true;
         self.error.clear();
         self.result = None;
-        self.status_text = format!("Capturing {}…", self.protocol.as_str()).into();
+        self.status_text =
+            t!("status.capturing", protocol = self.protocol.as_str()).into_owned().into();
 
         let cancel = CancellationToken::new();
         if let Some(prev) = self.capture_cancel.take() {
@@ -709,7 +722,7 @@ impl AppView {
         if let Some(token) = self.capture_cancel.take() {
             token.cancel();
         }
-        self.status_text = "Stopping…".into();
+        self.status_text = t!("status.stopping").into_owned().into();
         cx.notify();
     }
 
@@ -753,14 +766,14 @@ impl AppView {
                     }
                 }
                 self.result = Some(r);
-                self.status_text = "Complete".into();
+                self.status_text = t!("status.complete").into_owned().into();
             }
             Err(msg) => {
                 if msg.to_lowercase().contains("cancelled") {
-                    self.status_text = "Stopped".into();
+                    self.status_text = t!("status.stopped").into_owned().into();
                 } else {
                     self.error = msg;
-                    self.status_text = "Error".into();
+                    self.status_text = t!("status.error").into_owned().into();
                 }
             }
         }
@@ -773,7 +786,7 @@ impl AppView {
         }
         self.is_installing = true;
         self.error.clear();
-        self.status_text = "Installing helper…".into();
+        self.status_text = t!("status.installing_helper").into_owned().into();
         cx.notify();
 
         // `privilege::install_bpf_helper` blocks on `osascript`; run
@@ -787,12 +800,12 @@ impl AppView {
                 this.is_installing = false;
                 match result {
                     Ok(()) => {
-                        this.status_text = "BPF helper installed".into();
+                        this.status_text = t!("status.bpf_helper_installed").into_owned().into();
                         this.priv_status = Some(privilege::get_privilege_status());
                     }
                     Err(err) => {
                         this.error = err;
-                        this.status_text = "Error".into();
+                        this.status_text = t!("status.error").into_owned().into();
                     }
                 }
                 cx.notify();
@@ -1124,10 +1137,14 @@ impl AppView {
                     ))
                     .child(
                         Button::new("install-bpf")
-                            .label(if installing { "Installing…" } else { "Install BPF Helper" })
+                            .label(if installing {
+                                t!("button.install_bpf_helper_installing").into_owned()
+                            } else {
+                                t!("button.install_bpf_helper").into_owned()
+                            })
                             .small()
                             .disabled(installing)
-                            .tooltip("One-time install. Lets PortFinder capture without sudo.")
+                            .tooltip(t!("button.install_bpf_helper_tooltip").into_owned())
                             .on_click(cx.listener(|this, _, _window, cx| this.install_bpf(cx))),
                     )
                     .into_any_element()
@@ -1145,13 +1162,13 @@ impl AppView {
                 .flex_col()
                 .gap_2()
                 .child(div().text_sm().child(
-                    "PortFinder needs Npcap to capture packets on Windows.",
+                    t!("privilege.npcap_needed").into_owned(),
                 ))
                 .child(
                     Button::new("open-npcap")
-                        .label("Download Npcap")
+                        .label(t!("button.download_npcap").into_owned())
                         .small()
-                        .tooltip("Opens npcap.com to download the installer.")
+                        .tooltip(t!("button.download_npcap_tooltip").into_owned())
                         .on_click(|_, _window, cx| {
                             cx.open_url("https://npcap.com/#download");
                         }),
@@ -1160,7 +1177,7 @@ impl AppView {
                     div()
                         .text_xs()
                         .text_color(theme.muted_foreground)
-                        .child("After installing, relaunch PortFinder."),
+                        .child(t!("privilege.npcap_relaunch").into_owned()),
                 )
                 .into_any_element(),
             "windows" if !status.npcap_non_admin => div()
@@ -1175,7 +1192,7 @@ impl AppView {
                 .into_any_element(),
             _ => div()
                 .text_sm()
-                .child("PortFinder needs elevated privileges to capture packets.")
+                .child(t!("privilege.needs_capture_privilege").into_owned())
                 .into_any_element(),
         };
 
@@ -1208,7 +1225,7 @@ impl AppView {
                         div()
                             .text_xs()
                             .text_color(theme.muted_foreground)
-                            .child("Interface"),
+                            .child(t!("controls.interface_label").into_owned()),
                     )
                     .child(
                         div()
@@ -1224,7 +1241,7 @@ impl AppView {
                                 Button::new("refresh-interfaces")
                                     .label("↻")
                                     .small()
-                                    .tooltip("Refresh interface list")
+                                    .tooltip(t!("controls.refresh_interfaces_tooltip").into_owned())
                                     .disabled(is_capturing)
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         this.refresh_interfaces(window, cx)
@@ -1235,7 +1252,7 @@ impl AppView {
             .child(
                 Switch::new("only-with-ips")
                     .checked(only_with_ips)
-                    .label("Only show interfaces with IPs")
+                    .label(t!("controls.only_with_ips").into_owned())
                     .small()
                     .disabled(is_capturing)
                     .on_click(cx.listener(|this, value: &bool, window, cx| {
@@ -1251,7 +1268,7 @@ impl AppView {
                         div()
                             .text_xs()
                             .text_color(theme.muted_foreground)
-                            .child("Protocol"),
+                            .child(t!("controls.protocol_label").into_owned()),
                     )
                     .child(Select::new(&self.protocol_select).small()),
             )
@@ -1270,12 +1287,12 @@ impl AppView {
                         // root div, so gpui can resolve which
                         // binding to display.
                         Button::new("start-capture")
-                            .label("Start")
+                            .label(t!("button.start").into_owned())
                             .primary()
                             .small()
                             .disabled(is_capturing)
                             .tooltip_with_action(
-                                "Start capture",
+                                t!("button.start_tooltip").into_owned(),
                                 &StartOrStop,
                                 Some("AppView"),
                             )
@@ -1283,11 +1300,11 @@ impl AppView {
                     )
                     .child(
                         Button::new("stop-capture")
-                            .label("Stop")
+                            .label(t!("button.stop").into_owned())
                             .small()
                             .disabled(!is_capturing)
                             .tooltip_with_action(
-                                "Stop capture",
+                                t!("button.stop_tooltip").into_owned(),
                                 &StartOrStop,
                                 Some("AppView"),
                             )
@@ -1324,7 +1341,7 @@ impl AppView {
                     div()
                         .text_sm()
                         .text_color(cx.theme().muted_foreground)
-                        .child("Run a capture to see switch info here."),
+                        .child(t!("result.empty_placeholder").into_owned()),
                 );
             if let Some(el) = history_btn {
                 placeholder = placeholder.child(div().flex().justify_end().child(el));
@@ -1332,14 +1349,46 @@ impl AppView {
             return placeholder.into_any_element();
         };
 
-        let rows: [(ResultKey, &'static str, String); 7] = [
-            (ResultKey("switch"), "Switch Name", result.switch_name.clone()),
-            (ResultKey("ip"), "Switch IP", result.switch_ip.clone()),
-            (ResultKey("port"), "Switch Port", result.switch_port.clone()),
-            (ResultKey("vlan"), "VLAN", result.native_vlan.clone()),
-            (ResultKey("voiceVlan"), "Voice VLAN", result.voice_vlan.clone()),
-            (ResultKey("mtu"), "MTU", result.mtu.clone()),
-            (ResultKey("model"), "Switch Model", result.switch_model.clone()),
+        // Row labels are looked up via `t!()` so they translate
+        // live with the active locale. `String` (not `&'static
+        // str`) because t!() returns a Cow that may borrow the
+        // active translation table at render time.
+        let rows: [(ResultKey, String, String); 7] = [
+            (
+                ResultKey("switch"),
+                t!("result.row.switch_name").into_owned(),
+                result.switch_name.clone(),
+            ),
+            (
+                ResultKey("ip"),
+                t!("result.row.switch_ip").into_owned(),
+                result.switch_ip.clone(),
+            ),
+            (
+                ResultKey("port"),
+                t!("result.row.switch_port").into_owned(),
+                result.switch_port.clone(),
+            ),
+            (
+                ResultKey("vlan"),
+                t!("result.row.vlan").into_owned(),
+                result.native_vlan.clone(),
+            ),
+            (
+                ResultKey("voiceVlan"),
+                t!("result.row.voice_vlan").into_owned(),
+                result.voice_vlan.clone(),
+            ),
+            (
+                ResultKey("mtu"),
+                t!("result.row.mtu").into_owned(),
+                result.mtu.clone(),
+            ),
+            (
+                ResultKey("model"),
+                t!("result.row.switch_model").into_owned(),
+                result.switch_model.clone(),
+            ),
         ];
 
         let json_copied = self.copied_key == Some(RESULT_KEY_JSON);
@@ -1383,18 +1432,20 @@ impl AppView {
                 .border_t_1()
                 .border_color(border)
                 .when(json_copied, |this| {
-                    this.child(div().text_xs().text_color(success).child("Copied"))
+                    this.child(
+                        div()
+                            .text_xs()
+                            .text_color(success)
+                            .child(t!("button.copied").into_owned()),
+                    )
                 })
                 .when_some(history_btn, |this, el| this.child(el))
                 .child(
                     Button::new("copy-result-json")
-                        .label("Copy as JSON")
+                        .label(t!("button.copy_as_json").into_owned())
                         .ghost()
                         .small()
-                        .tooltip(
-                            "Copy the full capture result as JSON \
-                             (matches the CLI's --json output).",
-                        )
+                        .tooltip(t!("button.copy_as_json_tooltip").into_owned())
                         .on_click(cx.listener(move |this, _, _window, cx| {
                             let Some(r) = this.result.as_ref() else { return };
                             let json = match serde_json::to_string_pretty(r) {
@@ -1483,10 +1534,10 @@ impl AppView {
             Popover::new("history-popover")
                 .trigger(
                     Button::new("history-trigger")
-                        .label(format!("History ({count})"))
+                        .label(t!("history.button", count = count).into_owned())
                         .ghost()
                         .small()
-                        .tooltip("Show recent capture results (this session)."),
+                        .tooltip(t!("history.button_tooltip").into_owned()),
                 )
                 .content(move |_, _, _| {
                     let mut col = div()
@@ -1500,7 +1551,7 @@ impl AppView {
                                 .text_xs()
                                 .text_color(muted)
                                 .pb_1()
-                                .child(format!("Recent captures ({count})")),
+                                .child(t!("history.header", count = count).into_owned()),
                         );
                     for (ix, entry) in entries.iter().cloned() {
                         let entity_for_click = entity.clone();
@@ -1508,19 +1559,19 @@ impl AppView {
                         let switch_name = if entry.result.switch_name.is_empty()
                             || entry.result.switch_name == "N/A"
                         {
-                            "(no switch name)".to_string()
+                            t!("history.no_switch_name").into_owned()
                         } else {
                             entry.result.switch_name.clone()
                         };
                         let switch_ip = if entry.result.switch_ip.is_empty()
                             || entry.result.switch_ip == "N/A"
                         {
-                            "—".to_string()
+                            t!("history.ip_unknown").into_owned()
                         } else {
                             entry.result.switch_ip.clone()
                         };
                         let iface = if entry.interface_name.is_empty() {
-                            "all".to_string()
+                            t!("history.iface_all").into_owned()
                         } else {
                             entry.interface_name.clone()
                         };
@@ -1556,11 +1607,10 @@ impl AppView {
                                 .border_color(border)
                                 .hover(|this| this.bg(hover_bg))
                                 .tooltip(|window, cx| -> AnyView {
-                                    Tooltip::element(|_, _| {
-                                        div().w(px(220.0)).text_sm().child(
-                                            "Click to restore this capture · \
-                                             right-click to copy as JSON",
-                                        )
+                                    let text: SharedString =
+                                        t!("history.row_tooltip").into_owned().into();
+                                    Tooltip::element(move |_, _| {
+                                        div().w(px(220.0)).text_sm().child(text.clone())
                                     })
                                     .build(window, cx)
                                 })
@@ -1655,16 +1705,18 @@ impl AppView {
         self.result = Some(entry.result);
         self.error.clear();
         self.copied_key = None;
-        self.status_text = format!(
-            "Restored from history · {} on {} · {}",
-            entry.protocol.as_str(),
-            if entry.interface_name.is_empty() {
-                "all"
-            } else {
-                &entry.interface_name
-            },
-            format_ago(entry.captured_at_epoch_secs),
+        let iface_label = if entry.interface_name.is_empty() {
+            t!("history.iface_all").into_owned()
+        } else {
+            entry.interface_name.clone()
+        };
+        self.status_text = t!(
+            "status.restored_from_history",
+            protocol = entry.protocol.as_str(),
+            iface = iface_label,
+            ago = format_ago(entry.captured_at_epoch_secs),
         )
+        .into_owned()
         .into();
         cx.notify();
     }
@@ -1685,7 +1737,12 @@ impl AppView {
     fn render_settings_menu(&mut self, cx: &mut Context<Self>) -> gpui::AnyElement {
         let debug_log = self.settings.debug_log;
         let persist_history = self.settings.persist_history;
-        let view_about = self.settings_view_about;
+        let view = self.settings_view;
+        let language_code = self
+            .settings
+            .language
+            .clone()
+            .unwrap_or_else(|| crate::i18n::resolve(None).to_string());
         // Capture the AppView entity so the Switch's `on_click`
         // can mutate `self.settings` from inside the popover's
         // `.content(...)` callback. The popover renders in an
@@ -1741,11 +1798,14 @@ impl AppView {
                     .flex()
                     .flex_col()
                     .gap_2()
-                    .child(settings_section_header("Capture", muted))
+                    .child(settings_section_header(
+                        t!("settings.section.capture").into_owned(),
+                        muted,
+                    ))
                     .child(settings_switch_row(
                         "persist-history",
                         IconName::Inbox,
-                        "Save capture history",
+                        t!("settings.save_capture_history").into_owned(),
                         persist_history,
                         muted,
                         move |new, cx| {
@@ -1780,7 +1840,10 @@ impl AppView {
                     .pt_3()
                     .border_t_1()
                     .border_color(border)
-                    .child(settings_section_header("Logging", muted))
+                    .child(settings_section_header(
+                        t!("settings.section.logging").into_owned(),
+                        muted,
+                    ))
                     // Log level: icon + label header row, then
                     // the slider, then ticks + labels. Slider
                     // change events are routed via the
@@ -1794,7 +1857,7 @@ impl AppView {
                             .gap_1()
                             .child(settings_row_header(
                                 IconName::Settings2,
-                                "Log level",
+                                t!("settings.log_level").into_owned(),
                                 muted,
                             ))
                             .child(Slider::new(&log_level_slider))
@@ -1820,31 +1883,25 @@ impl AppView {
                                     .text_color(muted)
                                     .child(log_level_label(
                                         "log-level-label-normal",
-                                        "Normal",
-                                        "Lifecycle events only — boot, \
-                                         capture start/stop, settings \
-                                         flips. The default.",
+                                        t!("log_level.normal").into_owned(),
+                                        t!("log_level.normal_description").into_owned(),
                                     ))
                                     .child(log_level_label(
                                         "log-level-label-verbose",
-                                        "Verbose",
-                                        "Adds per-event capture diagnostics. \
-                                         Use when \"PortFinder isn't capturing\" \
-                                         is the bug you're chasing.",
+                                        t!("log_level.verbose").into_owned(),
+                                        t!("log_level.verbose_description").into_owned(),
                                     ))
                                     .child(log_level_label(
                                         "log-level-label-trace",
-                                        "Trace",
-                                        "Adds per-pcap-tick noise (~20 Hz per \
-                                         interface). Almost always overkill — \
-                                         useful for libpcap timing questions.",
+                                        t!("log_level.trace").into_owned(),
+                                        t!("log_level.trace_description").into_owned(),
                                     )),
                             ),
                     )
                     .child(settings_switch_row(
                         "debug-log",
                         IconName::SquareTerminal,
-                        "Write debug log",
+                        t!("settings.write_debug_log").into_owned(),
                         debug_log,
                         muted,
                         move |new, cx| {
@@ -1862,6 +1919,41 @@ impl AppView {
                         },
                     ));
 
+                // -- Language row -----------------------------
+                // Drill-down to the language picker sub-page
+                // (same pattern as About below). Displays the
+                // current locale's endonym ("English",
+                // "Español", "日本語", …) so the row text
+                // tracks the active language. Click flips
+                // `settings_view` to `Language`.
+                let entity_for_lang_open = entity_for_about.clone();
+                let lang_label = crate::i18n::display_name(&language_code).to_string();
+                let language_row = div()
+                    .id("settings-language-row")
+                    .cursor_pointer()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .child(settings_row_header(
+                        IconName::Globe,
+                        t!("settings.language_row").into_owned(),
+                        muted,
+                    ))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(div().text_sm().text_color(muted).child(lang_label))
+                            .child(Icon::new(IconName::ChevronRight).text_color(muted)),
+                    )
+                    .on_click(move |_, _window, cx| {
+                        entity_for_lang_open.update(cx, |this, cx| {
+                            this.settings_view = SettingsView::Language;
+                            cx.notify();
+                        });
+                    });
+
                 // -- About row --------------------------------
                 // Drill-down entry to the About page rather
                 // than an inline expandable section — gpui-
@@ -1871,8 +1963,8 @@ impl AppView {
                 // settings list gets clipped at the window
                 // bottom. Splitting About into its own page
                 // inside the same popover keeps both views
-                // short. Click sets `settings_view_about =
-                // true`, which the outer `if view_about`
+                // short. Click sets `settings_view =
+                // About`, which the outer `match view`
                 // below swaps in the About page.
                 let entity_for_about_open = entity_for_about.clone();
                 let about_row = div()
@@ -1884,11 +1976,15 @@ impl AppView {
                     .pt_3()
                     .border_t_1()
                     .border_color(border)
-                    .child(settings_row_header(IconName::Info, "About", muted))
+                    .child(settings_row_header(
+                        IconName::Info,
+                        t!("settings.about_row").into_owned(),
+                        muted,
+                    ))
                     .child(Icon::new(IconName::ChevronRight).text_color(muted))
                     .on_click(move |_, _window, cx| {
                         entity_for_about_open.update(cx, |this, cx| {
-                            this.settings_view_about = true;
+                            this.settings_view = SettingsView::About;
                             cx.notify();
                         });
                     });
@@ -1911,7 +2007,7 @@ impl AppView {
                     .child(
                         Button::new("settings-open-settings-folder")
                             .icon(IconName::FolderOpen)
-                            .label("Settings folder")
+                            .label(t!("button.settings_folder").into_owned())
                             .outline()
                             .small()
                             .on_click(|_, _window, _cx| {
@@ -1921,7 +2017,7 @@ impl AppView {
                     .child(
                         Button::new("settings-open-log-folder")
                             .icon(IconName::FolderOpen)
-                            .label("Log folder")
+                            .label(t!("button.log_folder").into_owned())
                             .outline()
                             .small()
                             .on_click(|_, _window, _cx| {
@@ -1929,113 +2025,170 @@ impl AppView {
                             }),
                     );
 
-                if view_about {
-                    // -- About page (drill-down view) --------
-                    // Replaces the settings list with the
-                    // About content + a "← Back" header. Same
-                    // popover, just different content; the
-                    // user's click on Back flips
-                    // `settings_view_about` off and the next
-                    // render returns to the settings list.
-                    let entity_for_back = entity.clone();
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap_2()
-                        .p_3()
-                        .w(panel_width)
-                        .child(
-                            div()
-                                .id("settings-about-back")
-                                .cursor_pointer()
-                                .flex()
-                                .items_center()
-                                .gap_2()
-                                .pb_1()
-                                .child(Icon::new(IconName::ChevronLeft).text_color(muted))
-                                .child(div().text_sm().child("About"))
-                                .on_click(move |_, _window, cx| {
-                                    entity_for_back.update(cx, |this, cx| {
-                                        this.settings_view_about = false;
-                                        cx.notify();
-                                    });
-                                }),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .flex_col()
-                                .gap_2()
-                                .pt_2()
-                                .border_t_1()
-                                .border_color(border)
-                                .child(about_row_with_icon(
-                                    IconName::Info,
-                                    "Version",
-                                    div()
-                                        .text_sm()
-                                        .text_color(muted)
-                                        .child(format!("v{}", version))
-                                        .into_any_element(),
-                                    muted,
-                                ))
-                                .child(about_row_with_icon(
-                                    IconName::Github,
-                                    "Repository",
-                                    Button::new("about-github")
-                                        .label("GitHub ↗")
-                                        .ghost()
-                                        .small()
-                                        .on_click(|_, _window, cx| {
-                                            cx.open_url(
-                                                "https://github.com/packetThrower/PortFinder",
-                                            );
-                                        })
-                                        .into_any_element(),
-                                    muted,
-                                ))
-                                .child(about_row_with_icon(
-                                    IconName::ExternalLink,
-                                    "License",
-                                    Button::new("about-license")
-                                        .label("GPL-3.0-or-later ↗")
-                                        .ghost()
-                                        .small()
-                                        .on_click(|_, _window, cx| {
-                                            cx.open_url(
-                                                "https://github.com/packetThrower/PortFinder/\
-                                                 blob/main/LICENSE",
-                                            );
-                                        })
-                                        .into_any_element(),
-                                    muted,
-                                ))
-                                .when_some(privilege_label, |this, (label, status)| {
-                                    this.child(about_row_with_icon(
-                                        IconName::Network,
-                                        label,
+                match view {
+                    SettingsView::About => {
+                        // Drill-down view. Same popover, "← Back"
+                        // header flips `settings_view` back to
+                        // `Main` and the next render returns to
+                        // the settings list.
+                        let entity_for_back = entity.clone();
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_2()
+                            .p_3()
+                            .w(panel_width)
+                            .child(back_header(
+                                "settings-about-back",
+                                &t!("settings.about_back"),
+                                muted,
+                                entity_for_back,
+                            ))
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_2()
+                                    .pt_2()
+                                    .border_t_1()
+                                    .border_color(border)
+                                    .child(about_row_with_icon(
+                                        IconName::Info,
+                                        t!("about.version"),
                                         div()
                                             .text_sm()
                                             .text_color(muted)
-                                            .child(status)
+                                            .child(format!("v{}", version))
                                             .into_any_element(),
                                         muted,
                                     ))
-                                }),
-                        )
-                        .into_any_element()
-                } else {
-                    div()
+                                    .child(about_row_with_icon(
+                                        IconName::Github,
+                                        t!("about.repository"),
+                                        Button::new("about-github")
+                                            .label("GitHub ↗")
+                                            .ghost()
+                                            .small()
+                                            .on_click(|_, _window, cx| {
+                                                cx.open_url(
+                                                    "https://github.com/packetThrower/PortFinder",
+                                                );
+                                            })
+                                            .into_any_element(),
+                                        muted,
+                                    ))
+                                    .child(about_row_with_icon(
+                                        IconName::ExternalLink,
+                                        t!("about.license"),
+                                        Button::new("about-license")
+                                            .label("GPL-3.0-or-later ↗")
+                                            .ghost()
+                                            .small()
+                                            .on_click(|_, _window, cx| {
+                                                cx.open_url(
+                                                    "https://github.com/packetThrower/PortFinder/\
+                                                     blob/main/LICENSE",
+                                                );
+                                            })
+                                            .into_any_element(),
+                                        muted,
+                                    ))
+                                    .when_some(privilege_label.clone(), |this, (label, status)| {
+                                        this.child(about_row_with_icon(
+                                            IconName::Network,
+                                            label,
+                                            div()
+                                                .text_sm()
+                                                .text_color(muted)
+                                                .child(status)
+                                                .into_any_element(),
+                                            muted,
+                                        ))
+                                    }),
+                            )
+                            .into_any_element()
+                    }
+                    SettingsView::Language => {
+                        // Drill-down language picker. Each
+                        // `SUPPORTED` locale renders as a
+                        // clickable row showing its endonym
+                        // ("English", "Español", "日本語", …);
+                        // the active one gets a leading check.
+                        // Click sets `settings.language` +
+                        // `rust_i18n::set_locale`, saves, and
+                        // returns to the main view. Next render
+                        // picks up the new locale on every t!()
+                        // lookup — no relaunch.
+                        let entity_for_back = entity.clone();
+                        let active_code = language_code.clone();
+                        let mut col = div()
+                            .flex()
+                            .flex_col()
+                            .gap_2()
+                            .p_3()
+                            .w(panel_width)
+                            .child(back_header(
+                                "settings-language-back",
+                                &t!("settings.section.language"),
+                                muted,
+                                entity_for_back,
+                            ));
+                        let mut rows = div()
+                            .flex()
+                            .flex_col()
+                            .pt_2()
+                            .border_t_1()
+                            .border_color(border);
+                        for (code, name) in crate::i18n::SUPPORTED.iter().copied() {
+                            let entity_for_pick = entity.clone();
+                            let selected = active_code == code;
+                            rows = rows.child(
+                                div()
+                                    .id(SharedString::from(format!(
+                                        "settings-language-pick-{code}"
+                                    )))
+                                    .cursor_pointer()
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
+                                    .p_2()
+                                    .hover(|this| this.bg(cx.theme().muted))
+                                    .child(div().text_sm().child(name))
+                                    .child(if selected {
+                                        Icon::new(IconName::Check)
+                                            .text_color(cx.theme().success)
+                                            .into_any_element()
+                                    } else {
+                                        div().w(px(16.0)).h(px(16.0)).into_any_element()
+                                    })
+                                    .on_click(move |_, _window, cx| {
+                                        entity_for_pick.update(cx, |this, cx| {
+                                            this.settings.language = Some(code.to_string());
+                                            rust_i18n::set_locale(code);
+                                            if let Err(e) = this.settings.save() {
+                                                log::warn!("settings save failed: {e}");
+                                            }
+                                            this.settings_view = SettingsView::Main;
+                                            cx.notify();
+                                        });
+                                    }),
+                            );
+                        }
+                        col = col.child(rows);
+                        col.into_any_element()
+                    }
+                    SettingsView::Main => div()
                         .flex()
                         .flex_col()
                         .gap_3()
                         .p_3()
                         .w(panel_width)
+                        .child(language_row)
                         .child(capture_section)
                         .child(logging_section)
                         .child(about_row)
                         .child(folders_row)
-                        .into_any_element()
+                        .into_any_element(),
                 }
             })
             .into_any_element()
@@ -2054,10 +2207,10 @@ impl AppView {
                 .gap_1()
                 .child(
                     Button::new("update-pill-open")
-                        .label(format!("Update v{} available", info.version))
+                        .label(t!("update.available", version = &info.version).into_owned())
                         .ghost()
                         .small()
-                        .tooltip("Click to view this release on GitHub.")
+                        .tooltip(t!("update.tooltip").into_owned())
                         .on_click(move |_, _window, cx| {
                             cx.open_url(&url);
                         }),
@@ -2090,7 +2243,7 @@ impl AppView {
     fn render_result_row(
         &mut self,
         key: ResultKey,
-        label: &'static str,
+        label: String,
         raw: String,
         cx: &mut Context<Self>,
     ) -> gpui::AnyElement {
@@ -2100,9 +2253,12 @@ impl AppView {
         let absent = raw.is_empty() || raw == "N/A";
         let copied = self.copied_key == Some(key);
         // ElementId is constructable from `(&'static str, u64)` —
-        // hash the label pointer into a u64 so each row gets a
-        // unique id without allocating a SharedString per render.
-        let row_id = label.as_ptr() as u64;
+        // hash the ResultKey's stable static string pointer into
+        // a u64 so each row gets a unique id without allocating
+        // a SharedString per render. Label is now dynamic (t!()
+        // output) so we can't use its pointer; key.0 stays
+        // 'static across locale switches.
+        let row_id = key.0.as_ptr() as u64;
 
         // The right-hand cell. For long values (Switch Model on the
         // SG350 advertises ~80 chars) we truncate with an ellipsis
@@ -2118,7 +2274,7 @@ impl AppView {
             div()
                 .italic()
                 .text_color(muted)
-                .child("Not advertised")
+                .child(t!("result.not_advertised").into_owned())
                 .into_any_element()
         } else {
             let copy_payload = raw.clone();
@@ -2266,15 +2422,15 @@ fn protocol_opts() -> Vec<Opt> {
 fn format_ago(captured_at_epoch_secs: u64) -> String {
     let secs = now_epoch_secs().saturating_sub(captured_at_epoch_secs);
     if secs < 5 {
-        "just now".to_string()
+        t!("format.just_now").into_owned()
     } else if secs < 60 {
-        format!("{secs}s ago")
+        t!("format.seconds_ago", n = secs).into_owned()
     } else if secs < 3600 {
-        format!("{}m ago", secs / 60)
+        t!("format.minutes_ago", n = secs / 60).into_owned()
     } else if secs < 86_400 {
-        format!("{}h ago", secs / 3600)
+        t!("format.hours_ago", n = secs / 3600).into_owned()
     } else {
-        format!("{}d ago", secs / 86_400)
+        t!("format.days_ago", n = secs / 86_400).into_owned()
     }
 }
 
@@ -2292,12 +2448,17 @@ fn now_epoch_secs() -> u64 {
 
 fn log_level_label(
     id: &'static str,
-    label: &'static str,
-    description: &'static str,
+    label: impl Into<SharedString>,
+    description: impl Into<SharedString>,
 ) -> gpui::Stateful<gpui::Div> {
+    let label = label.into();
+    let description = description.into();
     div().id(id).child(label).tooltip(move |window, cx| -> AnyView {
-        Tooltip::element(move |_, _| div().w(px(220.0)).text_sm().child(description))
-            .build(window, cx)
+        let description = description.clone();
+        Tooltip::element(move |_, _| {
+            div().w(px(220.0)).text_sm().child(description.clone())
+        })
+        .build(window, cx)
     })
 }
 
@@ -2308,8 +2469,8 @@ fn log_level_label(
 /// staying with plain xs muted keeps the popover legible
 /// against gpui-component's default theme without bringing
 /// in a custom font weight.
-fn settings_section_header(label: &'static str, muted: Hsla) -> gpui::Div {
-    div().text_xs().text_color(muted).child(label)
+fn settings_section_header(label: impl Into<SharedString>, muted: Hsla) -> gpui::Div {
+    div().text_xs().text_color(muted).child(label.into())
 }
 
 /// Leading icon + label for a settings row that doesn't have
@@ -2317,13 +2478,17 @@ fn settings_section_header(label: &'static str, muted: Hsla) -> gpui::Div {
 /// slider's header line, which sits above a full-width
 /// Slider. Icon is rendered in the muted-tone since the
 /// label colour drives the row's hierarchy, not the icon.
-fn settings_row_header(icon: IconName, label: &'static str, muted: Hsla) -> gpui::Div {
+fn settings_row_header(
+    icon: IconName,
+    label: impl Into<SharedString>,
+    muted: Hsla,
+) -> gpui::Div {
     div()
         .flex()
         .items_center()
         .gap_2()
         .child(Icon::new(icon).text_color(muted))
-        .child(div().text_sm().child(label))
+        .child(div().text_sm().child(label.into()))
 }
 
 /// Standard "icon + label on the left, Switch on the right"
@@ -2334,7 +2499,7 @@ fn settings_row_header(icon: IconName, label: &'static str, muted: Hsla) -> gpui
 fn settings_switch_row(
     id: &'static str,
     icon: IconName,
-    label: &'static str,
+    label: impl Into<SharedString>,
     checked: bool,
     muted: Hsla,
     on_click: impl Fn(bool, &mut App) + 'static,
@@ -2352,6 +2517,34 @@ fn settings_switch_row(
         )
 }
 
+/// "← Back" header that sits at the top of each settings sub-
+/// page (About, Language). Clicking it sets `settings_view`
+/// back to `Main` via the captured AppView entity. The drill-
+/// down pattern matches macOS System Settings panels.
+fn back_header(
+    id: &'static str,
+    label: &str,
+    muted: Hsla,
+    entity: Entity<AppView>,
+) -> gpui::Stateful<gpui::Div> {
+    let owned: SharedString = label.to_string().into();
+    div()
+        .id(id)
+        .cursor_pointer()
+        .flex()
+        .items_center()
+        .gap_2()
+        .pb_1()
+        .child(Icon::new(IconName::ChevronLeft).text_color(muted))
+        .child(div().text_sm().child(owned))
+        .on_click(move |_, _window, cx| {
+            entity.update(cx, |this, cx| {
+                this.settings_view = SettingsView::Main;
+                cx.notify();
+            });
+        })
+}
+
 /// One row in the settings-popover "About" section. Leading
 /// icon, label, then a value-or-control column flush right.
 /// macOS System-Settings convention: full-width
@@ -2361,7 +2554,7 @@ fn settings_switch_row(
 /// label (version, status) or a `Button` (link).
 fn about_row_with_icon(
     icon: IconName,
-    label: &'static str,
+    label: impl Into<SharedString>,
     value: gpui::AnyElement,
     muted: Hsla,
 ) -> gpui::Div {
@@ -2381,32 +2574,32 @@ fn about_row_with_icon(
 /// users get the generic "Capture access" (no single named
 /// component to point at — it's `setcap` on the binary, set by
 /// the .deb / .rpm postinstall).
-fn privilege_label_for(status: &privilege::PrivilegeStatus) -> (&'static str, &'static str) {
+fn privilege_label_for(status: &privilege::PrivilegeStatus) -> (String, String) {
     if cfg!(target_os = "macos") {
         (
-            "BPF helper",
+            t!("about.bpf_helper").into_owned(),
             if status.helper_installed {
-                "Installed"
+                t!("about.installed").into_owned()
             } else {
-                "Not installed"
+                t!("about.not_installed").into_owned()
             },
         )
     } else if cfg!(target_os = "windows") {
         (
-            "Npcap",
+            t!("about.npcap").into_owned(),
             if status.npcap_installed {
-                "Installed"
+                t!("about.installed").into_owned()
             } else {
-                "Not installed"
+                t!("about.not_installed").into_owned()
             },
         )
     } else {
         (
-            "Capture access",
+            t!("about.capture_access").into_owned(),
             if status.has_access {
-                "Available"
+                t!("about.available").into_owned()
             } else {
-                "Unavailable"
+                t!("about.unavailable").into_owned()
             },
         )
     }
@@ -2477,9 +2670,9 @@ pub fn run() {
                 // gpui derives the keystroke shown next to the
                 // menu label from the bound keybinding above —
                 // we don't pass the keystroke string here.
-                MenuItem::action("Start/Stop Capture", StartOrStop),
+                MenuItem::action(t!("menu.start_or_stop").into_owned(), StartOrStop),
                 MenuItem::separator(),
-                MenuItem::action("Quit PortFinder", Quit),
+                MenuItem::action(t!("menu.quit").into_owned(), Quit),
             ],
             disabled: false,
         }]);

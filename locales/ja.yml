@@ -1,0 +1,126 @@
+_version: 1
+
+# Japanese (日本語). Translations cover the high-visibility UI
+# surface; less-visible strings fall back to en.yml via rust-i18n.
+#
+# NOTE: gpui's default font may not include CJK glyphs — kanji /
+# hiragana / katakana may render as tofu boxes until a CJK-capable
+# font is configured. Tested first on macOS where the system font
+# fallback typically resolves CJK; Linux / Windows may need a
+# `fonts.system_ui` override.
+
+app:
+  title: PortFinder
+
+status:
+  ready: 準備完了
+  capturing: "%{protocol} を取得中…"
+  complete: 完了
+  stopping: "停止中…"
+  stopped: 停止しました
+  error: エラー
+  installing_helper: "ヘルパーをインストール中…"
+  bpf_helper_installed: BPFヘルパーがインストールされました
+  restored_from_history: "履歴から復元 · %{iface} 上の %{protocol} · %{ago}"
+
+controls:
+  interface_label: インターフェース
+  protocol_label: プロトコル
+  only_with_ips: IPアドレスを持つインターフェースのみ表示
+  sniff_all: すべてのインターフェースをキャプチャ
+  refresh_interfaces_tooltip: インターフェース一覧を更新
+
+button:
+  start: 開始
+  stop: 停止
+  start_tooltip: キャプチャを開始
+  stop_tooltip: キャプチャを停止
+  copy_as_json: JSONとしてコピー
+  copy_as_json_tooltip: "キャプチャ結果全体をJSONとしてコピー (CLIの--json出力と同一)。"
+  copied: コピーしました
+  download_npcap: Npcapをダウンロード
+  download_npcap_tooltip: インストーラーをダウンロードするためnpcap.comを開きます。
+  install_bpf_helper: BPFヘルパーをインストール
+  install_bpf_helper_installing: "インストール中…"
+  install_bpf_helper_tooltip: 一度だけのインストール。sudoなしでキャプチャできます。
+  settings_folder: 設定フォルダ
+  log_folder: ログフォルダ
+
+result:
+  empty_placeholder: キャプチャを実行してスイッチ情報を表示します。
+  not_advertised: 通知なし
+  row:
+    switch_name: スイッチ名
+    switch_ip: スイッチIP
+    switch_port: スイッチポート
+    vlan: VLAN
+    voice_vlan: 音声VLAN
+    mtu: MTU
+    switch_model: スイッチモデル
+
+history:
+  button: "履歴 (%{count})"
+  button_tooltip: 最近のキャプチャを表示 (このセッション)。
+  header: "最近のキャプチャ (%{count})"
+  no_switch_name: "(スイッチ名なし)"
+  ip_unknown: "—"
+  iface_all: すべて
+  row_tooltip: "クリックで復元 · 右クリックでJSONとしてコピー"
+
+settings:
+  section:
+    language: 言語
+    capture: キャプチャ
+    logging: ログ
+  language_row: 表示言語
+  save_capture_history: キャプチャ履歴を保存
+  log_level: ログレベル
+  write_debug_log: デバッグログを書き込む
+  about_row: PortFinderについて
+  about_back: PortFinderについて
+
+log_level:
+  normal: 標準
+  verbose: 詳細
+  trace: トレース
+
+about:
+  version: バージョン
+  repository: リポジトリ
+  license: ライセンス
+  bpf_helper: BPFヘルパー
+  npcap: Npcap
+  capture_access: キャプチャアクセス
+  installed: インストール済み
+  not_installed: 未インストール
+  available: 利用可能
+  unavailable: 利用不可
+
+update:
+  available: "アップデート v%{version} が利用可能"
+  tooltip: このリリースをGitHubで見るにはクリックします。
+
+privilege:
+  needs_capture_privilege: PortFinderがパケットをキャプチャするには昇格された権限が必要です。
+  npcap_needed: PortFinderがWindowsでパケットをキャプチャするにはNpcapが必要です。
+  npcap_relaunch: "インストール後、PortFinderを再起動してください。"
+
+format:
+  just_now: たった今
+  seconds_ago: "%{n}秒前"
+  minutes_ago: "%{n}分前"
+  hours_ago: "%{n}時間前"
+  days_ago: "%{n}日前"
+
+menu:
+  quit: PortFinderを終了
+  start_or_stop: キャプチャの開始/停止
+
+language:
+  en: English
+  es: Español
+  fr: Français
+  de: Deutsch
+  it: Italiano
+  pt: Português
+  ja: 日本語

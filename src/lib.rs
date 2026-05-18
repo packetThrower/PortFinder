@@ -45,9 +45,17 @@
 pub mod app_view;
 pub mod capture;
 pub mod cli;
+pub mod i18n;
 pub mod privilege;
 pub mod settings;
 pub mod updater;
+
+// Compile every YAML file under `locales/` into the binary and
+// expose the `t!()` macro globally. `fallback = "en"` makes
+// missing-key lookups in non-English locales return the English
+// string rather than `[locale.key.missing]`. See `i18n.rs` for
+// the startup `init()` that picks the active locale.
+rust_i18n::i18n!("locales", fallback = "en");
 
 use serde::{Deserialize, Serialize};
 
@@ -141,6 +149,13 @@ pub fn init_logging() {
     if std::env::var("RUST_LOG").is_err() {
         log::set_max_level(settings.log_level.to_max_level());
     }
+
+    // Resolve and install the active UI locale. Picks the
+    // user's `settings.language` override first, then the OS
+    // locale, then English. The CLI doesn't have a locale
+    // picker, so on CLI invocations this still applies — the
+    // few user-facing CLI strings honour the same setting.
+    i18n::init(settings.language.as_deref());
 
     if settings.debug_log {
         settings::set_logging_enabled(true);

@@ -56,6 +56,16 @@ pub struct Settings {
     /// file (in-memory stays for the rest of the session).
     #[serde(default)]
     pub persist_history: bool,
+
+    /// UI locale override. `None` (default) means "follow the
+    /// OS locale" — `i18n::init` reads the system language
+    /// via `sys-locale`. A `Some("es")` here pins the UI to
+    /// Spanish regardless of the OS, set from the settings
+    /// popover's Language picker. Code matches one of
+    /// `i18n::SUPPORTED`; unknown codes are ignored at init
+    /// time so a stale value can't break the boot path.
+    #[serde(default)]
+    pub language: Option<String>,
 }
 
 /// User-facing logging verbosity. Three options expose
