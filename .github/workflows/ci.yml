@@ -40,13 +40,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS — arm64 (Apple Silicon) + amd64 (Intel). macos-26
-          # is the Apple-Silicon-only runner; macos-15-intel replaced
-          # the retired macos-13 image.
+          # macOS — Apple Silicon only. The matching `build-macos`
+          # release job cross-compiles x86_64-apple-darwin from
+          # this runner (see release.yml), so we don't need the
+          # slow / scarce `macos-15-intel` runner in CI to verify
+          # the Intel build — clippy + test on arm64 plus the
+          # release-time cross-compile cover what matters.
           - runner: macos-26
             arch: arm64
-          - runner: macos-15-intel
-            arch: amd64
           # Windows — x64 + arm64. windows-11-arm landed in 2025,
           # native ARM runner, no Prism cross-compile dance.
           - runner: windows-latest

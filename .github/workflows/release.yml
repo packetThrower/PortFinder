@@ -24,34 +24,39 @@ jobs:
   ci:
     uses: ./.github/workflows/ci.yml
 
+  # Single macOS build job that cross-compiles BOTH arm64 and
+  # x86_64 binaries on the Apple Silicon runner. The retired
+  # `macos-15-intel` entry took 20+ minutes end-to-end (small
+  # runner pool + slower CPU); cross-compiling x86_64 on macos-26
+  # finishes in ~5-8 minutes on top of the native arm64 build.
+  # gpui's native deps (ring, psm, tree-sitter, stacker) all
+  # cross-compile cleanly between the two Apple targets — they
+  # use the standard cc-rs / cmake-rs build scripts that pick up
+  # the cross target from `CARGO_BUILD_TARGET`.
   build-macos:
     needs: [ci]
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-26
-            arch: arm64
-            target: aarch64-apple-darwin
-          - runner: macos-15-intel
-            arch: amd64
-            target: x86_64-apple-darwin
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
-      - name: Setup Rust (stable)
+      # Install both targets so we can build both arches from
+      # this one Apple Silicon runner. aarch64 is the host so
+      # rustup would have it implicitly, but listing it for
+      # symmetry / clarity.
+      - name: Setup Rust (stable + both Apple targets)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           toolchain: stable
-          targets: ${{ matrix.target }}
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       # `shared-key: release` makes successive release-tag runs
       # share the release-mode `target/` cache across tags.
+      # Cross-compile produces separate `target/<triple>/release`
+      # subdirs so the cache covers both arches in one entry.
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
@@ -86,43 +91,61 @@ jobs:
           plutil -replace CFBundleVersion -string "$VERSION" resources/Info.plist
           echo "Building version: $VERSION"
 
-      # `-f app -f dmg` produces both bundle types in one cargo-
-      # packager invocation. `before-packaging-command` in
-      # Cargo.toml runs `cargo build --release` once and both
-      # formats reuse the resulting binary.
-      - name: Build .app + .dmg
-        run: cargo packager --release -f app -f dmg
+      # Two cargo-packager invocations, one per target arch.
+      # `CARGO_BUILD_TARGET` is the env-var form of cargo's
+      # `--target` flag; setting it makes the inner
+      # `cargo build --release` from `before-packaging-command`
+      # compile for the cross target, and the `--target` flag on
+      # cargo-packager itself points it at the matching
+      # `target/<triple>/release/` for the resulting binary.
+      - name: Build arm64 .app + .dmg
+        env:
+          CARGO_BUILD_TARGET: aarch64-apple-darwin
+        run: cargo packager --release -f app -f dmg --target aarch64-apple-darwin
+
+      - name: Build amd64 .app + .dmg (cross-compile)
+        env:
+          CARGO_BUILD_TARGET: x86_64-apple-darwin
+        run: cargo packager --release -f app -f dmg --target x86_64-apple-darwin
 
       - name: Build BPF helper .pkg
+        # BPF helper is arch-independent (it's a LaunchDaemon
+        # plist + shell script); built once and shipped alongside
+        # both .dmg files.
         run: ./packaging/macos/build-pkg.sh
 
       - name: Stage artifacts
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p release-artifacts
-          BUNDLE="target/release"
 
-          # cargo-packager's .dmg naming uses its own arch labels
-          # (`aarch64` for arm64, `x64` for amd64). Glob whatever it
-          # produced and rename to our convention.
-          DMG=$(find "${BUNDLE}" -maxdepth 1 -name 'PortFinder_*.dmg' | head -1)
-          if [ -z "$DMG" ]; then
-            echo "no .dmg produced by cargo-packager"
-            ls -la "$BUNDLE"
-            exit 1
-          fi
-          mv "$DMG" "release-artifacts/PortFinder_${VERSION}_${{ matrix.arch }}.dmg"
+          # Loop both arches, renaming cargo-packager's outputs
+          # (which use `aarch64` / `x64` arch labels in their
+          # filenames) to our `arm64` / `amd64` convention.
+          for pair in "aarch64-apple-darwin:arm64" "x86_64-apple-darwin:amd64"; do
+            triple="${pair%%:*}"
+            arch="${pair##*:}"
+            bundle="target/${triple}/release"
 
-          # Drag-droppable .app zip for users who'd rather skip the
-          # .dmg mount-and-drag. `ditto -c -k --keepParent` preserves
-          # resource forks and extended attributes (matters once
-          # signing lands; the .app's xattrs need to survive the
-          # round trip through the archive).
-          ditto -c -k --keepParent \
-            "${BUNDLE}/PortFinder.app" \
-            "release-artifacts/PortFinder-macOS-${{ matrix.arch }}-${VERSION}.zip"
+            dmg=$(find "${bundle}" -maxdepth 1 -name 'PortFinder_*.dmg' | head -1)
+            if [ -z "$dmg" ]; then
+              echo "no .dmg produced for ${arch} at ${bundle}"
+              ls -la "${bundle}"
+              exit 1
+            fi
+            mv "$dmg" "release-artifacts/PortFinder_${VERSION}_${arch}.dmg"
 
-          # BPF helper .pkg — copied from build-pkg.sh's output.
+            # Drag-droppable .app zip for users who'd rather skip the
+            # .dmg mount-and-drag. `ditto -c -k --keepParent` preserves
+            # resource forks and extended attributes (matters once
+            # signing lands; the .app's xattrs need to survive the
+            # round trip through the archive).
+            ditto -c -k --keepParent \
+              "${bundle}/PortFinder.app" \
+              "release-artifacts/PortFinder-macOS-${arch}-${VERSION}.zip"
+          done
+
+          # BPF helper .pkg — copied once (arch-independent).
           if ls dist/PortFinder-BPF-*.pkg >/dev/null 2>&1; then
             cp dist/PortFinder-BPF-*.pkg release-artifacts/
           fi
@@ -133,7 +156,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: macos-${{ matrix.arch }}-package
+          name: macos-package
           path: release-artifacts/*
 
   build-windows:
@@ -233,8 +256,19 @@ jobs:
         shell: pwsh
         run: |
           $config = Get-Content packaging/windows/Packager.json -Raw
-          $wix_flag = if (!"${{ github.ref_name }}".Contains("-") -and "${{ matrix.arch }}" -eq "amd64") { "-f wix" } else { "" }
-          cargo packager --release -f nsis $wix_flag.Split() --config $config --out-dir target/release --binaries-dir target/release
+          # Stable amd64 also gets a WiX/MSI alongside NSIS. Two
+          # separate cargo packager branches because PowerShell's
+          # `.Split()` on an empty string returns `[""]` (one
+          # element, not an empty array), and splatting that as
+          # CLI args feeds cargo packager an empty string it
+          # parses as an unrecognised subcommand. Branching is
+          # less clever than splat-an-array but doesn't trip on
+          # that gotcha.
+          if (!"${{ github.ref_name }}".Contains("-") -and "${{ matrix.arch }}" -eq "amd64") {
+            cargo packager --release -f nsis -f wix --config $config --out-dir target/release --binaries-dir target/release
+          } else {
+            cargo packager --release -f nsis --config $config --out-dir target/release --binaries-dir target/release
+          }
 
       - name: Stage artifacts
         shell: pwsh
