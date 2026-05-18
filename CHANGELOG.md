@@ -14,6 +14,26 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-05-18
+
+### Added
+- **Opt-in debug logger** with in-app toggle. New title-bar
+  hamburger menu opens a popover with a "Write debug log"
+  switch + an "Open log folder" button. Default is OFF — a
+  fresh install no longer drops `~/Desktop/portfinder-debug.log`
+  on launch (a leftover from alpha testing). When enabled,
+  logs live at the platform-conventional location:
+  `~/Library/Logs/PortFinder/portfinder.log` on macOS
+  (Console.app indexes it), `$XDG_STATE_HOME/portfinder/` on
+  Linux, `%LOCALAPPDATA%\PortFinder\Logs\` on Windows. Toggle
+  is live — no restart needed.
+
+### Removed
+- **`~/Desktop/portfinder-debug.log` is no longer written.**
+  Existing files from alpha-era installs stay where they are
+  (the new build just doesn't touch them); delete manually if
+  you don't want them around.
+
 ## [4.0.0] - 2026-05-17
 
 Graduates the gpui rewrite to stable. The major architectural
