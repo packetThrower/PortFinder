@@ -222,6 +222,44 @@ jobs:
         with:
           tool: cargo-packager
 
+      # cargo-wix replaces cargo-packager's `-f wix` path because
+      # cargo-packager 0.11 bundles WiX 3.11 (2017) — whose
+      # candle.exe predates `-arch arm64` (added in WiX 3.14) —
+      # so the arm64 MSI was impossible there. cargo-wix uses
+      # the system-installed WiX (provisioned below as 3.14 via
+      # chocolatey), which clears that limit. Stable tags only:
+      # MSI ProductVersion rejects alphanumeric pre-release
+      # identifiers like `4.1.0-beta.1` — NSIS has no such
+      # limit, so pre-releases still ship NSIS.
+      - name: Install cargo-wix
+        if: ${{ !contains(github.ref_name, '-') }}
+        uses: taiki-e/install-action@7be9fd86bd1707236395105d6e9329dd1511a7e1 # v2.79.0
+        with:
+          tool: cargo-wix
+
+      # WiX 3.14 (current pre-GA build under chocolatey's `--pre`
+      # gate) is the minimum that carries `-arch arm64`. choco's
+      # package sets the `WIX` env var and adds `<install>\bin` to
+      # the system PATH on install, but the current process's
+      # environment doesn't pick up those changes until we re-read
+      # them — hence the path-write to GITHUB_PATH so the cargo-
+      # wix step below can find candle.exe / light.exe without a
+      # full session reload.
+      - name: Install WiX Toolset 3.14
+        if: ${{ !contains(github.ref_name, '-') }}
+        shell: pwsh
+        run: |
+          choco install wixtoolset --pre -y --no-progress
+          $wixDir = (Get-ChildItem 'C:\Program Files (x86)\WiX Toolset *' -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          if ($wixDir) {
+            "$wixDir\bin" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+            "WIX=$wixDir\" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+            Write-Host "WiX installed at $wixDir"
+          } else {
+            Write-Error "WiX install directory not found after choco install"
+            exit 1
+          }
+
       - name: Patch version from tag
         shell: pwsh
         run: |
@@ -232,18 +270,12 @@ jobs:
 
       # Windows-only: build the console-subsystem `portfinder-cli`
       # sibling alongside the GUI `PortFinder.exe`, then package
-      # both into the NSIS / WiX installers. macOS / Linux stay
-      # single-binary because `required-features = ["windows-cli"]`
-      # on the cli `[[bin]]` in Cargo.toml keeps them from
-      # compiling it. See `src/lib.rs` for the dual-binary
-      # rationale and `packaging/windows/README.md` for the
-      # config-override mechanics.
-      #
-      # NSIS ships on every Windows build. WiX/MSI is gated to
-      # stable amd64 only — see release-pipeline notes in Baudrun
-      # for why (cargo-packager 0.11 bundles WiX 3.11 which
-      # predates `-arch arm64`, and WiX rejects alphanumeric
-      # pre-release identifiers).
+      # both into the NSIS installer. macOS / Linux stay single-
+      # binary because `required-features = ["windows-cli"]` on
+      # the cli `[[bin]]` in Cargo.toml keeps them from compiling
+      # it. See `src/lib.rs` for the dual-binary rationale and
+      # `packaging/windows/README.md` for the config-override
+      # mechanics.
       #
       # The `--config` override is required because cargo-packager's
       # `binaries` field is global — no per-format filter — and
@@ -252,16 +284,15 @@ jobs:
       # `Get-Content -Raw` inlines the JSON because cargo-packager
       # 0.11.8 has a bug where `--config <file_path>` errors with
       # "Not a directory" — only raw JSON inline works.
-      - name: Build .exe (NSIS) + .msi (stable amd64 only)
+      #
+      # cargo-packager's `beforePackagingCommand` (set in
+      # Packager.json to `cargo build --release --features
+      # windows-cli`) is what actually compiles both binaries
+      # into `target/release/`. The cargo-wix step below reuses
+      # those binaries via `--no-build`.
+      - name: Build .exe (NSIS via cargo-packager)
         shell: pwsh
         run: |
-          # Inject the version from the tag into the packager
-          # JSON. cargo-packager normally auto-fills `version`
-          # from the cargo workspace's metadata, but `--config`
-          # with raw JSON skips that path entirely — without the
-          # explicit `version` field cargo-packager bails with
-          # `empty string, expected a semver version`. Parse,
-          # add the field, re-serialise.
           $version = "${{ github.ref_name }}" -replace '^v', ''
           $config_obj = Get-Content packaging/windows/Packager.json -Raw | ConvertFrom-Json
           $config_obj | Add-Member -NotePropertyName version -NotePropertyValue $version -Force
@@ -280,19 +311,26 @@ jobs:
             $env:CARGO_PROFILE_RELEASE_LTO = "false"
           }
 
-          # Stable amd64 also gets a WiX/MSI alongside NSIS. Two
-          # separate cargo packager branches because PowerShell's
-          # `.Split()` on an empty string returns `[""]` (one
-          # element, not an empty array), and splatting that as
-          # CLI args feeds cargo packager an empty string it
-          # parses as an unrecognised subcommand. Branching is
-          # less clever than splat-an-array but doesn't trip on
-          # that gotcha.
-          if (!"${{ github.ref_name }}".Contains("-") -and "${{ matrix.arch }}" -eq "amd64") {
-            cargo packager --release -f nsis -f wix --config $config --out-dir target/release --binaries-dir target/release
-          } else {
-            cargo packager --release -f nsis --config $config --out-dir target/release --binaries-dir target/release
-          }
+          cargo packager --release -f nsis --config $config --out-dir target/release --binaries-dir target/release
+
+      # `--no-build` reuses the just-built binaries at
+      # `target/release/PortFinder.exe` + `portfinder-cli.exe`
+      # instead of compiling a second time. `--nocapture`
+      # streams candle/light output so a WiX failure surfaces
+      # in the GH Actions log instead of being buried in
+      # cargo-wix's default-quiet wrapper.
+      #
+      # No `--target` on either cargo packager or cargo wix:
+      # the runner is already native for its arch (windows-
+      # latest = x64, windows-11-arm = arm64), so the default
+      # host target matches what we want. Passing --target
+      # would split paths between `target/<triple>/release/`
+      # and `target/release/`, confusing both tools'
+      # binary-discovery.
+      - name: Build .msi (cargo-wix, stable tags only)
+        if: ${{ !contains(github.ref_name, '-') }}
+        shell: cmd
+        run: cargo wix --no-build --nocapture
 
       - name: Stage artifacts
         shell: pwsh
@@ -302,15 +340,34 @@ jobs:
           $bundle = "target/release"
           New-Item -ItemType Directory -Force release-artifacts | Out-Null
 
+          Write-Host "--- contents of $bundle ---"
+          Get-ChildItem -Path $bundle -File -Recurse | ForEach-Object { $_.FullName }
+
+          # NSIS .exe ships from cargo-packager's output dir.
           Get-ChildItem "$bundle/*-setup.exe" -ErrorAction SilentlyContinue |
             Copy-Item -Destination release-artifacts/
-          Get-ChildItem "$bundle/*.msi" -ErrorAction SilentlyContinue |
-            Copy-Item -Destination release-artifacts/
+
+          # MSI ships from cargo-wix's output dir (`target/wix/`).
+          # cargo-wix uses kebab-case `portfinder-<version>-<arch>.msi`
+          # by default; rename to the existing
+          # `PortFinder_<version>_<arch>_en-US.msi` convention so the
+          # winget manifest URLs stay stable across the cargo-
+          # packager → cargo-wix migration.
+          $wixOut = "target/wix"
+          if (Test-Path $wixOut) {
+            Write-Host "--- contents of $wixOut ---"
+            Get-ChildItem -Path $wixOut -File | ForEach-Object { $_.FullName }
+            Get-ChildItem "$wixOut/*.msi" -ErrorAction SilentlyContinue | ForEach-Object {
+              $dest = "release-artifacts/PortFinder_${version}_${arch}_en-US.msi"
+              Copy-Item $_.FullName -Destination $dest
+              Write-Host "renamed $($_.Name) -> $(Split-Path -Leaf $dest)"
+            }
+          }
 
           # Portable .zip of both binaries for users who don't
           # want an installer. portfinder-cli.exe is the
           # console-subsystem CLI sibling (built via the
-          # `windows-cli` feature in the previous step);
+          # `windows-cli` feature in the cargo-packager step);
           # PortFinder.exe is the GUI entry. See `src/lib.rs`
           # for why two exist.
           Compress-Archive `

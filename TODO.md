@@ -28,9 +28,9 @@ All landed in 4.1.0 (see CHANGELOG).
 - [ ] **Refresh screenshots.** Docs site + README still reference
   3.x-era PNGs. Take fresh ones from 4.0.x on each platform
   (macos.png, windows.png, linux.png, cli.png).
-- [ ] **i18n.** 3.x had Spanish / French / German translations;
-  the 4.0 rewrite dropped them. Bring them back as Rust string
-  tables if there's contributor bandwidth.
+- [x] **i18n** — landed in 4.1.0. Seven shipped locales (en/de/
+  es/fr/it/pt/ja) via `rust-i18n`, OS-locale detection at
+  startup, in-app picker that switches live.
 
 ## CI / build
 

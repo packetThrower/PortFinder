@@ -14,6 +14,30 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [4.1.1] - 2026-05-19
+
+### Changed
+- **Windows MSI is now built by cargo-wix + system WiX 3.14**
+  instead of cargo-packager's bundled WiX 3.11. The bundled
+  version predated `candle.exe -arch arm64` (added in WiX 3.14),
+  so the arm64 fallback in 4.1.0 was NSIS-only — and the
+  half-machine / half-user registry shape of that NSIS install
+  is what tripped winget's `Validation-Executable-Error` on PR
+  microsoft/winget-pkgs#376193. The new setup produces a real
+  `.msi` on both x64 and arm64. The Windows release workflow
+  picks up `cargo-wix` via taiki-e/install-action and WiX 3.14
+  via `choco install wixtoolset --pre`.
+- **MSI now sets `ARPINSTALLLOCATION` explicitly** to
+  `[APPLICATIONFOLDER]`, written to
+  `HKLM\…\Uninstall\<ProductCode>\InstallLocation`. winget's
+  executable-discovery step reads this value to find
+  `PortFinder.exe` post-install — making it explicit avoids the
+  validator's heuristic fallback ever missing the binary.
+- **Apps & Features icon for the MSI** is now PortFinder's
+  multi-resolution `icon.ico` instead of Windows Installer's
+  generic blue MSI glyph. Matches the icon on `PortFinder.exe`
+  in Explorer / taskbar / Alt-Tab.
+
 ## [4.1.0] - 2026-05-18
 
 Consolidates the work shipped through `4.1.0-beta.1` and

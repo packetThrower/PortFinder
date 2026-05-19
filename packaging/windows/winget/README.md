@@ -9,11 +9,11 @@ a PR submitted upstream against `microsoft/winget-pkgs`. The
 templates exist so the maintainer of that PR (us) doesn't have
 to hand-write the YAML each release.
 
-**Submission unlocks on stable 4.1.0**, because winget needs the
-WiX `.msi` artifact for amd64 and `.github/workflows/release.yml`
-only emits one on non-pre-release tags (see the "Build .exe
-(NSIS) + .msi (stable amd64 only)" step). Beta tags ship NSIS
-only.
+**Stable tags only.** winget needs a WiX `.msi` for both arches,
+and `.github/workflows/release.yml` only emits MSIs on non-pre-
+release tags (see the "Build .msi (cargo-wix, stable tags only)"
+step). MSI ProductVersion rejects alphanumeric pre-release
+identifiers, so betas ship NSIS-only.
 
 ## Files
 
@@ -21,7 +21,8 @@ only.
 |---|---|
 | `packetThrower.PortFinder.locale.en-US.yaml` | Default-locale manifest. Static across versions — copy as-is into each per-version dir, bump `PackageVersion`. |
 | `packetThrower.PortFinder.yaml.template` | Version manifest. Substitute `${VERSION}`. |
-| `packetThrower.PortFinder.installer.yaml.template` | Installer manifest. Substitute `${VERSION}`, `${RELEASE_DATE}`, `${SHA256_AMD64_MSI}`, `${SHA256_ARM64_NSIS}`, `${PRODUCT_CODE_AMD64}`. |
+| `packetThrower.PortFinder.installer.yaml.template` | Installer manifest. Substitute `${VERSION}`, `${RELEASE_DATE}`, `${SHA256_AMD64_MSI}`, `${SHA256_ARM64_MSI}`, `${PRODUCT_CODE_AMD64}`, `${PRODUCT_CODE_ARM64}`. |
+| `rendered/<version>/` | Archived copy of the YAMLs submitted upstream for each version. Mirrors what's at `manifests/p/packetThrower/PortFinder/<version>/` in `microsoft/winget-pkgs`. |
 
 ## The submission, manually
 
@@ -31,7 +32,7 @@ Targets the `winget-pkgs` fork's `manifests/p/packetThrower/PortFinder/<version>
 ```bash
 # From a fork of microsoft/winget-pkgs checked out locally:
 
-VERSION=4.1.0
+VERSION=4.1.1
 DATE=$(date -u +%Y-%m-%d)
 DEST="manifests/p/packetThrower/PortFinder/$VERSION"
 mkdir -p "$DEST"
@@ -41,27 +42,28 @@ cp /path/to/PortFinder/packaging/windows/winget/packetThrower.PortFinder.locale.
 sed -i "s/^PackageVersion: .*/PackageVersion: $VERSION/" "$DEST/packetThrower.PortFinder.locale.en-US.yaml"
 
 # Compute the SHA256s from the GitHub Release artifacts.
-SHA_MSI=$(curl -sL "https://github.com/packetThrower/PortFinder/releases/download/v$VERSION/PortFinder_${VERSION}_x64_en-US.msi" | sha256sum | awk '{print $1}')
-SHA_ARM64=$(curl -sL "https://github.com/packetThrower/PortFinder/releases/download/v$VERSION/PortFinder_${VERSION}_arm64-setup.exe" | sha256sum | awk '{print $1}')
+SHA_X64=$(curl -sL "https://github.com/packetThrower/PortFinder/releases/download/v$VERSION/PortFinder_${VERSION}_x64_en-US.msi" | sha256sum | awk '{print $1}')
+SHA_ARM64=$(curl -sL "https://github.com/packetThrower/PortFinder/releases/download/v$VERSION/PortFinder_${VERSION}_arm64_en-US.msi" | sha256sum | awk '{print $1}')
 
-# ProductCode extraction needs an MSI inspector. On Linux/macOS:
-#   `msiextract --version <msi>` or `lessmsi list <msi>`, or just
-#   read `<Product Id="...">` from the WiX source in the binary.
-# On Windows: `Get-AppxPackage` doesn't apply; use
-#   `Get-WmiObject Win32_Product` against an installed instance,
-#   or run `wingetcreate` and let it auto-detect (see below).
-PRODUCT_CODE='{REPLACE-WITH-MSI-PRODUCT-GUID}'
+# ProductCodes are per-build GUIDs that change each release.
+# Extract from each MSI with `msiextract --version` or `lessmsi
+# list` on Linux/macOS; on Windows use the WindowsInstaller COM
+# API. wingetcreate auto-detects if going via that path (see
+# below). The UpgradeCode is stable (defined in
+# packaging/windows/wix/main.wxs); ProductCodes are not.
+PRODUCT_CODE_X64='{REPLACE-WITH-X64-MSI-PRODUCT-GUID}'
+PRODUCT_CODE_ARM64='{REPLACE-WITH-ARM64-MSI-PRODUCT-GUID}'
 
 # Render the templates.
 VERSION="$VERSION" RELEASE_DATE="$DATE" \
-  SHA256_AMD64_MSI="$SHA_MSI" SHA256_ARM64_NSIS="$SHA_ARM64" \
-  PRODUCT_CODE_AMD64="$PRODUCT_CODE" \
+  SHA256_AMD64_MSI="$SHA_X64" SHA256_ARM64_MSI="$SHA_ARM64" \
+  PRODUCT_CODE_AMD64="$PRODUCT_CODE_X64" PRODUCT_CODE_ARM64="$PRODUCT_CODE_ARM64" \
   envsubst < /path/to/PortFinder/packaging/windows/winget/packetThrower.PortFinder.yaml.template \
   > "$DEST/packetThrower.PortFinder.yaml"
 
 VERSION="$VERSION" RELEASE_DATE="$DATE" \
-  SHA256_AMD64_MSI="$SHA_MSI" SHA256_ARM64_NSIS="$SHA_ARM64" \
-  PRODUCT_CODE_AMD64="$PRODUCT_CODE" \
+  SHA256_AMD64_MSI="$SHA_X64" SHA256_ARM64_MSI="$SHA_ARM64" \
+  PRODUCT_CODE_AMD64="$PRODUCT_CODE_X64" PRODUCT_CODE_ARM64="$PRODUCT_CODE_ARM64" \
   envsubst < /path/to/PortFinder/packaging/windows/winget/packetThrower.PortFinder.installer.yaml.template \
   > "$DEST/packetThrower.PortFinder.installer.yaml"
 
@@ -82,19 +84,20 @@ PR for us against `microsoft/winget-pkgs`.
 ```powershell
 # Windows host. winget install Microsoft.WingetCreate (one-time).
 
-$Version = "4.1.0"
-$MsiUrl  = "https://github.com/packetThrower/PortFinder/releases/download/v$Version/PortFinder_${Version}_x64_en-US.msi"
-$ArmUrl  = "https://github.com/packetThrower/PortFinder/releases/download/v$Version/PortFinder_${Version}_arm64-setup.exe"
+$Version  = "4.1.1"
+$MsiX64   = "https://github.com/packetThrower/PortFinder/releases/download/v$Version/PortFinder_${Version}_x64_en-US.msi"
+$MsiArm64 = "https://github.com/packetThrower/PortFinder/releases/download/v$Version/PortFinder_${Version}_arm64_en-US.msi"
 
 # First-time submission: scaffolds the three YAMLs interactively
-# from the .msi inspection, then prompts for the locale fields.
-wingetcreate new "$MsiUrl,$ArmUrl"
+# from the .msi inspection (auto-detects both ProductCodes), then
+# prompts for the locale fields.
+wingetcreate new "$MsiX64,$MsiArm64"
 
 # Subsequent version bumps: reuses the existing locale manifest
 # and only updates URLs + SHA256 + ProductCode.
 wingetcreate update packetThrower.PortFinder `
   --version $Version `
-  --urls "$MsiUrl,$ArmUrl" `
+  --urls "$MsiX64,$MsiArm64" `
   --submit `
   --token $env:GITHUB_TOKEN
 ```
@@ -130,7 +133,10 @@ automated flow.
   will still see SmartScreen on first run (same UX as Scoop today
   and the manual installer). Notarisation is tracked in
   `TODO.md` under "Known open items from the 4.0 cycle".
-- **NSIS arm64 has no ProductCode** because NSIS doesn't generate
-  one. winget handles this by reading the Add/Remove Programs
-  registry entry the NSIS installer writes; cargo-packager's
-  default NSIS template includes the entry.
+- **Both arches ship WiX MSI now** (since the build switched from
+  cargo-packager's bundled WiX 3.11 to cargo-wix + system WiX 3.14
+  on the Windows runners). The half-machine / half-user registry
+  shape of the prior NSIS-on-arm64 install is what tripped
+  winget's Validation-Executable-Error on PR
+  microsoft/winget-pkgs#376193; the matching shape of two MSIs
+  with explicit `Scope: machine` clears that.

@@ -1,6 +1,6 @@
 [package]
 name = "portfinder"
-version = "4.1.0"
+version = "4.1.1"
 description = "Network switch port discovery tool using CDP/LLDP/MNDP."
 authors = ["Will Lehnertz <6597817+packetThrower@users.noreply.github.com>"]
 edition = "2021"
@@ -305,3 +305,21 @@ minimum-system-version = "11.0"
 # download is "unidentified developer" (right-click → Open, or
 # `xattr -cr`), which is what the README documents.
 signing-identity = "-"
+
+# cargo-wix-driven MSI generation, replacing cargo-packager's `-f wix`
+# path. cargo-packager 0.11 hardcoded WiX 3.11 (2017), whose
+# candle.exe predates `-arch arm64` (added in WiX 3.14) — so the
+# arm64 MSI was impossible there. cargo-wix uses the system-installed
+# WiX, which the release workflow provisions as WiX 3.14 via
+# chocolatey.
+[package.metadata.wix]
+# Stable per-app. Mirrors the UpgradeCode in
+# packaging/windows/wix/main.wxs — the two must agree or cargo-wix's
+# own upgrade detection won't line up with the .msi's MajorUpgrade
+# table. Never change once an installer has shipped with it.
+upgrade-guid = "703937D7-639D-4BF6-ABB5-697986B5701B"
+# Override cargo-wix's default `wix/`-at-repo-root discovery so the
+# WiX source can live under `packaging/windows/`, alongside the
+# Linux + macOS packaging files and the winget manifest scaffold.
+# Keeps the repo's OS-grouped packaging tree consistent.
+include = ["packaging/windows/wix/main.wxs"]
