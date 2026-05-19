@@ -34,7 +34,7 @@ Installers:
     InstallerType: wix
     InstallerUrl: https://github.com/packetThrower/PortFinder/releases/download/v${VERSION}/PortFinder_${VERSION}_x64_en-US.msi
     InstallerSha256: ${SHA256_AMD64_MSI}
-    ProductCode: ${PRODUCT_CODE_AMD64}
+    ProductCode: '${PRODUCT_CODE_AMD64}'
     Scope: machine
   - Architecture: arm64
     InstallerType: nullsoft
