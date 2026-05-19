@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
 #
-# Default-locale manifest for the winget-pkgs entry. Static —
+# Default-locale manifest for the winget-pkgs entry. Static â€”
 # doesn't change between versions, so the per-version submission
 # only updates the version + installer manifests. Copy this file
 # verbatim into `manifests/p/packetThrower/PortFinder/<version>/`
@@ -25,7 +25,7 @@ Description: |-
   PortFinder identifies which switch, switchport, and VLAN your
   machine is currently plugged into by listening for the discovery
   packets the switch is already broadcasting. No agent on the
-  switch, no SNMP, no login — just a passive 30-second listen on
+  switch, no SNMP, no login â€” just a passive 30-second listen on
   the wire.
 
   Supported protocols:
