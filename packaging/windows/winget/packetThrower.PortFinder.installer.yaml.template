@@ -41,9 +41,6 @@ Installers:
     InstallerSwitches:
       Silent: /quiet /norestart
       SilentWithProgress: /passive /norestart
-    Dependencies:
-      PackageDependencies:
-        - PackageIdentifier: Microsoft.VCRedist.2015+.x64
   - Architecture: arm64
     InstallerType: wix
     InstallerUrl: https://github.com/packetThrower/PortFinder/releases/download/v${VERSION}/PortFinder_${VERSION}_arm64_en-US.msi
@@ -53,8 +50,5 @@ Installers:
     InstallerSwitches:
       Silent: /quiet /norestart
       SilentWithProgress: /passive /norestart
-    Dependencies:
-      PackageDependencies:
-        - PackageIdentifier: Microsoft.VCRedist.2015+.arm64
 ManifestType: installer
 ManifestVersion: 1.12.0
