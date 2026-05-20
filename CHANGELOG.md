@@ -14,6 +14,28 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [4.1.2] - 2026-05-19
+
+### Fixed
+- **Windows installs on machines without the Visual C++
+  Redistributable now work.** v4.1.0, v4.1.1, and every prior
+  Rust+MSVC build of PortFinder shipped binaries that dynamically
+  linked against `VCRUNTIME140.dll`, part of the Visual C++ 2015+
+  Redistributable. On a freshly-imaged Windows install — including
+  winget's automated validator sandbox — that DLL isn't present,
+  so the Windows loader bailed with `STATUS_DLL_NOT_FOUND`
+  (`0xC0000135`) before any PortFinder code could run, and the
+  user got Windows' "code execution cannot proceed because
+  VCRUNTIME140.dll was not found" loader dialog with no recovery
+  hint from us. v4.1.2 static-links the MSVC C runtime into both
+  binaries (`PortFinder.exe` and `portfinder-cli.exe`) via
+  `+crt-static` in a new `.cargo/config.toml`, so the `.msi` is
+  self-contained at the CRT layer. ~200 KB binary growth per
+  executable, no other behaviour change. Also unblocks the v4.1.0
+  winget submission ([microsoft/winget-pkgs#376193](https://github.com/microsoft/winget-pkgs/pull/376193))
+  which has been failing the validator's launch test on this
+  exact issue (a fresh submission against v4.1.2 will replace it).
+
 ## [4.1.1] - 2026-05-19
 
 ### Changed
