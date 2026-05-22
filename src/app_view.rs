@@ -392,6 +392,29 @@ pub struct AppView {
     // to `Main` on relaunch.
     settings_view: SettingsView,
 
+    // Dirty flag for the `window.resize` call in `Render::
+    // render`. Set to `true` by every mutator that touches
+    // an input to `desired_height()` (start_capture, on_
+    // capture_done, restore_from_history, the BPF install
+    // callback, the update listener, and the update-pill
+    // dismiss). Cleared by `render` after applying the
+    // resize.
+    //
+    // The earlier shape — checking `desired_height() !=
+    // viewport_size().height` on every render frame — sent
+    // an `xdg_surface.configure` round-trip through the
+    // Wayland compositor on every animation tick under
+    // fractional scaling (the 1 px slack guard isn't enough
+    // when Hyprland reports logical sizes at 1.25× or
+    // 1.5×). Strict wlroots compositors then raced popup
+    // positioning against the in-flight configure, leaving
+    // dropdowns rendering at stale coordinates. Mutter /
+    // KWin smoothed over the configure storm; Hyprland
+    // didn't. Initial value is `true` so the first render
+    // sizes the window to fit the boot-time banner state
+    // before the user sees it.
+    resize_pending: bool,
+
     // Privileges + helper install.
     priv_status: Option<privilege::PrivilegeStatus>,
     is_installing: bool,
@@ -597,6 +620,10 @@ impl AppView {
                 VecDeque::with_capacity(HISTORY_MAX)
             },
             settings_view: SettingsView::Main,
+            // `true` so the first `render` resizes the window
+            // to fit the banner state detected at boot before
+            // the user sees the initial frame.
+            resize_pending: true,
             priv_status,
             is_installing: false,
             update_available: None,
@@ -624,6 +651,9 @@ impl AppView {
             if let Ok(info) = rx.recv_async().await {
                 let _ = this.update(cx, |this, cx| {
                     this.update_available = Some(info);
+                    // Footer pill appears → window grows by
+                    // HEIGHT_UPDATE_PILL_EXTRA. Flag resize.
+                    this.resize_pending = true;
                     cx.notify();
                 });
             }
@@ -696,6 +726,9 @@ impl AppView {
         self.is_capturing = true;
         self.error.clear();
         self.result = None;
+        // Result card switches from `_FILLED` / `_EMPTY` to
+        // `_SKELETON` height — flag the window resize.
+        self.resize_pending = true;
         self.status_text =
             t!("status.capturing", protocol = self.protocol.as_str()).into_owned().into();
 
@@ -736,6 +769,10 @@ impl AppView {
         );
         self.is_capturing = false;
         self.capture_cancel = None;
+        // `is_capturing` flipping off changes which result-card
+        // height applies; result transitions also do. Flag the
+        // resize for both Ok and Err branches.
+        self.resize_pending = true;
         match res {
             Ok(r) => {
                 // Push to history before claiming `r` for
@@ -802,6 +839,10 @@ impl AppView {
                     Ok(()) => {
                         this.status_text = t!("status.bpf_helper_installed").into_owned().into();
                         this.priv_status = Some(privilege::get_privilege_status());
+                        // Privilege banner disappears once
+                        // has_access flips → window shrinks
+                        // by HEIGHT_BANNER. Flag resize.
+                        this.resize_pending = true;
                     }
                     Err(err) => {
                         this.error = err;
@@ -894,50 +935,61 @@ impl Focusable for AppView {
 impl Render for AppView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Dynamic resize: pick the height that fits the current
-        // state (banner present? result populated?) and apply it if
-        // the window is currently the wrong height. `cx.notify()`
-        // after every state change re-enters render, so the resize
-        // re-evaluates on every flip. The 1px slack on the diff
-        // guards against rounding noise from gpui's px → device-px
-        // → px round-trip causing an infinite resize loop.
-        let desired = px(self.desired_height());
-        // Use `viewport_size()` (not `bounds().size`) because the two
-        // gpui platform backends interpret bounds differently:
-        //   - macOS: `bounds()` returns the FULL window frame (content
-        //     + title bar). `resize()` sets just the CONTENT size.
-        //   - Windows: `bounds()` returns the logical content area.
-        //     `resize()` sets the CONTENT size (border offset added
-        //     internally before SetWindowPos).
-        // Comparing `bounds().size` against the desired content size
-        // is therefore always ~28 px off on macOS — `resize()` fires
-        // every render because they never converge (the loop is a
-        // no-op visually but spams the log). `viewport_size()` is
-        // the drawable area on both backends, so the comparison is
-        // cross-platform-consistent.
-        let current = window.viewport_size().height;
-        if (current - desired).abs() > px(1.0) {
-            // Log resize events to the debug log. Only fires on
-            // actual mismatch — animation-driven re-renders (the
-            // skeleton pulse) shouldn't spam the log because the
-            // desired stays constant while pulsing. `debug` level
-            // because resize is a per-frame render-tick concern,
-            // not a lifecycle event — only useful when debugging
-            // the Windows / Wayland "did the resize actually take
-            // effect" question; not what you want filling the log
-            // file on every banner state change.
-            log::debug!(
-                "render: resize viewport.h={} -> desired={} (scale={}, capturing={}, result={}, banner_visible={})",
-                current,
-                desired,
-                window.scale_factor(),
-                self.is_capturing,
-                self.result.is_some(),
-                self.priv_status
-                    .as_ref()
-                    .map(|s| !s.has_access)
-                    .unwrap_or(false),
-            );
-            window.resize(gpui::size(px(BASE_WIDTH), desired));
+        // state (banner present? result populated?) and apply it.
+        // Gated on `resize_pending` so it only fires after a
+        // mutator that actually changed a `desired_height()`
+        // input — not on every `cx.notify()` (which can come
+        // from theme observation, focus events, the copied-key
+        // timeout, etc., none of which affect the desired size).
+        //
+        // The earlier shape — comparing `desired_height()` to
+        // `viewport_size().height` on every render — sent an
+        // `xdg_surface.configure` round-trip through the
+        // Wayland compositor on every animation tick under
+        // fractional scaling (the 1 px slack guard isn't
+        // enough when Hyprland reports logical sizes at 1.25×
+        // or 1.5×). Strict wlroots compositors then raced
+        // popup positioning against the in-flight configure,
+        // leaving dropdowns rendering at stale coordinates.
+        // Each mutator that touches a `desired_height()` input
+        // sets the flag explicitly, so the resize fires exactly
+        // N times instead of every frame.
+        //
+        // `viewport_size()` is read here (not `bounds().size`)
+        // because the two gpui platform backends interpret
+        // bounds differently:
+        //   - macOS: `bounds()` returns the FULL window frame
+        //     (content + title bar). `resize()` sets just the
+        //     CONTENT size.
+        //   - Windows: `bounds()` returns the logical content
+        //     area. `resize()` sets the CONTENT size (border
+        //     offset added internally before SetWindowPos).
+        // Comparing `bounds().size` against the desired content
+        // size is therefore always ~28 px off on macOS;
+        // `viewport_size()` is the drawable area on both
+        // backends, so the comparison is cross-platform-
+        // consistent. The 1 px slack guards against rounding
+        // noise from the px → device-px → px round-trip when
+        // the requested size already matches in practice.
+        if self.resize_pending {
+            self.resize_pending = false;
+            let desired = px(self.desired_height());
+            let current = window.viewport_size().height;
+            if (current - desired).abs() > px(1.0) {
+                log::debug!(
+                    "render: resize viewport.h={} -> desired={} (scale={}, capturing={}, result={}, banner_visible={})",
+                    current,
+                    desired,
+                    window.scale_factor(),
+                    self.is_capturing,
+                    self.result.is_some(),
+                    self.priv_status
+                        .as_ref()
+                        .map(|s| !s.has_access)
+                        .unwrap_or(false),
+                );
+                window.resize(gpui::size(px(BASE_WIDTH), desired));
+            }
         }
 
         // Read all theme colors up front so the immutable cx borrow
@@ -1705,6 +1757,11 @@ impl AppView {
         self.result = Some(entry.result);
         self.error.clear();
         self.copied_key = None;
+        // Result card transitions to the populated height
+        // (or stays there, if a prior result was already
+        // showing). Flag resize either way — `resize_pending`
+        // is cheap and the render-time guard skips no-ops.
+        self.resize_pending = true;
         let iface_label = if entry.interface_name.is_empty() {
             t!("history.iface_all").into_owned()
         } else {
@@ -2233,6 +2290,10 @@ impl AppView {
                         .small()
                         .on_click(cx.listener(|this, _, _window, cx| {
                             this.update_dismissed = true;
+                            // Footer pill disappears → window
+                            // shrinks by HEIGHT_UPDATE_PILL_EXTRA.
+                            // Flag resize.
+                            this.resize_pending = true;
                             cx.notify();
                         })),
                 )
