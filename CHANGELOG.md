@@ -14,6 +14,29 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [4.1.3-beta.1] - 2026-05-20
+
+### Fixed
+- **Hyprland dropdown / popover positioning glitches.** PortFinder's
+  `Render::render` was calling `window.resize` on every render frame
+  where `desired_height()` and `viewport_size().height` disagreed by
+  more than 1 px — calibrated for integer scaling, but under
+  Hyprland's `wp_fractional_scale_v1` at 1.25× / 1.5× / 1.75× the
+  px → device-px → px round-trip drifts past that slack repeatedly,
+  so the resize re-fired on basically every animation tick. Each
+  `window.resize` sends an `xdg_surface.configure` round-trip
+  through the compositor; strict wlroots compositors route popups
+  through the xdg-shell state machine during the in-flight cycle,
+  leaving dropdowns and the title-bar settings popover landing at
+  stale parent geometry. Mutter (GNOME) and KWin (KDE) smoothed
+  over the configure storm and the visible effect was just unneeded
+  protocol traffic; Hyprland surfaced it as visible misposition.
+  Sibling Baudrun didn't hit this — it only resizes on explicit
+  user actions, never from inside its render path. Same shape
+  applied here: a new `resize_pending` dirty flag means the resize
+  fires exactly N times instead of every frame. macOS / Windows
+  behaviour is unchanged.
+
 ## [4.1.2] - 2026-05-19
 
 ### Fixed
