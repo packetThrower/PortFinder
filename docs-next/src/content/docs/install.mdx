@@ -10,7 +10,7 @@ The fastest path on each platform, in one row:
 | Platform | Command |
 |---|---|
 | macOS | `brew install --cask packetThrower/tap/portfinder` |
-| Windows | `scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket && scoop install portfinder` |
+| Windows | `winget install packetThrower.PortFinder` |
 | Linux (Debian/Ubuntu) | `sudo apt install ./PortFinder_<version>_amd64.deb` |
 | Linux (Fedora/RHEL) | `sudo dnf install ./PortFinder-<version>-1.x86_64.rpm` |
 | Linux (any) | `chmod +x PortFinder_<version>_amd64.AppImage && ./PortFinder_<version>_amd64.AppImage` |
@@ -74,38 +74,61 @@ Without the symlink, the binary's full path inside the bundle works too — `/Ap
 
 ## Windows
 
-### Scoop (recommended)
+### winget (preinstalled)
+
+[winget](https://learn.microsoft.com/en-us/windows/package-manager/winget/) is Microsoft's own package manager, preinstalled on Windows 10 1809+ and Windows 11. The [packetThrower.PortFinder manifest](https://github.com/microsoft/winget-pkgs/tree/master/manifests/p/packetThrower/PortFinder) ships per-arch MSI installers and resolves either by the full `PackageIdentifier` or the short moniker:
+
+```powershell
+winget install packetThrower.PortFinder        # full identifier
+winget install portfinder                      # short moniker (same result)
+```
+
+winget picks the right architecture automatically (x64 or arm64) based on the host. The MSI installs to `Program Files\PortFinder\`, registers `PortFinder` and `portfinder-cli` on `PATH`, adds a Start menu shortcut, and shows up in Apps & Features with the PortFinder icon. Silent install is the default (no SmartScreen prompt, no clicks).
+
+You still need [Npcap](https://npcap.com/#download) for packet capture — winget can chain-install it in one command:
+
+```powershell
+winget install Insecure.Npcap        # one-time, then PortFinder works without sudo / admin
+```
+
+winget carries **stable only** — no pre-release channel. If you want to ride pre-release builds on Windows, use Scoop below (which has a `portfinder-prerelease` manifest) or grab the artifact directly from the [Releases](https://github.com/packetThrower/PortFinder/releases) page.
+
+Update with `winget upgrade packetThrower.PortFinder` (or `winget upgrade --all`). winget polls Microsoft's centralized manifest index every few hours, so a new stable tag is normally installable within a quarter day of release.
+
+### Scoop
+
+The bucket [`packetThrower/scoop-bucket`](https://github.com/packetThrower/scoop-bucket) ships PortFinder under both a stable and a pre-release manifest — the latter is the path to alpha / beta / rc builds Windows-side, which winget can't carry.
 
 ```powershell
 scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket
 scoop install portfinder
 ```
 
-This installs PortFinder, drops a Start menu shortcut, and exposes the [CLI](/PortFinder/usage/cli/) on your `PATH` so `portfinder capture …` works from PowerShell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. The bucket source lives at [packetThrower/scoop-bucket](https://github.com/packetThrower/scoop-bucket).
+This installs PortFinder, drops a Start menu shortcut, and exposes the [CLI](/PortFinder/usage/cli/) on your `PATH` so `portfinder capture …` works from PowerShell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`.
 
-You still need [Npcap](https://npcap.com/#download) for packet capture — Scoop can't bundle the kernel driver.
+You still need [Npcap](https://npcap.com/#download) for packet capture — Scoop can't bundle the kernel driver. (winget above will chain-install it.)
 
 <Aside type="tip" title="Already have Wireshark?">
 Wireshark on Windows ships with Npcap, so you may already have it. Open *Programs and Features* and check for **Npcap** — if it's there, you're set.
 </Aside>
 
 <details>
-<summary>Pre-release channel</summary>
+<summary>Pre-release channel (Scoop only)</summary>
 
-The bucket also ships a parallel manifest tracking pre-release tags (alpha / beta / rc). It coexists with the stable install:
+The bucket ships a parallel manifest tracking pre-release tags (alpha / beta / rc). It coexists with the stable install:
 
 ```powershell
 scoop install portfinder-prerelease
 ```
 
-The pre-release CLI shim is `portfinder-alpha` and the Start menu shortcut is `PortFinder Alpha`, so the two never collide.
+The pre-release CLI shim is `portfinder-alpha` and the Start menu shortcut is `PortFinder Alpha`, so the two never collide. winget has no pre-release equivalent — for pre-release on Windows, use Scoop or grab the artifact directly from [Releases](https://github.com/packetThrower/PortFinder/releases).
 </details>
 
 <details>
 <summary>Manual installer</summary>
 
 1. Install [Npcap](https://npcap.com/#download) — be sure to tick **"Allow non-administrators to capture"** during install.
-2. Download `PortFinder_<version>_x64-setup.exe` (or `_arm64-setup.exe`) from the release.
+2. Download `PortFinder_<version>_amd64_en-US.msi` (x64) or `PortFinder_<version>_arm64_en-US.msi` (ARM64) from the release for the cleanest install path. The NSIS `PortFinder_<version>_x64-setup.exe` is also there as a fallback.
 3. Run the installer.
 </details>
 

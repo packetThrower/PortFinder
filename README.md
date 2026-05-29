@@ -7,6 +7,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/packetThrower/PortFinder/ci.yml?branch=main&style=flat-square&logo=github&label=CI)](https://github.com/packetThrower/PortFinder/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/packetThrower/PortFinder?style=flat-square&logo=github&label=release&include_prereleases)](https://github.com/packetThrower/PortFinder/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/packetThrower/PortFinder/total?style=flat-square&logo=github&label=downloads)](https://github.com/packetThrower/PortFinder/releases)
+[![winget](https://img.shields.io/badge/winget-packetThrower.PortFinder-0078D4?style=flat-square&logo=windows&logoColor=white)](https://github.com/microsoft/winget-pkgs/tree/master/manifests/p/packetThrower/PortFinder)
 [![Rust](https://img.shields.io/badge/Rust-stable-CE422B?style=flat-square&logo=rust&logoColor=white)](Cargo.toml)
 [![gpui](https://img.shields.io/badge/gpui-from%20Zed-1F1F28?style=flat-square)](https://www.gpui.rs/)
 
@@ -111,6 +112,17 @@ For early access to alpha / beta / rc builds, install the parallel `@alpha` cask
 brew install --cask packetThrower/tap/portfinder@alpha
 ```
 
+### Windows — winget (preinstalled)
+
+```powershell
+winget install packetThrower.PortFinder        # full identifier
+winget install portfinder                      # short moniker (same result)
+```
+
+winget is Microsoft's own package manager and ships built-in on Windows 10 1809+ and Windows 11. The MSI auto-resolves x64 or arm64 to your host, installs to `Program Files\PortFinder\`, registers `PortFinder` and `portfinder-cli` on `PATH`, and adds a Start menu shortcut. Silent install is the default (no SmartScreen prompt). winget carries **stable only** — for pre-release builds use Scoop below or [Releases](https://github.com/packetThrower/PortFinder/releases) directly.
+
+Update with `winget upgrade packetThrower.PortFinder` (or `winget upgrade --all`); uninstall with `winget uninstall packetThrower.PortFinder`. You'll still need [Npcap](https://npcap.com/#download) installed for packet capture (winget can chain it: `winget install Insecure.Npcap` once).
+
 ### Windows — Scoop
 
 ```powershell
@@ -118,7 +130,7 @@ scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket
 scoop install portfinder
 ```
 
-Installs PortFinder and exposes `portfinder` on your `PATH` so `portfinder capture …` works from PowerShell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. You'll still need [Npcap](https://npcap.com/#download) installed for packet capture.
+Installs PortFinder and exposes `portfinder` on your `PATH` so `portfinder capture …` works from PowerShell. Update with `scoop update portfinder`; uninstall with `scoop uninstall portfinder`. Scoop also carries a parallel `portfinder-prerelease` manifest for the alpha / beta / rc channel — winget doesn't have a pre-release equivalent. You'll still need [Npcap](https://npcap.com/#download) installed for packet capture.
 
 ### All platforms — release artifacts
 
