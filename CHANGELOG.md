@@ -14,6 +14,28 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [4.1.3-beta.1] - 2026-05-29
+
+### Fixed
+- **Settings popover bottom row cut off in shortest window state.**
+  The title-bar settings popover renders as an overlay anchored
+  to the hamburger button, and gpui-component's
+  `snap_to_window_with_margin` constrains the overlay to the
+  window's content bounds. In the shortest window state (no
+  privilege banner, no capture result, no update pill ≈ 381 px
+  tall on Windows) the popover's ~410 px Main view overflowed
+  the window's bottom — the `Settings folder` / `Log folder`
+  row got clipped. The popover's `on_open_change` callback
+  now flips a `settings_popover_open` flag, `desired_height()`
+  reads that flag as another input, and the existing per-render
+  resize loop grows the window to `HEIGHT_SETTINGS_POPOVER_MIN`
+  (440 px) when the popover opens. The window shrinks back to
+  its state-dependent height when the popover closes. The
+  callback also resets the popover's sub-page state to `Main`
+  on close so the next open lands on the settings list instead
+  of the About / Language sub-page the user happened to leave
+  on last time.
+
 ## [4.1.2] - 2026-05-19
 
 ### Fixed
