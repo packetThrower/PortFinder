@@ -153,6 +153,26 @@ const HEIGHT_RESULT_SKELETON: f32 = 206.0;
 /// when an update notification is up.
 const HEIGHT_UPDATE_PILL_EXTRA: f32 = 12.0;
 
+/// Minimum window height while the title-bar settings popover is
+/// open, picked to fit the tallest Main-view state of that popover
+/// (Language row + Capture + Logging slider/labels + About row +
+/// Folders row + the popover's own border / padding, ~410 px) plus
+/// a small slack so the bottom-aligned action row (`Settings folder`
+/// / `Log folder`) isn't flush against the window edge.
+///
+/// gpui-component's Popover renders as an overlay anchored to its
+/// trigger's top-left, and `snap_to_window_with_margin` constrains
+/// the overlay to the window's content bounds — so a popover taller
+/// than the window gets visibly clipped at the bottom. On Windows
+/// users reported the bottom row of folder buttons cut off in the
+/// shortest window state (no privilege banner, no capture result,
+/// no update pill ≈ 381 px tall, vs the popover's ~410 px). The
+/// fix: `desired_height` takes the popover's open/close state as
+/// another input, and the per-render resize loop grows the window
+/// to this minimum when the popover is up — then shrinks back to
+/// the normal state-dependent height when the popover closes.
+const HEIGHT_SETTINGS_POPOVER_MIN: f32 = 440.0;
+
 /// Brand accent. macOS system blue — the same colour the 3.x design
 /// system reached for whenever it needed to step outside the OS-
 /// neutral palette (privilege-warning button, focused-toggle pill).
@@ -392,6 +412,19 @@ pub struct AppView {
     // to `Main` on relaunch.
     settings_view: SettingsView,
 
+    // Whether the title-bar settings popover is currently open.
+    // Driven by the popover's own `on_open_change` callback.
+    // `desired_height` reads this to grow the window to at
+    // least `HEIGHT_SETTINGS_POPOVER_MIN` while the popover is
+    // up — the popover renders as an overlay anchored to the
+    // hamburger, and gpui-component's `snap_to_window_with_
+    // margin` clips overlay content to the window's content
+    // bounds. Without this resize, the shortest window state
+    // (no banner, no result, no update pill ≈ 381 px) was
+    // cutting off the popover's bottom row of folder buttons
+    // on Windows.
+    settings_popover_open: bool,
+
     // Privileges + helper install.
     priv_status: Option<privilege::PrivilegeStatus>,
     is_installing: bool,
@@ -597,6 +630,7 @@ impl AppView {
                 VecDeque::with_capacity(HISTORY_MAX)
             },
             settings_view: SettingsView::Main,
+            settings_popover_open: false,
             priv_status,
             is_installing: false,
             update_available: None,
@@ -862,6 +896,15 @@ impl AppView {
         };
         if self.update_available.is_some() && !self.update_dismissed {
             h += HEIGHT_UPDATE_PILL_EXTRA;
+        }
+        // When the title-bar settings popover is open, grow the
+        // window to fit the popover's overlay. gpui-component
+        // clips overlay popovers to the window's content bounds
+        // via `snap_to_window_with_margin`, so a window shorter
+        // than the popover hides the popover's bottom rows.
+        // See HEIGHT_SETTINGS_POPOVER_MIN for the picked minimum.
+        if self.settings_popover_open {
+            h = h.max(HEIGHT_SETTINGS_POPOVER_MIN);
         }
         h
     }
@@ -1775,6 +1818,14 @@ impl AppView {
         // for label fit.
         let panel_width = px(280.0);
 
+        // Capture an entity handle for the on-open-change
+        // callback below so it can write to `settings_popover_
+        // open` on AppView. The callback's `cx: &mut App` arg
+        // lets us update entity state via the standard
+        // `entity.update(cx, ...)` form without needing a
+        // higher-level context.
+        let entity_for_popover = cx.entity().clone();
+
         Popover::new("settings-popover")
             .trigger(
                 Button::new("settings-trigger")
@@ -1782,6 +1833,25 @@ impl AppView {
                     .ghost()
                     .small(),
             )
+            // When the popover opens/closes, flip the matching
+            // flag on AppView so `desired_height()` accounts for
+            // the overlay's needed height on the next render.
+            // The per-render resize loop then grows the window
+            // (open) or shrinks it back (close) automatically.
+            // Also reset the sub-page state to `Main` on close
+            // so the next open lands on the top-level settings
+            // list instead of the About / Language sub-page the
+            // user happened to leave on.
+            .on_open_change(move |is_open, _window, cx| {
+                let opened = *is_open;
+                entity_for_popover.update(cx, |this, cx| {
+                    this.settings_popover_open = opened;
+                    if !opened {
+                        this.settings_view = SettingsView::Main;
+                    }
+                    cx.notify();
+                });
+            })
             .content(move |_, _, cx| {
                 let entity_for_history = entity.clone();
                 let entity_for_switch = entity.clone();
