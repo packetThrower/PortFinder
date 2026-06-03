@@ -14,7 +14,7 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
-## [4.1.3-beta.1] - 2026-05-29
+## [4.1.3] - 2026-06-02
 
 ### Fixed
 - **Settings popover bottom row cut off in shortest window state.**
