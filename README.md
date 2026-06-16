@@ -101,6 +101,8 @@ Press Ctrl+C to interrupt a running capture; a second press force-exits. The Hom
 ### macOS — Homebrew
 
 ```bash
+brew tap packetThrower/tap
+brew trust packetThrower/tap   # Homebrew 6.0.0+: trust the tap before installing
 brew install --cask packetThrower/tap/portfinder
 ```
 
