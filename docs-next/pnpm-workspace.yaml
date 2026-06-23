@@ -1,3 +1,18 @@
 allowBuilds:
   esbuild: true
   sharp: true
+
+# Transitive-dep overrides for CVE remediation. pnpm 11 moved
+# the `overrides` field out of package.json into here. Each entry
+# pins a transitive dep above the vulnerable version range; the
+# direct dep chain (astro, @astrojs/starlight, etc.) doesn't
+# have to release a bump first.
+overrides:
+  # js-yaml <=4.1.1 has a quadratic-complexity DoS in merge-key
+  # handling via repeated aliases. Transitive via
+  # `@astrojs/markdown-remark` -> `astro`. Dependabot alert #16.
+  js-yaml: ">=4.2.0"
+  # esbuild >=0.27.3 <0.28.1 allows arbitrary file read when its
+  # dev server is running on Windows (`pnpm dev`). Transitive via
+  # `astro` -> `vite`. Dependabot alert #9 (GHSA-g7r4-m6w7-qqqr).
+  esbuild: ">=0.28.1"
