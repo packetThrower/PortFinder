@@ -12,16 +12,31 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 3. **Click Start.** Most switches send a discovery packet every 30–60 seconds, so it usually takes a few seconds for the first frame to arrive.
 4. **Read the result.** Switch name, IP, port, VLAN, voice VLAN, MTU, and model populate the result card.
 
-## On each platform
-
-Native widgets per platform — same workflow, different chrome.
+Each stage, on macOS:
 
 <Tabs>
-<TabItem label="macOS">
+<TabItem label="Ready">
 
-![PortFinder on macOS](/PortFinder/screenshots/macos.png)
+![PortFinder ready to capture — interface and protocol selected](/PortFinder/screenshots/macos_start.png)
 
 </TabItem>
+<TabItem label="Capturing">
+
+![PortFinder capturing — progress bar running, Stop button active](/PortFinder/screenshots/macos_sniffing.png)
+
+</TabItem>
+<TabItem label="Result">
+
+![PortFinder showing a captured LLDP result](/PortFinder/screenshots/macos.png)
+
+</TabItem>
+</Tabs>
+
+## On each platform
+
+Same workflow, different chrome — macOS is shown above.
+
+<Tabs>
 <TabItem label="Windows">
 
 ![PortFinder on Windows](/PortFinder/screenshots/windows.png)
