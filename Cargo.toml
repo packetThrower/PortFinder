@@ -61,13 +61,13 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["fo
 # stays unified across both apps in this org. Published `0.5.x` on
 # crates.io targets the older gpui 0.2 line and conflicts with our
 # Zed-git pin.
-gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "2d2524d89efc47270e9a0ee18f10fa72cd573eff" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "3c270ed244d06fb211b47f156761c1d833eac535" }
 
 # Bundled icon SVGs (Lucide set). Required at startup via
 # `.with_assets(...)` so any `IconName::*` widget code references
 # resolves to a real glyph — the gpui-component title-bar window
 # controls on Windows + Linux otherwise render blank.
-gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "2d2524d89efc47270e9a0ee18f10fa72cd573eff" }
+gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "3c270ed244d06fb211b47f156761c1d833eac535" }
 
 # pcap-on-libpcap (macOS / Linux) and pcap-on-Npcap (Windows). The
 # 3.x Tauri build was already on this crate; the parsers + capture
