@@ -19,11 +19,10 @@ export default defineConfig({
 			customCss: ['./src/styles/theme.css'],
 			components: {
 				Hero: './src/components/Hero.astro',
-				// Adds a "← packetThrower" back-link pill to the
-				// left of the default site title. The default
-				// component (logo + wordmark) is still rendered
-				// alongside it — see SiteTitle.astro.
-				SiteTitle: './src/components/SiteTitle.astro',
+				// Adds "← packetThrower" + "Docs" pills to the
+				// top-right, left of the GitHub icon — same pattern
+				// as Baudrun's docs site. See SocialIcons.astro.
+				SocialIcons: './src/components/SocialIcons.astro',
 			},
 			social: [
 				{

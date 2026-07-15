@@ -32,6 +32,10 @@ Network switch port discovery tool. Captures CDP (Cisco Discovery Protocol), LLD
 
 📖 **Docs:** <https://packetthrower.github.io/PortFinder/> · 📝 [**Changelog**](CHANGELOG.md)
 
+<p align="center">
+  <img src="docs-next/public/screenshots/macos.png" alt="PortFinder on macOS showing a captured LLDP result" width="420">
+</p>
+
 > **4.x is the pure-Rust rewrite.** Zed's [gpui](https://www.gpui.rs/)
 > replaces the Tauri 2 + Svelte 5 stack from the 3.x line, which is
 > preserved on the [`tauri-version`](https://github.com/packetThrower/PortFinder/tree/tauri-version)
