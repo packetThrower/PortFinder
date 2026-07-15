@@ -574,7 +574,11 @@ impl AppView {
             &log_level_slider,
             window,
             |this, slider, event: &SliderEvent, window, cx| {
-                let SliderEvent::Change(value) = event;
+                // `Release` (new upstream variant) is ignored: the level
+                // already applied live on the last `Change` during drag.
+                let SliderEvent::Change(value) = event else {
+                    return;
+                };
                 let ix = value.start().round() as usize;
                 // Always snap the thumb, even if the log level
                 // hasn't changed — the user may have dragged
@@ -1178,7 +1182,9 @@ impl AppView {
                          Installing the helper grants /dev/bpf* read access \
                          to the access_bpf group.",
                     ))
-                    .child(
+                    .child(with_wrapping_tooltip(
+                        "install-bpf-tip",
+                        t!("button.install_bpf_helper_tooltip").into_owned(),
                         Button::new("install-bpf")
                             .label(if installing {
                                 t!("button.install_bpf_helper_installing").into_owned()
@@ -1187,9 +1193,8 @@ impl AppView {
                             })
                             .small()
                             .disabled(installing)
-                            .tooltip(t!("button.install_bpf_helper_tooltip").into_owned())
                             .on_click(cx.listener(|this, _, _window, cx| this.install_bpf(cx))),
-                    )
+                    ))
                     .into_any_element()
             }
             "linux" => div()
@@ -1207,15 +1212,16 @@ impl AppView {
                 .child(div().text_sm().child(
                     t!("privilege.npcap_needed").into_owned(),
                 ))
-                .child(
+                .child(with_wrapping_tooltip(
+                    "open-npcap-tip",
+                    t!("button.download_npcap_tooltip").into_owned(),
                     Button::new("open-npcap")
                         .label(t!("button.download_npcap").into_owned())
                         .small()
-                        .tooltip(t!("button.download_npcap_tooltip").into_owned())
                         .on_click(|_, _window, cx| {
                             cx.open_url("https://npcap.com/#download");
                         }),
-                )
+                ))
                 .child(
                     div()
                         .text_xs()
@@ -1483,12 +1489,13 @@ impl AppView {
                     )
                 })
                 .when_some(history_btn, |this, el| this.child(el))
-                .child(
+                .child(with_wrapping_tooltip(
+                    "copy-result-json-tip",
+                    t!("button.copy_as_json_tooltip").into_owned(),
                     Button::new("copy-result-json")
                         .label(t!("button.copy_as_json").into_owned())
                         .ghost()
                         .small()
-                        .tooltip(t!("button.copy_as_json_tooltip").into_owned())
                         .on_click(cx.listener(move |this, _, _window, cx| {
                             let Some(r) = this.result.as_ref() else { return };
                             let json = match serde_json::to_string_pretty(r) {
@@ -1500,7 +1507,7 @@ impl AppView {
                             };
                             this.copy_value(RESULT_KEY_JSON, json, cx);
                         })),
-                )
+                ))
                 .text_color(muted),
         );
         col.into_any_element()
@@ -2275,16 +2282,17 @@ impl AppView {
                 .flex()
                 .items_center()
                 .gap_1()
-                .child(
+                .child(with_wrapping_tooltip(
+                    "update-pill-open-tip",
+                    t!("update.tooltip").into_owned(),
                     Button::new("update-pill-open")
                         .label(t!("update.available", version = &info.version).into_owned())
                         .ghost()
                         .small()
-                        .tooltip(t!("update.tooltip").into_owned())
                         .on_click(move |_, _window, cx| {
                             cx.open_url(&url);
                         }),
-                )
+                ))
                 .child(
                     // No tooltip on the dismiss ✕ — gpui-component's
                     // Tooltip overlay doesn't track its trigger
@@ -2529,6 +2537,26 @@ fn log_level_label(
             div().w(px(220.0)).text_sm().child(description.clone())
         })
         .build(window, cx)
+    })
+}
+
+/// Wraps a `Button` in an id'd div that carries a width-capped,
+/// wrapping tooltip. gpui-component's `Button::tooltip` only accepts
+/// a string and renders it via `Tooltip::new`, which lays the text
+/// out on a single line — longer strings (especially in the de / fr
+/// locales) run past the window edge and clip. Same fixed-width
+/// `Tooltip::element` trick as `log_level_label` above; the button's
+/// own hover / click behavior is unaffected by the wrapper.
+fn with_wrapping_tooltip(
+    id: &'static str,
+    text: impl Into<SharedString>,
+    button: Button,
+) -> gpui::Stateful<gpui::Div> {
+    let text = text.into();
+    div().id(id).child(button).tooltip(move |window, cx| -> AnyView {
+        let text = text.clone();
+        Tooltip::element(move |_, _| div().w(px(220.0)).text_sm().child(text.clone()))
+            .build(window, cx)
     })
 }
 
