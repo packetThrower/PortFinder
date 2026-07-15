@@ -14,6 +14,24 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [4.1.4] - 2026-07-15
+
+### Fixed
+- **Long button tooltips clipped at the window edge.** Tooltips on
+  Copy as JSON, Install BPF Helper, Download Npcap, and the update
+  pill rendered on a single line and ran past the window bounds
+  (worst in the de / fr locales). They now wrap inside a
+  fixed-width tooltip via the same `Tooltip::element` mechanism the
+  log-level slider labels already used.
+
+### Security
+- **`async-tar` removed from the dependency graph** (Dependabot
+  alert #17, GHSA-35rm-7j9c-2f7m — PAX extension-header desync).
+  The crate arrived transitively through zed's `http_client`;
+  bumping the pinned zed (gpui) commit drops it entirely.
+  gpui-component moves in lockstep (`2d2524d` → `3c270ed`) since
+  its tip tracks gpui's git tip.
+
 ## [4.1.3] - 2026-06-02
 
 ### Fixed
