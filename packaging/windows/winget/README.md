@@ -107,19 +107,24 @@ microsoft/winget-pkgs to your account, commits, pushes,
 PRs). Without `--submit` it just writes the YAMLs to a
 temp directory for review.
 
-## CI hookup (future)
+## CI hookup (live)
 
-A natural follow-up is to call `wingetcreate update --submit` from
-`.github/workflows/release.yml`'s Windows job once the release
-artifacts are uploaded — same auto-bump pattern the Homebrew tap
-and Scoop bucket already use. Needs a GitHub PAT in the secret
-store with `public_repo` scope on a `packetThrower-bot` (or
-similar) account that owns the `winget-pkgs` fork.
+`.github/workflows/after_release.yml` submits automatically:
 
-Defer until the first manual submission lands cleanly — the
-moderator review on the first PR can take 1–7 days and may flag
-metadata adjustments that would otherwise be baked into the
-automated flow.
+  1. release.yml publishes the GitHub Release (stable tag only).
+  2. release.yml completing fires `after_release.yml` (a
+     `workflow_run` trigger — a `release: published` trigger never
+     fires here, because the Release is created with the default
+     GITHUB_TOKEN whose events GitHub suppresses; the job guard
+     requires a successful run and a stable `v*` tag).
+  3. The `publish_winget` job syncs the maintainer's
+     `packetThrower/winget-pkgs` fork against upstream, renders the
+     templates via `vedantmgoyal9/winget-releaser`, and opens the PR
+     against `microsoft/winget-pkgs` using the `WINGET_TOKEN` PAT.
+
+If the auto-triggered run flakes, the `workflow_dispatch` trigger on
+the Actions UI re-runs just the submission for a given tag. The
+manual paths below remain for debugging and first-time bootstraps.
 
 ## Notes
 
