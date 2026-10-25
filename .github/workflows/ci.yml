@@ -131,6 +131,19 @@ jobs:
           echo "LIB=${{ github.workspace }}\npcap-sdk\Lib\${{ matrix.npcap_lib }};$env:LIB" >> $env:GITHUB_ENV
         shell: powershell
 
+      # cargo-deny reads Cargo.lock + deny.toml only — platform-
+      # independent, so one runner is enough. taiki-e/install-action
+      # fetches a prebuilt binary rather than building from source.
+      - name: Install cargo-deny
+        if: matrix.runner == 'ubuntu-latest'
+        uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
+        with:
+          tool: cargo-deny
+
+      - name: cargo deny check
+        if: matrix.runner == 'ubuntu-latest'
+        run: cargo deny check
+
       - name: cargo clippy
         run: cargo clippy --all-targets -- -D warnings
 
