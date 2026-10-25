@@ -58,7 +58,7 @@ jobs:
       # Cross-compile produces separate `target/<triple>/release`
       # subdirs so the cache covers both arches in one entry.
       - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
         with:
           shared-key: release
           # Preserve the cache even when a later step (build,
@@ -72,7 +72,7 @@ jobs:
         run: brew install pkg-config
 
       - name: Install cargo-packager
-        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-packager
 
@@ -188,7 +188,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
         with:
           shared-key: release
           # Preserve the cache even when a later step (build,
@@ -218,7 +218,7 @@ jobs:
         shell: powershell
 
       - name: Install cargo-packager
-        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-packager
 
@@ -233,7 +233,7 @@ jobs:
       # limit, so pre-releases still ship NSIS.
       - name: Install cargo-wix
         if: ${{ !contains(github.ref_name, '-') }}
-        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-wix
 
@@ -412,7 +412,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
         with:
           shared-key: release
           # Preserve the cache even when a later step (build,
@@ -442,7 +442,7 @@ jobs:
             libarchive-tools
 
       - name: Install cargo-packager
-        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        uses: taiki-e/install-action@f7e5d7c961414b23f5b25b2da9294395d08513ad # v2.87.26
         with:
           tool: cargo-packager
 
@@ -729,7 +729,7 @@ jobs:
           persist-credentials: false
 
       - name: Download artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
           pattern: "*-package"
@@ -777,7 +777,7 @@ jobs:
           cat release-notes.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: |
             artifacts/macos-package/*

@@ -1,16 +1,53 @@
 version: 2
+
+# Dependency-update schedule for the three ecosystems PortFinder
+# uses today: the single Rust crate at the repo root, the Astro
+# docs site under docs-next/, and the GitHub Actions in the
+# workflows. Paths are explicit so renaming a directory surfaces
+# as a Dependabot error instead of silently dropping coverage.
+# (The 3.x Tauri paths, /src-tauri and /frontend, no longer exist.)
+
 updates:
+  # The app itself — one Rust crate at the repo root.
   - package-ecosystem: "cargo"
-    directory: "/src-tauri"
+    directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the routine patch/minor sweep instead of a
+      # dozen; majors still come through individually so they get
+      # a proper look.
+      cargo-minor:
+        update-types: ["minor", "patch"]
+    # gpui moves deliberately, in one pass across all four
+    # packetThrower apps: a lone gpui bump without gpui-component (or
+    # vice versa) splits the graph or lands an untested combo.
+    ignore:
+      - dependency-name: "gpui"
+      - dependency-name: "gpui_platform"
+      - dependency-name: "gpui-component"
+      - dependency-name: "gpui-component-assets"
 
+  # Docs site — Astro + Starlight, a self-contained pnpm project
+  # under docs-next/. Dependabot's `npm` ecosystem reads
+  # pnpm-lock.yaml the same way it reads package-lock.json.
   - package-ecosystem: "npm"
-    directory: "/frontend"
+    directory: "/docs-next"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      docs-minor:
+        update-types: ["minor", "patch"]
 
+  # GitHub Actions in .github/workflows/. The workflows pin every
+  # action to a full commit SHA; Dependabot bumps the SHA and the
+  # trailing `# vX.Y.Z` comment together.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      actions-all:
+        patterns: ["*"]
