@@ -14,6 +14,20 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+### Security
+- **rustls patched** (0.23.40 → 0.23.46, rustls-webpki 0.103.16,
+  webpki-roots 1.0.11): clears six TLS advisories, including a
+  ServerHello downgrade to classical key exchange, certificate
+  verification accepting distrusted intermediates, and the
+  distrusted emSign roots. Used by the update checker.
+- **h2, tokio and crossbeam-epoch patched** (h2 0.4.20, tokio 1.54.1,
+  crossbeam-epoch 0.9.21), and the unmaintained `unsafe-libyaml`
+  dropped from the dependency graph.
+- **Docs toolchain refreshed** (astro 7.4.2, starlight 0.42.7, sharp
+  0.35.5 and their transitive dependencies), clearing all 32 open
+  advisories against the docs site's build tooling. None affected
+  the PortFinder app.
+
 ## [4.1.4] - 2026-07-15
 
 ### Fixed

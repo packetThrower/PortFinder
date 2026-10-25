@@ -2,10 +2,6 @@ allowBuilds:
   esbuild: true
   sharp: true
 
-minimumReleaseAgeExclude:
-  - '@astrojs/starlight@0.41.9'
-  - astro@7.2.7
-
 # Transitive-dep overrides for CVE remediation. pnpm 11 moved
 # the `overrides` field out of package.json into here. Each entry
 # pins a transitive dep above the vulnerable version range; the
