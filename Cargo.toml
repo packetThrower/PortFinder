@@ -38,36 +38,15 @@ required-features = ["windows-cli"]
 windows-cli = []
 
 [dependencies]
-# Zed's GPU-accelerated UI framework. Pinned (via Cargo.lock) to a
-# specific zed-industries/zed commit because the gpui crate is a
-# workspace member of that monorepo. Bump deliberately with
-# `cargo update -p gpui` so we know what changed.
-#
-# No `rev` here on purpose: gpui-component's git tip pins gpui as
-# `git = "..."` with no rev, and Cargo treats `git = "..."` and
-# `git = "..." rev = "..."` as different sources even when they
-# resolve to the same commit — duplicating the entire Zed crate
-# graph. Matching the spec (no rev) lets Cargo unify them. The
-# locked commit is reproducible via Cargo.lock.
-gpui = { git = "https://github.com/zed-industries/zed" }
-
-# Per-OS platform initialization for gpui. Provides
-# `gpui_platform::application()` — the entry-point constructor
-# replaces the older `Application::new()` on this fork.
-gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "wayland", "x11"] }
-
-# gpui-component (Apache-2.0 / MIT) — Button, Switch, Select,
-# Theme. Pinned to the same commit Baudrun uses so the gpui graph
-# stays unified across both apps in this org. Published `0.5.x` on
-# crates.io targets the older gpui 0.2 line and conflicts with our
-# Zed-git pin.
-gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "3c270ed244d06fb211b47f156761c1d833eac535" }
-
-# Bundled icon SVGs (Lucide set). Required at startup via
-# `.with_assets(...)` so any `IconName::*` widget code references
-# resolves to a real glyph — the gpui-component title-bar window
-# controls on Windows + Linux otherwise render blank.
-gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "3c270ed244d06fb211b47f156761c1d833eac535" }
+# GPUI Kit: gpui (crates.io `gpui-pre` snapshot), its platform
+# backends, gpui-component and the default icon assets behind one
+# dependency. `extern crate gpui_kit as gpui;` in lib.rs keeps the
+# `gpui::` paths (and gpui's derive-macro output) resolving through it.
+# Exact pin: gpui-kit pins one gpui-pre snapshot, and all four
+# packetThrower apps move to the same Kit version in one pass.
+# The Linux wayland + x11 backends and macOS `runtime_shaders` come
+# enabled through gpui-kit's own gpui-pre-platform dependency.
+gpui-kit = "=0.8.0"
 
 # pcap-on-libpcap (macOS / Linux) and pcap-on-Npcap (Windows). The
 # 3.x Tauri build was already on this crate; the parsers + capture

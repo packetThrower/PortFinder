@@ -25,7 +25,7 @@ use gpui::{
     Entity, FocusHandle, Focusable, Hsla, IntoElement, KeyBinding, Menu, MenuItem, ParentElement,
     QuitMode, Render, SharedString, Styled, Window, WindowBounds, WindowDecorations, WindowOptions,
 };
-use gpui_component::{
+use gpui_kit::component::{
     button::{Button, ButtonVariants},
     popover::Popover,
     select::{Select, SelectEvent, SelectItem, SelectState},
@@ -2455,7 +2455,7 @@ fn compact_address(addrs: &str) -> String {
         // Dotted-quad heuristic. `split('.').count() == 4` reads the
         // same as the Tauri-era `matches('.').count() == 3` did but
         // sidesteps an ambiguous-method-resolution headache with
-        // `gpui_component::select::SelectItem::matches` (also takes
+        // `gpui_kit::component::select::SelectItem::matches` (also takes
         // `&str`) that the compiler can't auto-pick between when
         // `&str` is in deref scope from the iterator's `&&str`.
         p.split('.').count() == 4 && p.chars().all(|c| c.is_ascii_digit() || c == '.')
@@ -2728,15 +2728,15 @@ pub fn run() {
     // pointless if the close button didn't also exit. Behaviour on
     // Linux / Windows is unchanged (`LastWindowClosed` was already
     // the default there).
-    let app = gpui_platform::application()
-        .with_assets(gpui_component_assets::Assets)
+    let app = gpui_kit::application()
+        .with_assets(gpui_kit::assets::Assets)
         .with_quit_mode(QuitMode::LastWindowClosed);
     app.run(move |cx: &mut App| {
         // gpui-component widgets (Input, Form, Select, Switch, …)
         // require the Theme global to be installed before the first
         // render — without this, the very first `Select::new` panics
         // looking for `Theme`.
-        gpui_component::init(cx);
+        gpui_kit::component::init(cx);
 
         // Wire Cmd+Q. Three pieces:
         //   1. The keybinding (`cmd-q` works across macOS / Linux /
@@ -2906,47 +2906,50 @@ fn apply_system_theme(cx: &mut App, appearance: gpui::WindowAppearance) {
 /// turns blue but the Start button stays the gpui-component default
 /// (near-black on light mode).
 fn apply_brand_palette(cx: &mut App, mode: ThemeMode) {
-    let theme = Theme::global_mut(cx);
-    let primary: Hsla = rgb(BRAND_PRIMARY).into();
-    let primary_hover: Hsla = rgb(BRAND_PRIMARY_HOVER).into();
-    let primary_active: Hsla = rgb(BRAND_PRIMARY_ACTIVE).into();
-    let white: Hsla = rgb(0xffffff).into();
+    // `Theme::update` (not `global_mut`) so GPUI Kit re-derives the
+    // color tokens its components paint with.
+    Theme::update(cx, |theme| {
+        let primary: Hsla = rgb(BRAND_PRIMARY).into();
+        let primary_hover: Hsla = rgb(BRAND_PRIMARY_HOVER).into();
+        let primary_active: Hsla = rgb(BRAND_PRIMARY_ACTIVE).into();
+        let white: Hsla = rgb(0xffffff).into();
 
-    // Accent surface — Switch on-state, Select focus ring, etc.
-    theme.primary = primary;
-    theme.primary_hover = primary_hover;
-    theme.primary_active = primary_active;
-    theme.primary_foreground = white;
+        // Accent surface — Switch on-state, Select focus ring, etc.
+        theme.primary = primary;
+        theme.primary_hover = primary_hover;
+        theme.primary_active = primary_active;
+        theme.primary_foreground = white;
 
-    // Filled-button surface — Start button's `.primary()` variant.
-    theme.button_primary = primary;
-    theme.button_primary_hover = primary_hover;
-    theme.button_primary_active = primary_active;
-    theme.button_primary_foreground = white;
+        // Filled-button surface — Start button's `.primary()` variant.
+        theme.button_primary = primary;
+        theme.button_primary_hover = primary_hover;
+        theme.button_primary_active = primary_active;
+        theme.button_primary_foreground = white;
 
-    // Card surface — Apple's secondary-system-fill grays so the
-    // cards read as native macOS 26 (Tahoe) elevated content rather
-    // than a custom palette. Overrides `theme.popover` because
-    // that's the slot `render` reads for `card_bg`. Side effect:
-    // Select's open-dropdown popover and any gpui-component Tooltip
-    // use the same slot, so they pick up the same neutral gray —
-    // desirable consistency (every elevated surface in the app
-    // speaks the same colour, matching System Settings' behaviour).
-    let card_bg: Hsla = match mode {
-        ThemeMode::Dark => rgb(CARD_BG_DARK).into(),
-        ThemeMode::Light => rgb(CARD_BG_LIGHT).into(),
-    };
-    theme.popover = card_bg;
+        // Card surface — Apple's secondary-system-fill grays so the
+        // cards read as native macOS 26 (Tahoe) elevated content rather
+        // than a custom palette. Overrides `theme.popover` because
+        // that's the slot `render` reads for `card_bg`. Side effect:
+        // Select's open-dropdown popover and any gpui-component Tooltip
+        // use the same slot, so they pick up the same neutral gray —
+        // desirable consistency (every elevated surface in the app
+        // speaks the same colour, matching System Settings' behaviour).
+        let card_bg: Hsla = match mode {
+            ThemeMode::Dark => rgb(CARD_BG_DARK).into(),
+            ThemeMode::Light => rgb(CARD_BG_LIGHT).into(),
+        };
+        theme.popover = card_bg;
 
-    // Skeleton fill — set per-mode so the result-card loading rows
-    // have visible contrast against the (deliberately subtle) card
-    // surface. Without this override, the gpui-component default
-    // skeleton colour is barely darker than `theme.popover` and
-    // the pulsing rows look like an empty card.
-    theme.skeleton = match mode {
-        ThemeMode::Dark => rgb(SKELETON_DARK).into(),
-        ThemeMode::Light => rgb(SKELETON_LIGHT).into(),
-    };
+        // Skeleton fill — set per-mode so the result-card loading rows
+        // have visible contrast against the (deliberately subtle) card
+        // surface. Without this override, the gpui-component default
+        // skeleton colour is barely darker than `theme.popover` and
+        // the pulsing rows look like an empty card.
+        theme.skeleton = match mode {
+            ThemeMode::Dark => rgb(SKELETON_DARK).into(),
+            ThemeMode::Light => rgb(SKELETON_LIGHT).into(),
+        };
+    });
 }
 
 /// macOS-only: set the dock icon at runtime so `cargo run` shows the
@@ -2970,7 +2973,7 @@ fn install_macos_dock_icon() {
 
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let icon_path = format!("{manifest_dir}/resources/icons/icon.icns");
-    // SAFETY: gpui_platform::application runs its callback on the
+    // SAFETY: gpui_kit::application runs its callback on the
     // macOS main thread, which is what NSApplication /
     // NSGraphicsContext (lockFocus / unlockFocus) require.
     // lockFocus / unlockFocus are deprecated in favour of the

@@ -20,14 +20,16 @@ updates:
       # a proper look.
       cargo-minor:
         update-types: ["minor", "patch"]
-    # gpui moves deliberately, in one pass across all four
-    # packetThrower apps: a lone gpui bump without gpui-component (or
-    # vice versa) splits the graph or lands an untested combo.
+    # GPUI Kit moves deliberately, in one pass across all four
+    # packetThrower apps (Baudrun, PortFinder, etch341, Zorite): gpui-kit pins
+    # one gpui-pre snapshot, so a lone bump of any of these splits the
+    # graph or lands an untested combo.
     ignore:
-      - dependency-name: "gpui"
-      - dependency-name: "gpui_platform"
+      - dependency-name: "gpui-kit"
+      - dependency-name: "gpui-base"
       - dependency-name: "gpui-component"
-      - dependency-name: "gpui-component-assets"
+      - dependency-name: "gpui-kit-assets"
+      - dependency-name: "gpui-pre*"
 
   # Docs site — Astro + Starlight, a self-contained pnpm project
   # under docs-next/. Dependabot's `npm` ecosystem reads
