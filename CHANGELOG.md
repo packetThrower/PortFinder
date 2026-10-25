@@ -14,6 +14,12 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+## [4.2.0-beta.1] - 2026-10-25
+
+The move to [GPUI Kit](https://gpui-kit.com): PortFinder now builds
+entirely from crates.io, more of the window uses GPUI Kit components,
+and a round of security fixes lands.
+
 ### Changed
 - **More of the UI on GPUI Kit components**: the history and
   settings-popover rows (including the language picker) are Kit list
