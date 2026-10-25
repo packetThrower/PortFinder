@@ -41,11 +41,9 @@ All landed in 4.1.0 (see CHANGELOG).
   rerun. GitHub Actions has `actions/retry` but it's better as
   a workflow-level retry on the build step than wrapping the
   whole job.
-- [ ] **Stable `gpui` commit pin.** Currently `gpui = { git =
-  "..." }` with no `rev`, relying on `Cargo.lock` for
-  reproducibility. A `cargo update -p gpui` could silently
-  pick up a breaking change. Pin to a specific rev with a
-  comment + a process for deliberate bumps.
+- [x] **Stable `gpui` commit pin.** Done by the move to GPUI Kit:
+  `gpui-kit = "=0.8.0"` pins one crates.io gpui-pre snapshot, and
+  Dependabot ignores the family so bumps stay deliberate.
 - [ ] **Cargo profile per Windows arch.** The thin-LTO crash
   workaround lives in `release.yml`'s `CARGO_PROFILE_RELEASE_LTO`
   env override. Cleaner home for it: a `profile.release.windows-
@@ -64,11 +62,10 @@ All landed in 4.1.0 (see CHANGELOG).
   - `settings::Settings` round-trip (load → toggle → save → load)
   - `updater::check_for_update` against a fake `ureq` response
     (legacy-tag filter, prefix allowlist, channel policy)
-- [ ] **A property test or two on the parsers.** Fuzz random
-  byte sequences through `cdp::parse` / `lldp::parse` /
-  `mndp::parse` and assert they never panic. We already do
-  bounds-checks but a `proptest` harness would catch any
-  arithmetic-overflow regression future-us introduces.
+- [x] **No-panic test on the parsers.** `parsers_never_panic_on_
+  random_or_truncated_frames` feeds CDP / LLDP / MNDP random frames,
+  valid headers with random TLV bodies, and every truncation of a
+  good frame (deterministic xorshift, no proptest dependency).
 
 ## Polish / discoverability
 
