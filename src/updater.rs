@@ -13,8 +13,7 @@ use semver::Version;
 use serde::Deserialize;
 use std::time::Duration;
 
-const RELEASES_URL: &str =
-    "https://api.github.com/repos/packetThrower/PortFinder/releases";
+const RELEASES_URL: &str = "https://api.github.com/repos/packetThrower/PortFinder/releases";
 // Allowlist for the `html_url` field on each release. The footer
 // pill click handler passes that string straight to `cx.open_url`,
 // which on macOS hands it to NSWorkspace and on Linux to xdg-open
@@ -26,8 +25,7 @@ const RELEASES_URL: &str =
 // caught at the transport layer. Pin the prefix as defence in
 // depth: any release whose `html_url` doesn't start with this is
 // dropped before it can reach the UI.
-const RELEASES_HTML_PREFIX: &str =
-    "https://github.com/packetThrower/PortFinder/releases/";
+const RELEASES_HTML_PREFIX: &str = "https://github.com/packetThrower/PortFinder/releases/";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// What `check_for_update` returns when a newer release is found.

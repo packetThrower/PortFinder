@@ -61,9 +61,7 @@ use tokio_util::sync::CancellationToken;
 // or modal is up.
 actions!(portfinder, [Quit, StartOrStop]);
 
-use crate::{
-    capture, privilege, settings, updater, CaptureRequest, CaptureResult, InterfaceInfo,
-};
+use crate::{capture, privilege, settings, updater, CaptureRequest, CaptureResult, InterfaceInfo};
 
 /// Logical window width. Stays fixed — only the height grows or
 /// shrinks based on the privilege banner and result-card state.
@@ -485,9 +483,8 @@ impl AppView {
 
         let interface_select =
             cx.new(|cx| SelectState::new(initial_filtered, Some(IndexPath::new(0)), window, cx));
-        let protocol_select = cx.new(|cx| {
-            SelectState::new(protocol_opts(), Some(IndexPath::new(0)), window, cx)
-        });
+        let protocol_select =
+            cx.new(|cx| SelectState::new(protocol_opts(), Some(IndexPath::new(0)), window, cx));
 
         let iface_sub = cx.subscribe(
             &interface_select,
@@ -518,12 +515,11 @@ impl AppView {
         let (update_tx, update_rx) = flume::bounded::<updater::UpdateInfo>(1);
         let current_version = env!("CARGO_PKG_VERSION");
         tokio_handle().spawn(async move {
-            let result = tokio::task::spawn_blocking(move || {
-                updater::check_for_update(current_version)
-            })
-            .await
-            .ok()
-            .flatten();
+            let result =
+                tokio::task::spawn_blocking(move || updater::check_for_update(current_version))
+                    .await
+                    .ok()
+                    .flatten();
             if let Some(info) = result {
                 log::info!("update check: {} available", info.version);
                 let _ = update_tx.send_async(info).await;
@@ -708,8 +704,7 @@ impl AppView {
         // so swap the entity. The new subscription replaces the old
         // one held on `iface_sub` — dropping the old Subscription
         // unhooks the previous listener.
-        let new_state =
-            cx.new(|cx| SelectState::new(opts, Some(IndexPath::new(0)), window, cx));
+        let new_state = cx.new(|cx| SelectState::new(opts, Some(IndexPath::new(0)), window, cx));
         let sub = cx.subscribe(
             &new_state,
             |this, _state, event: &SelectEvent<Vec<Opt>>, cx| {
@@ -736,8 +731,9 @@ impl AppView {
         self.is_capturing = true;
         self.error.clear();
         self.result = None;
-        self.status_text =
-            t!("status.capturing", protocol = self.protocol.as_str()).into_owned().into();
+        self.status_text = t!("status.capturing", protocol = self.protocol.as_str())
+            .into_owned()
+            .into();
 
         let cancel = CancellationToken::new();
         if let Some(prev) = self.capture_cancel.take() {
@@ -1126,12 +1122,7 @@ impl Render for AppView {
                             .bg(card_bg)
                             .child(result_card),
                     )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(status_color)
-                            .child(status_line),
-                    )
+                    .child(div().text_xs().text_color(status_color).child(status_line))
                     .child({
                         // Footer: hairline top border separates the
                         // version line from the live status line
@@ -1211,9 +1202,11 @@ impl AppView {
                 .flex()
                 .flex_col()
                 .gap_2()
-                .child(div().text_sm().child(
-                    t!("privilege.npcap_needed").into_owned(),
-                ))
+                .child(
+                    div()
+                        .text_sm()
+                        .child(t!("privilege.npcap_needed").into_owned()),
+                )
                 .child(with_wrapping_tooltip(
                     "open-npcap-tip",
                     t!("button.download_npcap_tooltip").into_owned(),
@@ -1384,16 +1377,12 @@ impl AppView {
             // started a fresh capture (which clears `result`
             // to None) but then cancelled / lost focus.
             let history_btn = self.render_history_popover(cx);
-            let mut placeholder = div()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(t!("result.empty_placeholder").into_owned()),
-                );
+            let mut placeholder = div().flex().flex_col().gap_2().child(
+                div()
+                    .text_sm()
+                    .text_color(cx.theme().muted_foreground)
+                    .child(t!("result.empty_placeholder").into_owned()),
+            );
             if let Some(el) = history_btn {
                 placeholder = placeholder.child(div().flex().justify_end().child(el));
             }
@@ -1499,7 +1488,9 @@ impl AppView {
                         .ghost()
                         .small()
                         .on_click(cx.listener(move |this, _, _window, cx| {
-                            let Some(r) = this.result.as_ref() else { return };
+                            let Some(r) = this.result.as_ref() else {
+                                return;
+                            };
                             let json = match serde_json::to_string_pretty(r) {
                                 Ok(s) => s,
                                 Err(e) => {
@@ -1591,19 +1582,13 @@ impl AppView {
                         .tooltip(t!("history.button_tooltip").into_owned()),
                 )
                 .content(move |_, _, _| {
-                    let mut col = div()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .p_2()
-                        .w(px(320.0))
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(muted)
-                                .pb_1()
-                                .child(t!("history.header", count = count).into_owned()),
-                        );
+                    let mut col = div().flex().flex_col().gap_1().p_2().w(px(320.0)).child(
+                        div()
+                            .text_xs()
+                            .text_color(muted)
+                            .pb_1()
+                            .child(t!("history.header", count = count).into_owned()),
+                    );
                     for (ix, entry) in entries.iter().cloned() {
                         let entity_for_click = entity.clone();
                         let entity_for_right_click = entity.clone();
@@ -1673,7 +1658,9 @@ impl AppView {
                                                 .justify_between()
                                                 .gap_2()
                                                 .text_sm()
-                                                .child(div().truncate().min_w_0().child(switch_name))
+                                                .child(
+                                                    div().truncate().min_w_0().child(switch_name),
+                                                )
                                                 .child(
                                                     div()
                                                         .flex_shrink_0()
@@ -1712,7 +1699,9 @@ impl AppView {
     /// the popover stays open, no toast feedback. The row's
     /// tooltip hints at the gesture's existence.
     fn copy_history_entry_json(&mut self, ix: usize, cx: &mut Context<Self>) {
-        let Some(entry) = self.history.get(ix) else { return };
+        let Some(entry) = self.history.get(ix) else {
+            return;
+        };
         let json = match serde_json::to_string_pretty(&entry.result) {
             Ok(s) => s,
             Err(e) => {
@@ -2175,17 +2164,13 @@ impl AppView {
                         // lookup — no relaunch.
                         let entity_for_back = entity.clone();
                         let active_code = language_code.clone();
-                        let mut col = div()
-                            .flex()
-                            .flex_col()
-                            .gap_2()
-                            .p_3()
-                            .w(panel_width)
-                            .child(back_header(
+                        let mut col = div().flex().flex_col().gap_2().p_3().w(panel_width).child(
+                            back_header(
                                 "settings-language-back",
                                 &t!("settings.section.language"),
                                 entity_for_back,
-                            ));
+                            ),
+                        );
                         let mut rows = div()
                             .flex()
                             .flex_col()
@@ -2202,17 +2187,19 @@ impl AppView {
                                 .check_icon(IconName::Check)
                                 .confirmed(selected)
                                 .child(div().text_sm().child(name))
-                                .on_click(move |_, _window, cx| {
-                                    entity_for_pick.update(cx, |this, cx| {
-                                        this.settings.language = Some(code.to_string());
-                                        rust_i18n::set_locale(code);
-                                        if let Err(e) = this.settings.save() {
-                                            log::warn!("settings save failed: {e}");
-                                        }
-                                        this.settings_view = SettingsView::Main;
-                                        cx.notify();
-                                    });
-                                }),
+                                .on_click(
+                                    move |_, _window, cx| {
+                                        entity_for_pick.update(cx, |this, cx| {
+                                            this.settings.language = Some(code.to_string());
+                                            rust_i18n::set_locale(code);
+                                            if let Err(e) = this.settings.save() {
+                                                log::warn!("settings save failed: {e}");
+                                            }
+                                            this.settings_view = SettingsView::Main;
+                                            cx.notify();
+                                        });
+                                    },
+                                ),
                             );
                         }
                         col = col.child(rows);
@@ -2336,13 +2323,7 @@ impl AppView {
                 .gap_1()
                 .min_w_0()
                 .w_full()
-                .child(
-                    div()
-                        .min_w_0()
-                        .truncate()
-                        .text_right()
-                        .child(raw),
-                )
+                .child(div().min_w_0().truncate().text_right().child(raw))
                 // Kit copy button; while a click on the value itself has
                 // just copied, the same slot shows a check instead.
                 .child(if copied {
@@ -2506,13 +2487,14 @@ fn log_level_label(
 ) -> gpui::Stateful<gpui::Div> {
     let label = label.into();
     let description = description.into();
-    div().id(id).child(label).tooltip(move |window, cx| -> AnyView {
-        let description = description.clone();
-        Tooltip::element(move |_, _| {
-            div().w(px(220.0)).text_sm().child(description.clone())
+    div()
+        .id(id)
+        .child(label)
+        .tooltip(move |window, cx| -> AnyView {
+            let description = description.clone();
+            Tooltip::element(move |_, _| div().w(px(220.0)).text_sm().child(description.clone()))
+                .build(window, cx)
         })
-        .build(window, cx)
-    })
 }
 
 /// Wraps a `Button` in an id'd div that carries a width-capped,
@@ -2528,11 +2510,14 @@ fn with_wrapping_tooltip(
     button: Button,
 ) -> gpui::Stateful<gpui::Div> {
     let text = text.into();
-    div().id(id).child(button).tooltip(move |window, cx| -> AnyView {
-        let text = text.clone();
-        Tooltip::element(move |_, _| div().w(px(220.0)).text_sm().child(text.clone()))
-            .build(window, cx)
-    })
+    div()
+        .id(id)
+        .child(button)
+        .tooltip(move |window, cx| -> AnyView {
+            let text = text.clone();
+            Tooltip::element(move |_, _| div().w(px(220.0)).text_sm().child(text.clone()))
+                .build(window, cx)
+        })
 }
 
 /// Small "section heading" label for the settings popover —
@@ -2551,11 +2536,7 @@ fn settings_section_header(label: impl Into<SharedString>, muted: Hsla) -> gpui:
 /// slider's header line, which sits above a full-width
 /// Slider. Icon is rendered in the muted-tone since the
 /// label colour drives the row's hierarchy, not the icon.
-fn settings_row_header(
-    icon: IconName,
-    label: impl Into<SharedString>,
-    muted: Hsla,
-) -> gpui::Div {
+fn settings_row_header(icon: IconName, label: impl Into<SharedString>, muted: Hsla) -> gpui::Div {
     div()
         .flex()
         .items_center()
@@ -2950,13 +2931,11 @@ fn install_macos_dock_icon() {
     #[allow(deprecated)]
     unsafe {
         let path = NSString::from_str(&icon_path);
-        let Some(source) = NSImage::initWithContentsOfFile(NSImage::alloc(), &path)
-        else {
+        let Some(source) = NSImage::initWithContentsOfFile(NSImage::alloc(), &path) else {
             log::warn!("dock icon: could not load {icon_path}");
             return;
         };
-        let canvas =
-            NSImage::initWithSize(NSImage::alloc(), NSSize::new(CANVAS_PX, CANVAS_PX));
+        let canvas = NSImage::initWithSize(NSImage::alloc(), NSSize::new(CANVAS_PX, CANVAS_PX));
         canvas.lockFocus();
         source.drawInRect_fromRect_operation_fraction(
             NSRect::new(

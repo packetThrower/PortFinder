@@ -15,8 +15,7 @@ const DAEMON_PLIST: &str =
 // new installer — the legacy ChmodBPF binary still grants /dev/bpf* access
 // to the access_bpf group, so capture works either way until the new
 // installer is run (which cleans up the legacy entry).
-const LEGACY_DAEMON_PLIST: &str =
-    "/Library/LaunchDaemons/coop.otec.portfinder.ChmodBPF.plist";
+const LEGACY_DAEMON_PLIST: &str = "/Library/LaunchDaemons/coop.otec.portfinder.ChmodBPF.plist";
 const WIRESHARK_PLIST: &str = "/Library/LaunchDaemons/org.wireshark.ChmodBPF.plist";
 
 pub fn has_platform_privilege() -> bool {

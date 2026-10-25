@@ -14,7 +14,10 @@
 // routed through the matching `portfinder-cli.exe` binary instead.
 // See `lib.rs` for the full dual-binary rationale. No-op on
 // non-Windows targets.
-#![cfg_attr(all(target_os = "windows", not(debug_assertions)), windows_subsystem = "windows")]
+#![cfg_attr(
+    all(target_os = "windows", not(debug_assertions)),
+    windows_subsystem = "windows"
+)]
 
 use clap::Parser;
 use portfinder::{app_view, cli, init_logging};

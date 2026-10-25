@@ -206,7 +206,10 @@ fn capture_blocking(
         }
         match cap.next_packet() {
             Ok(packet) => {
-                log::debug!("capture_blocking: got {}-byte frame on {iface}", packet.data.len());
+                log::debug!(
+                    "capture_blocking: got {}-byte frame on {iface}",
+                    packet.data.len()
+                );
                 return Ok(packet.data.to_vec());
             }
             Err(pcap::Error::TimeoutExpired) => {
@@ -641,5 +644,96 @@ mod tests {
 
         let result = lldp::parse(&frame).expect("LLDP parse should succeed");
         assert_eq!(result.switch_port, "1/1/1 (Duty PC)");
+    }
+
+    // ---- Parsers never panic on hostile input -----------------------
+    //
+    // CDP / LLDP / MNDP frames come straight off the wire from any
+    // device on the segment, so a malformed or truncated frame must
+    // come back as `Err` (or a partial result), never a panic. A
+    // deterministic xorshift keeps this dependency-free and
+    // reproducible; three shapes per parser: fully random bytes, a
+    // valid protocol header followed by random TLV bytes (so the TLV
+    // loops actually run), and every truncation of a valid frame.
+
+    type ParseFn = fn(&[u8]) -> Result<CaptureResult, String>;
+
+    fn xorshift(state: &mut u64) -> u64 {
+        *state ^= *state << 13;
+        *state ^= *state >> 7;
+        *state ^= *state << 17;
+        *state
+    }
+
+    fn random_bytes(state: &mut u64, len: usize) -> Vec<u8> {
+        (0..len).map(|_| xorshift(state) as u8).collect()
+    }
+
+    fn cdp_header() -> Vec<u8> {
+        let mut f = vec![0u8; 12];
+        f.extend_from_slice(&[0x00, 0x40]);
+        f.extend_from_slice(&[0xAA, 0xAA, 0x03, 0x00, 0x00, 0x0C, 0x20, 0x00]);
+        f.extend_from_slice(&[0x02, 0xb4, 0x00, 0x00]);
+        f
+    }
+
+    fn lldp_header() -> Vec<u8> {
+        let mut f = vec![0u8; 12];
+        f.extend_from_slice(&[0x88, 0xCC]);
+        f
+    }
+
+    /// Ethernet + IPv4 + UDP/5678 + MNDP header around `body`, with
+    /// the IPv4 / UDP length fields set to cover it.
+    fn mndp_frame(body: &[u8]) -> Vec<u8> {
+        let mut f = vec![0u8; 12];
+        f.extend_from_slice(&[0x08, 0x00]);
+        let udp_len = (8 + 4 + body.len()) as u16;
+        let ip_len = 20 + udp_len;
+        f.extend_from_slice(&[0x45, 0x00]);
+        f.extend_from_slice(&ip_len.to_be_bytes());
+        f.extend_from_slice(&[0, 0, 0, 0, 0xFF, 17, 0, 0, 10, 0, 0, 1, 255, 255, 255, 255]);
+        f.extend_from_slice(&[0x16, 0x2E, 0x16, 0x2E]);
+        f.extend_from_slice(&udp_len.to_be_bytes());
+        f.extend_from_slice(&[0, 0, 0x00, 0x00, 0x00, 0x01]);
+        f.extend_from_slice(body);
+        f
+    }
+
+    #[test]
+    fn parsers_never_panic_on_random_or_truncated_frames() {
+        let parsers: [ParseFn; 3] = [cdp::parse, lldp::parse, mndp::parse];
+        let mut state = 0x9E37_79B9_7F4A_7C15u64;
+
+        for _ in 0..20_000 {
+            let len = (xorshift(&mut state) % 256) as usize;
+            let junk = random_bytes(&mut state, len);
+            for parse in parsers {
+                let _ = parse(&junk);
+            }
+            let _ = cdp::parse(&[cdp_header(), junk.clone()].concat());
+            let _ = lldp::parse(&[lldp_header(), junk.clone()].concat());
+            let _ = mndp::parse(&mndp_frame(&junk));
+        }
+
+        // Every truncation of a well-formed frame per protocol.
+        let mut cdp_ok = cdp_header();
+        cdp_ok.extend_from_slice(&[0, 1, 0, 11, b's', b'w', b'i', b't', b'c', b'h', b'1']);
+        cdp_ok.extend_from_slice(&[0, 0x0A, 0, 6, 0x00, 0x64]);
+        let mut lldp_ok = lldp_header();
+        lldp_ok.extend_from_slice(&[(5 << 1) as u8, 7]);
+        lldp_ok.extend_from_slice(b"switch2");
+        lldp_ok.extend_from_slice(&[0xFE, 6, 0x00, 0x80, 0xC2, 0x01, 0x00, 0xC8, 0, 0]);
+        let mndp_ok = mndp_frame(&[0, 5, 0, 4, b'c', b'o', b'r', b'e', 0, 17, 0, 4, 10, 0, 0, 1]);
+        for (frame, parse) in [
+            (cdp_ok, cdp::parse as ParseFn),
+            (lldp_ok, lldp::parse),
+            (mndp_ok, mndp::parse),
+        ] {
+            assert!(parse(&frame).is_ok(), "fixture should parse");
+            for cut in 0..frame.len() {
+                let _ = parse(&frame[..cut]);
+            }
+        }
     }
 }

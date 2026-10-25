@@ -233,7 +233,10 @@ pub fn log_file_path() -> Option<PathBuf> {
         // `Library/Logs` is the cleanest way to land there without
         // pulling a macOS-specific crate; `dirs` doesn't have a
         // dedicated log_dir() helper on macOS.
-        dirs::home_dir()?.join("Library").join("Logs").join("PortFinder")
+        dirs::home_dir()?
+            .join("Library")
+            .join("Logs")
+            .join("PortFinder")
     } else {
         // `dirs::state_dir` is $XDG_STATE_HOME (defaulting to
         // ~/.local/state) — the XDG-spec'd location for logs and
@@ -405,10 +408,7 @@ pub fn try_remove_legacy_desktop_log() {
         return;
     }
     if std::fs::remove_file(&path).is_ok() {
-        log::info!(
-            "removed legacy alpha-era debug log at {}",
-            path.display()
-        );
+        log::info!("removed legacy alpha-era debug log at {}", path.display());
     }
 }
 
@@ -419,7 +419,9 @@ pub fn try_remove_legacy_desktop_log() {
 /// open anything. Creates the directory first so the open
 /// succeeds even before any log line has been written.
 pub fn reveal_log_folder() {
-    let Some(log_path) = log_file_path() else { return };
+    let Some(log_path) = log_file_path() else {
+        return;
+    };
     let Some(dir) = log_path.parent() else { return };
     reveal_dir(dir);
 }
@@ -451,8 +453,5 @@ fn reveal_dir(dir: &std::path::Path) {
     } else {
         ("xdg-open", vec![])
     };
-    let _ = std::process::Command::new(cmd)
-        .args(args)
-        .arg(dir)
-        .spawn();
+    let _ = std::process::Command::new(cmd).args(args).arg(dir).spawn();
 }
