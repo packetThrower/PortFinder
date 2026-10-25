@@ -15,6 +15,11 @@ Each major version line is a different implementation:
 ## [Unreleased]
 
 ### Changed
+- **More of the UI on GPUI Kit components**: the history and
+  settings-popover rows (including the language picker) are Kit list
+  items, the settings sub-pages' back control is a Kit button, and
+  every result row gets a Kit copy button. Clicking a value still
+  copies it, as before.
 - **Moved to GPUI Kit 0.8.0** (gpui-pre 0.3.9), the crates.io home of
   gpui-component, replacing the Zed-git gpui and gpui-component git
   pins. The build now uses crates.io only.

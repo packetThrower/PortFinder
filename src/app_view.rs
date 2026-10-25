@@ -27,6 +27,8 @@ use gpui::{
 };
 use gpui_kit::component::{
     button::{Button, ButtonVariants},
+    clipboard::Clipboard,
+    list::ListItem,
     popover::Popover,
     select::{Select, SelectEvent, SelectItem, SelectState},
     skeleton::Skeleton,
@@ -1578,7 +1580,6 @@ impl AppView {
         let theme = cx.theme();
         let muted = theme.muted_foreground;
         let border = theme.border;
-        let hover_bg = theme.muted;
 
         Some(
             Popover::new("history-popover")
@@ -1646,16 +1647,9 @@ impl AppView {
                             port_segment,
                         );
                         col = col.child(
-                            div()
-                                .id(("history-row", ix))
-                                .cursor_pointer()
-                                .flex()
-                                .flex_col()
-                                .gap_0p5()
-                                .p_2()
+                            ListItem::new(("history-row", ix))
                                 .border_t_1()
                                 .border_color(border)
-                                .hover(|this| this.bg(hover_bg))
                                 .tooltip(|window, cx| -> AnyView {
                                     let text: SharedString =
                                         t!("history.row_tooltip").into_owned().into();
@@ -1666,23 +1660,26 @@ impl AppView {
                                 })
                                 .child(
                                     div()
-                                        .text_xs()
-                                        .text_color(muted)
-                                        .child(meta),
-                                )
-                                .child(
-                                    div()
                                         .flex()
-                                        .items_center()
-                                        .justify_between()
-                                        .gap_2()
-                                        .text_sm()
-                                        .child(div().truncate().min_w_0().child(switch_name))
+                                        .flex_col()
+                                        .gap_0p5()
+                                        .w_full()
+                                        .min_w_0()
+                                        .child(div().text_xs().text_color(muted).child(meta))
                                         .child(
                                             div()
-                                                .flex_shrink_0()
-                                                .text_color(muted)
-                                                .child(switch_ip),
+                                                .flex()
+                                                .items_center()
+                                                .justify_between()
+                                                .gap_2()
+                                                .text_sm()
+                                                .child(div().truncate().min_w_0().child(switch_name))
+                                                .child(
+                                                    div()
+                                                        .flex_shrink_0()
+                                                        .text_color(muted)
+                                                        .child(switch_ip),
+                                                ),
                                         ),
                                 )
                                 .on_click(move |_, _window, cx| {
@@ -1691,25 +1688,15 @@ impl AppView {
                                     });
                                 })
                                 // Right-click → silently copy that
-                                // entry's CaptureResult as JSON
-                                // (same `serde_json::to_string_pretty`
-                                // shape the CLI / "Copy as JSON"
-                                // footer button produce). Silent:
-                                // the popover stays open on right-
-                                // click, no banner/toast feedback —
-                                // the discoverable hint is the row
-                                // tooltip above. Pragmatic: an
-                                // explicit "Copied" indicator
-                                // inside a popover that closes on
-                                // outside-click is awkward.
-                                .on_mouse_down(
-                                    gpui::MouseButton::Right,
-                                    move |_, _window, cx| {
-                                        entity_for_right_click.update(cx, |this, cx| {
-                                            this.copy_history_entry_json(ix, cx);
-                                        });
-                                    },
-                                ),
+                                // entry's CaptureResult as JSON (same
+                                // shape as the CLI / "Copy as JSON"
+                                // button). The popover stays open; the
+                                // row tooltip is the discoverable hint.
+                                .on_mouse_down(gpui::MouseButton::Right, move |_, _window, cx| {
+                                    entity_for_right_click.update(cx, |this, cx| {
+                                        this.copy_history_entry_json(ix, cx);
+                                    });
+                                }),
                         );
                     }
                     col.into_any_element()
@@ -2005,25 +1992,23 @@ impl AppView {
                 // `settings_view` to `Language`.
                 let entity_for_lang_open = entity_for_about.clone();
                 let lang_label = crate::i18n::display_name(&language_code).to_string();
-                let language_row = div()
-                    .id("settings-language-row")
-                    .cursor_pointer()
-                    .flex()
-                    .items_center()
-                    .justify_between()
+                // `-mx` cancels ListItem's own px_3 so the label lines up
+                // with the other rows while the hover fill keeps its inset.
+                let language_row = ListItem::new("settings-language-row")
+                    .mx(px(-12.0))
                     .child(settings_row_header(
                         IconName::Globe,
                         t!("settings.language_row").into_owned(),
                         muted,
                     ))
-                    .child(
+                    .suffix(move |_, _| {
                         div()
                             .flex()
                             .items_center()
                             .gap_2()
-                            .child(div().text_sm().text_color(muted).child(lang_label))
-                            .child(Icon::new(IconName::ChevronRight).text_color(muted)),
-                    )
+                            .child(div().text_sm().text_color(muted).child(lang_label.clone()))
+                            .child(Icon::new(IconName::ChevronRight).text_color(muted))
+                    })
                     .on_click(move |_, _window, cx| {
                         entity_for_lang_open.update(cx, |this, cx| {
                             this.settings_view = SettingsView::Language;
@@ -2044,21 +2029,14 @@ impl AppView {
                 // About`, which the outer `match view`
                 // below swaps in the About page.
                 let entity_for_about_open = entity_for_about.clone();
-                let about_row = div()
-                    .id("settings-about-row")
-                    .cursor_pointer()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .pt_3()
-                    .border_t_1()
-                    .border_color(border)
+                let about_row = ListItem::new("settings-about-row")
+                    .mx(px(-12.0))
                     .child(settings_row_header(
                         IconName::Info,
                         t!("settings.about_row").into_owned(),
                         muted,
                     ))
-                    .child(Icon::new(IconName::ChevronRight).text_color(muted))
+                    .suffix(move |_, _| Icon::new(IconName::ChevronRight).text_color(muted))
                     .on_click(move |_, _window, cx| {
                         entity_for_about_open.update(cx, |this, cx| {
                             this.settings_view = SettingsView::About;
@@ -2118,7 +2096,6 @@ impl AppView {
                             .child(back_header(
                                 "settings-about-back",
                                 &t!("settings.about_back"),
-                                muted,
                                 entity_for_back,
                             ))
                             .child(
@@ -2207,7 +2184,6 @@ impl AppView {
                             .child(back_header(
                                 "settings-language-back",
                                 &t!("settings.section.language"),
-                                muted,
                                 entity_for_back,
                             ));
                         let mut rows = div()
@@ -2220,35 +2196,23 @@ impl AppView {
                             let entity_for_pick = entity.clone();
                             let selected = active_code == code;
                             rows = rows.child(
-                                div()
-                                    .id(SharedString::from(format!(
-                                        "settings-language-pick-{code}"
-                                    )))
-                                    .cursor_pointer()
-                                    .flex()
-                                    .items_center()
-                                    .justify_between()
-                                    .p_2()
-                                    .hover(|this| this.bg(cx.theme().muted))
-                                    .child(div().text_sm().child(name))
-                                    .child(if selected {
-                                        Icon::new(IconName::Check)
-                                            .text_color(cx.theme().success)
-                                            .into_any_element()
-                                    } else {
-                                        div().w(px(16.0)).h(px(16.0)).into_any_element()
-                                    })
-                                    .on_click(move |_, _window, cx| {
-                                        entity_for_pick.update(cx, |this, cx| {
-                                            this.settings.language = Some(code.to_string());
-                                            rust_i18n::set_locale(code);
-                                            if let Err(e) = this.settings.save() {
-                                                log::warn!("settings save failed: {e}");
-                                            }
-                                            this.settings_view = SettingsView::Main;
-                                            cx.notify();
-                                        });
-                                    }),
+                                ListItem::new(SharedString::from(format!(
+                                    "settings-language-pick-{code}"
+                                )))
+                                .check_icon(IconName::Check)
+                                .confirmed(selected)
+                                .child(div().text_sm().child(name))
+                                .on_click(move |_, _window, cx| {
+                                    entity_for_pick.update(cx, |this, cx| {
+                                        this.settings.language = Some(code.to_string());
+                                        rust_i18n::set_locale(code);
+                                        if let Err(e) = this.settings.save() {
+                                            log::warn!("settings save failed: {e}");
+                                        }
+                                        this.settings_view = SettingsView::Main;
+                                        cx.notify();
+                                    });
+                                }),
                             );
                         }
                         col = col.child(rows);
@@ -2263,7 +2227,13 @@ impl AppView {
                         .child(language_row)
                         .child(capture_section)
                         .child(logging_section)
-                        .child(about_row)
+                        .child(
+                            div()
+                                .pt_1()
+                                .border_t_1()
+                                .border_color(border)
+                                .child(about_row),
+                        )
                         .child(folders_row)
                         .into_any_element(),
                 }
@@ -2356,6 +2326,7 @@ impl AppView {
                 .into_any_element()
         } else {
             let copy_payload = raw.clone();
+            let copy_button_payload = raw.clone();
             div()
                 .id(("copy-value", row_id))
                 .cursor_pointer()
@@ -2372,14 +2343,18 @@ impl AppView {
                         .text_right()
                         .child(raw),
                 )
+                // Kit copy button; while a click on the value itself has
+                // just copied, the same slot shows a check instead.
                 .child(if copied {
-                    div()
-                        .flex_shrink_0()
+                    Icon::new(IconName::Check)
+                        .xsmall()
                         .text_color(success)
-                        .child("✓")
+                        .flex_shrink_0()
                         .into_any_element()
                 } else {
-                    div().w_0().h_0().into_any_element()
+                    Clipboard::new(("copy-button", row_id))
+                        .value(copy_button_payload)
+                        .into_any_element()
                 })
                 .on_mouse_up(
                     gpui::MouseButton::Left,
@@ -2619,22 +2594,14 @@ fn settings_switch_row(
 /// page (About, Language). Clicking it sets `settings_view`
 /// back to `Main` via the captured AppView entity. The drill-
 /// down pattern matches macOS System Settings panels.
-fn back_header(
-    id: &'static str,
-    label: &str,
-    muted: Hsla,
-    entity: Entity<AppView>,
-) -> gpui::Stateful<gpui::Div> {
+fn back_header(id: &'static str, label: &str, entity: Entity<AppView>) -> Button {
     let owned: SharedString = label.to_string().into();
-    div()
-        .id(id)
-        .cursor_pointer()
-        .flex()
-        .items_center()
-        .gap_2()
-        .pb_1()
-        .child(Icon::new(IconName::ChevronLeft).text_color(muted))
-        .child(div().text_sm().child(owned))
+    Button::new(id)
+        .ghost()
+        .small()
+        .self_start()
+        .icon(IconName::ChevronLeft)
+        .label(owned)
         .on_click(move |_, _window, cx| {
             entity.update(cx, |this, cx| {
                 this.settings_view = SettingsView::Main;
