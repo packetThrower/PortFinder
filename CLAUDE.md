@@ -2,9 +2,10 @@
 
 ## Project
 PortFinder — Network switch port discovery tool using CDP / LLDP / MNDP.
-Pure-Rust app: Zed's gpui (GPU-accelerated UI), gpui-component (Button /
-Switch / Select / Theme), and the pcap crate. Single binary on macOS /
-Linux, **two binaries on Windows** — see "Windows dual binary" below.
+Pure-Rust app: GPUI via GPUI Kit (one `gpui-kit = "=x.y.z"` dependency:
+gpui-pre + gpui-component's Button / Switch / Select / Theme + icons;
+`extern crate gpui_kit as gpui;` in lib.rs), and the pcap crate.
+Single binary on macOS / Linux, **two binaries on Windows** — see "Windows dual binary" below.
 4.x is the gpui rewrite; 3.x was Tauri (Rust backend + Svelte 5 frontend)
 on the `tauri-version` branch, 2.x was Wails+Go on `wails-version`, 1.x
 was Python on `python-legacy`.
@@ -114,7 +115,7 @@ LaunchDaemon. Replaces the legacy `coop.otec.portfinder.ChmodBPF` /
 Binary name in Cargo (`[[bin]] name = "PortFinder"`) is capitalised to
 match CFBundleExecutable; the package name stays lowercase as is
 conventional.
-gpui-component widgets need `gpui_component::init(cx)` called before the
+gpui-component widgets need `gpui_kit::component::init(cx)` called before the
 first render or `Select::new` panics on the missing Theme global.
 
 ## Windows dual binary

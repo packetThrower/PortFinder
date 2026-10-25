@@ -42,6 +42,10 @@
 //!
 //! [rust-lang/rust#40490]: https://github.com/rust-lang/rust/pull/40490
 
+// gpui is reached through GPUI Kit (see Cargo.toml); the alias keeps
+// `gpui::` paths and gpui's derive-macro output resolving.
+extern crate gpui_kit as gpui;
+
 pub mod app_view;
 pub mod capture;
 pub mod cli;

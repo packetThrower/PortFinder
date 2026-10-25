@@ -14,6 +14,11 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+### Changed
+- **Moved to GPUI Kit 0.8.0** (gpui-pre 0.3.9), the crates.io home of
+  gpui-component, replacing the Zed-git gpui and gpui-component git
+  pins. The build now uses crates.io only.
+
 ### Security
 - **rustls patched** (0.23.40 → 0.23.46, rustls-webpki 0.103.16,
   webpki-roots 1.0.11): clears six TLS advisories, including a
