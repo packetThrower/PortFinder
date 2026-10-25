@@ -206,7 +206,10 @@ fn capture_blocking(
         }
         match cap.next_packet() {
             Ok(packet) => {
-                log::debug!("capture_blocking: got {}-byte frame on {iface}", packet.data.len());
+                log::debug!(
+                    "capture_blocking: got {}-byte frame on {iface}",
+                    packet.data.len()
+                );
                 return Ok(packet.data.to_vec());
             }
             Err(pcap::Error::TimeoutExpired) => {
@@ -697,8 +700,11 @@ mod tests {
 
     #[test]
     fn parsers_never_panic_on_random_or_truncated_frames() {
-        let parsers: [(&str, fn(&[u8]) -> Result<CaptureResult, String>); 3] =
-            [("cdp", cdp::parse), ("lldp", lldp::parse), ("mndp", mndp::parse)];
+        let parsers: [(&str, fn(&[u8]) -> Result<CaptureResult, String>); 3] = [
+            ("cdp", cdp::parse),
+            ("lldp", lldp::parse),
+            ("mndp", mndp::parse),
+        ];
         let mut state = 0x9E37_79B9_7F4A_7C15u64;
 
         for _ in 0..20_000 {
@@ -722,7 +728,10 @@ mod tests {
         lldp_ok.extend_from_slice(&[0xFE, 6, 0x00, 0x80, 0xC2, 0x01, 0x00, 0xC8, 0, 0]);
         let mndp_ok = mndp_frame(&[0, 5, 0, 4, b'c', b'o', b'r', b'e', 0, 17, 0, 4, 10, 0, 0, 1]);
         for (frame, parse) in [
-            (cdp_ok, cdp::parse as fn(&[u8]) -> Result<CaptureResult, String>),
+            (
+                cdp_ok,
+                cdp::parse as fn(&[u8]) -> Result<CaptureResult, String>,
+            ),
             (lldp_ok, lldp::parse),
             (mndp_ok, mndp::parse),
         ] {

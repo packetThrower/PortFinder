@@ -69,11 +69,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Rust (stable + clippy)
+      - name: Setup Rust (stable + clippy + rustfmt)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           toolchain: stable
-          components: clippy
+          components: clippy, rustfmt
 
       - name: Cache cargo registry + target
         uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
@@ -130,6 +130,11 @@ jobs:
         run: |
           echo "LIB=${{ github.workspace }}\npcap-sdk\Lib\${{ matrix.npcap_lib }};$env:LIB" >> $env:GITHUB_ENV
         shell: powershell
+
+      # Formatting is platform-independent; one runner is enough.
+      - name: cargo fmt --check
+        if: matrix.runner == 'ubuntu-latest'
+        run: cargo fmt --check
 
       # cargo-deny reads Cargo.lock + deny.toml only — platform-
       # independent, so one runner is enough. taiki-e/install-action
