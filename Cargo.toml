@@ -110,7 +110,7 @@ ureq = { version = "2", features = ["json", "tls"] }
 semver = "1"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.30", features = ["user"] }
+nix = { version = "0.31", features = ["user"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.59", features = [
