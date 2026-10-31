@@ -96,7 +96,7 @@ sys-locale = "0.3"
 # `%LOCALAPPDATA%\PortFinder\Logs\` on Windows. Already in the
 # transitive dep graph via gpui's font-kit chain; declaring directly
 # so we don't break if upstream drops it.
-dirs = "6"
+dirs = "7"
 
 # Sync HTTP client for the on-launch GitHub Releases update check.
 # `ureq` is the minimal-deps sync flavour — bundles rustls so we
