@@ -76,7 +76,7 @@ jobs:
           components: clippy, rustfmt
 
       - name: Cache cargo registry + target
-        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+        uses: Swatinem/rust-cache@c8037a86dde8214a8310e9f54a8fc61ab362aa31 # v2
         with:
           # Preserve the cache even when a later step (clippy, test)
           # fails. Default is to discard on failure, which forces a
@@ -141,7 +141,7 @@ jobs:
       # fetches a prebuilt binary rather than building from source.
       - name: Install cargo-deny
         if: matrix.runner == 'ubuntu-latest'
-        uses: taiki-e/install-action@a4d3f3f761dcd95cce1b72cb61cb6d1963438177 # v2.87.30
+        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
         with:
           tool: cargo-deny
 
