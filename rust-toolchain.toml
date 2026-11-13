@@ -1,0 +1,9 @@
+# Pinned to 1.98.0: Rust 1.100 links WaitOnAddress / WakeByAddressAll on
+# x64 Windows from vertdll.dll, via the import lib of windows-sys 0.36.1
+# (pulled in by pcap 2.x), and every binary crashes on its first thread
+# wait. pcap 3.0 moves to windows-sys 0.61; unpin once PortFinder is on it.
+# The workflows pass the same version to dtolnay/rust-toolchain so the
+# targets they add land on this toolchain.
+[toolchain]
+channel = "1.98.0"
+components = ["clippy", "rustfmt"]

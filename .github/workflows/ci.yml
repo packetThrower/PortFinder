@@ -69,10 +69,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Rust (stable + clippy + rustfmt)
+      - name: Setup Rust (1.98.0 + clippy + rustfmt)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
-          toolchain: stable
+          toolchain: 1.98.0 # matches rust-toolchain.toml
           components: clippy, rustfmt
 
       - name: Cache cargo registry + target
