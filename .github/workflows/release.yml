@@ -47,10 +47,10 @@ jobs:
       # this one Apple Silicon runner. aarch64 is the host so
       # rustup would have it implicitly, but listing it for
       # symmetry / clarity.
-      - name: Setup Rust (stable + both Apple targets)
+      - name: Setup Rust (1.98.0 + both Apple targets)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
-          toolchain: stable
+          toolchain: 1.98.0 # matches rust-toolchain.toml
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       # `shared-key: release` makes successive release-tag runs
@@ -181,10 +181,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Rust (stable)
+      - name: Setup Rust (1.98.0)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
-          toolchain: stable
+          toolchain: 1.98.0 # matches rust-toolchain.toml
           targets: ${{ matrix.target }}
 
       - name: Cache cargo registry + target
@@ -407,10 +407,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Rust (stable)
+      - name: Setup Rust (1.98.0)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
-          toolchain: stable
+          toolchain: 1.98.0 # matches rust-toolchain.toml
           targets: ${{ matrix.target }}
 
       - name: Cache cargo registry + target
