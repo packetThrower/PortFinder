@@ -11,47 +11,49 @@ export default defineConfig({
 		starlight({
 			title: 'PortFinder',
 			description: 'Network switch port discovery via CDP, LLDP, and MNDP.',
-			logo: {
-				src: './src/assets/icon.svg',
-				replacesTitle: false,
-			},
 			favicon: '/favicon.svg',
-			customCss: ['./src/styles/theme.css'],
+			customCss: ['@packetthrower/site-theme/styles/starlight.css'],
 			components: {
-				Hero: './src/components/Hero.astro',
-				// Adds "← packetThrower" + "Docs" pills to the
-				// top-right, left of the GitHub icon — same pattern
-				// as Baudrun's docs site. See SocialIcons.astro.
-				SocialIcons: './src/components/SocialIcons.astro',
+				// Shared packetThrower header: global bar (Apps menu, search,
+				// theme, GitHub) + PortFinder's app bar. The landing page at
+				// /PortFinder/ is src/pages/index.astro, outside Starlight.
+				Header: '@packetthrower/site-theme/components/StarlightHeader.astro',
 			},
-			social: [
-				{
-					icon: 'github',
-					label: 'GitHub',
-					href: 'https://github.com/packetThrower/PortFinder',
-				},
-			],
 			editLink: {
 				baseUrl: 'https://github.com/packetThrower/PortFinder/edit/main/docs-next/',
 			},
 			sidebar: [
-				{ label: 'Install', slug: 'install' },
+				// Same groups, in the same order, on every packetThrower docs site.
 				{
-					label: 'Usage',
+					label: 'Get started',
+					items: [{ label: 'Install', slug: 'install' }],
+				},
+				{
+					label: 'Guides',
 					items: [
 						{ label: 'GUI', slug: 'usage/gui' },
 						{ label: 'CLI', slug: 'usage/cli' },
 					],
 				},
 				{
-					label: 'Development',
+					label: 'Develop',
 					items: [
 						{ label: 'Setup', slug: 'dev/setup' },
 						{ label: 'Architecture', slug: 'dev/architecture' },
 						{ label: 'Releasing', slug: 'dev/releasing' },
 					],
 				},
-				{ label: 'Changelog', slug: 'changelog' },
+				{
+					label: 'Project',
+					items: [
+						{ label: 'Changelog', slug: 'changelog' },
+						{
+							label: 'Issues',
+							link: 'https://github.com/packetThrower/PortFinder/issues',
+							attrs: { target: '_blank', rel: 'noopener' },
+						},
+					],
+				},
 			],
 			lastUpdated: true,
 		}),

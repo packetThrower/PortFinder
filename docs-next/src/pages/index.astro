@@ -1,0 +1,179 @@
+---
+// Landing page at /PortFinder/ (replaces the Starlight splash index.mdx).
+// Layout + components come from the shared @packetthrower/site-theme.
+import Layout from '@packetthrower/site-theme/components/Layout.astro';
+import InstallTabs from '@packetthrower/site-theme/components/InstallTabs.astro';
+import { latestRelease } from '@packetthrower/site-theme';
+
+const v = latestRelease()?.version ?? 'latest';
+const description = "Plug a laptop into a switch, see what port you're on, in under thirty seconds.";
+
+const shots = [
+	['macos_start', 'macOS · ready'],
+	['macos_sniffing', 'macOS · capturing'],
+	['macos', 'macOS · result'],
+	['macos_settings', 'macOS · settings'],
+	['windows', 'windows'],
+	['linux', 'linux'],
+];
+---
+
+<Layout title="PortFinder — which switch port am I on?" description={description} app="portfinder" ogImage="https://packetthrower.github.io/PortFinder/og-image.png">
+	<section class="pt-hero">
+		<div class="pt-wrap pt-hero-grid">
+			<div>
+				<a class="pt-pill" href="/PortFinder/changelog/"><span class="pt-ver">v{v}</span> What's new in this release →</a>
+				<h1>Plug into a switch, <em>see what port you're on.</em></h1>
+				<p class="pt-lede">
+					PortFinder listens for the CDP, LLDP and MNDP packets switches already broadcast and reads the switch name, IP,
+					port, VLAN, voice VLAN, MTU and model, in under thirty seconds. No scanning, no login, no agent on the switch.
+				</p>
+				<div class="pt-actions">
+					<a class="pt-btn pt-btn-primary" href="#install"><span>Download for <span data-pt-os>your OS</span></span></a>
+					<a class="pt-btn" href="/PortFinder/usage/gui/">Read the docs</a>
+				</div>
+				<div class="pt-chips" style="margin-top:16px">
+					<span class="pt-chip">macOS 11+</span><span class="pt-chip">Windows 10 21H2+</span><span class="pt-chip">Ubuntu 24.04+</span><span class="pt-chip">GPL-3.0</span>
+				</div>
+			</div>
+			<!-- ponytail: portrait screenshot, so cap the column width instead of letting it fill the grid cell. -->
+			<div class="pt-shot" style="max-width:380px;justify-self:center">
+				<img src="/PortFinder/screenshots/macos.png" alt="PortFinder on macOS showing a captured LLDP result" width="1064" height="1442" />
+			</div>
+		</div>
+	</section>
+
+	<section class="pt-section">
+		<div class="pt-wrap">
+			<div class="pt-head"><div><div class="pt-eyebrow">What it does</div><h2>Seven answers from one packet.</h2></div></div>
+			<div class="pt-features">
+				<div class="pt-feature">
+					<div class="pt-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12a7 7 0 0 1 14 0M8.5 12a3.5 3.5 0 0 1 7 0" /><circle cx="12" cy="12" r="1" /><path d="M12 13v7" /></svg></div>
+					<h3>CDP, LLDP and MNDP</h3>
+					<p>LLDP for Aruba, HP, Juniper, Extreme, Cisco and MikroTik; CDP for Cisco; MNDP for RouterOS. Sniff all interfaces when you don't know which port is patched.</p>
+				</div>
+				<div class="pt-feature">
+					<div class="pt-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 8 4 4-4 4M12 16h7" /></svg></div>
+					<h3>GUI and headless CLI</h3>
+					<p>One release, two surfaces. Run it with no arguments for the desktop app, or pass <code>capture</code>, <code>list</code> or <code>privileges</code>. Same engine, same fields.</p>
+				</div>
+				<div class="pt-feature">
+					<div class="pt-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5M12 7v5l3 2" /></svg></div>
+					<h3>History and settings</h3>
+					<p>The last ten captures in a popover: restore one or copy it as JSON. Opt in to keep history across launches; a live log-level slider for debugging.</p>
+				</div>
+				<div class="pt-feature">
+					<div class="pt-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg></div>
+					<h3>macOS, Windows, Linux</h3>
+					<p>Apple Silicon and Intel, x64 and ARM64, amd64 and arm64. Capture without root via the BPF helper, Npcap or <code>CAP_NET_RAW</code>.</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="pt-section pt-band">
+		<div class="pt-wrap pt-split">
+			<div>
+				<div class="pt-eyebrow">Headless CLI</div>
+				<h2>The same capture, from a shell.</h2>
+				<p>The CLI shares the capture engine with the GUI. Print the result as text, or as JSON to pipe into <code>jq</code> or paste into a ticket.</p>
+				<ul class="pt-checks">
+					<li><code>--json</code> matches the GUI's <em>Copy as JSON</em> byte for byte</li>
+					<li><code>list --with-ip</code> and <code>privileges</code> to check the machine first</li>
+					<li><code>-v</code>, <code>-vv</code>, <code>-q</code> and <code>--log-file</code> per run, without touching settings</li>
+				</ul>
+				<div class="pt-actions">
+					<a class="pt-btn" href="/PortFinder/usage/cli/">CLI reference</a>
+				</div>
+			</div>
+			<div class="pt-term" aria-label="Example portfinder CLI output">
+				<div class="pt-term-bar"><i></i><i></i><i></i><span>portfinder · CDP · enxa0cec8fc01fc</span></div>
+				<pre><span class="t-p">$</span> portfinder capture -i enxa0cec8fc01fc -p CDP
+<span class="t-dim">Switch Name:</span>  test-C800.test.org
+<span class="t-dim">Switch IP:</span>    <span class="t-ip">192.168.0.1</span>
+<span class="t-dim">Switch Port:</span>  <span class="t-if">GigabitEthernet0</span>
+<span class="t-dim">VLAN:</span>         N/A
+<span class="t-dim">Voice VLAN:</span>   N/A
+<span class="t-dim">MTU:</span>          N/A
+<span class="t-dim">Switch Model:</span> Cisco C819HG-4G-V-K9
+<span class="t-p">$</span> portfinder capture -p CDP --json | jq -r .switchName
+test-C800.test.org
+<span class="t-p">$</span> <span class="t-p">▌</span></pre>
+			</div>
+		</div>
+	</section>
+
+	<section class="pt-section">
+		<div class="pt-wrap">
+			<div class="pt-head">
+				<div>
+					<div class="pt-eyebrow">Screenshots</div>
+					<h2>Pick, start, read.</h2>
+					<p>Pick an interface and protocol, click Start, and the result card fills in. Click any value to copy it.</p>
+				</div>
+				<a class="pt-link" href="/PortFinder/usage/gui/">GUI guide →</a>
+			</div>
+			<div class="pt-gallery">
+				{shots.map(([file, caption]) => (
+					<figure><img src={`/PortFinder/screenshots/${file}.png`} alt={`PortFinder: ${caption}`} loading="lazy" /><figcaption>{caption}</figcaption></figure>
+				))}
+			</div>
+		</div>
+	</section>
+
+	<section id="install" class="pt-section pt-band">
+		<div class="pt-wrap pt-split">
+			<div>
+				<div class="pt-eyebrow">Install</div>
+				<h2>Stable or alpha, side by side.</h2>
+				<p>
+					Package managers keep PortFinder updated and put the <code>portfinder</code> CLI on your <code>PATH</code>. The
+					pre-release channel installs as PortFinder Alpha with a <code>portfinder-alpha</code> CLI, so the two coexist.
+				</p>
+				<div class="pt-channels">
+					<div class="pt-channel"><h3>Stable <span class="pt-ver">{v}</span></h3><span>Homebrew · Scoop · winget · Linux packages</span></div>
+					<div class="pt-channel"><h3>Alpha <span class="pt-ver">pre-release</span></h3><span><code>portfinder@alpha</code> · <code>portfinder-prerelease</code></span></div>
+				</div>
+			</div>
+			<InstallTabs
+				id="portfinder"
+				panels={[
+					{
+						os: 'mac',
+						cmds: ['brew tap packetThrower/tap', 'brew trust packetThrower/tap', 'brew install --cask portfinder'],
+						note: 'Click <strong>Install BPF Helper</strong> in the app once to capture without <code>sudo</code>. Without Homebrew: the <code>.dmg</code> plus the standalone <code>PortFinder-BPF-&lt;version&gt;.pkg</code> helper from the release page.',
+					},
+					{
+						os: 'win',
+						cmds: ['winget install packetThrower.PortFinder', 'scoop bucket add packetThrower https://github.com/packetThrower/scoop-bucket', 'scoop install portfinder'],
+						note: 'Packet capture needs <a href="https://npcap.com/#download">Npcap</a>: <code>winget install Insecure.Npcap</code>, or tick “Allow non-administrators to capture” when installing it by hand.',
+					},
+					{
+						os: 'linux',
+						cmds: [`sudo apt install ./PortFinder_${v}_amd64.deb`, `sudo dnf install ./PortFinder-${v}-1.x86_64.rpm`],
+						note: 'The <code>.deb</code> and <code>.rpm</code> grant <code>CAP_NET_RAW</code>, so capture works without <code>sudo</code>. AppImage and Arch <code>.pkg.tar.zst</code> on the release page too.',
+					},
+				]}
+			>
+				<p class="pt-note" style="margin-top:14px">
+					<a href="https://github.com/packetThrower/PortFinder/releases/latest">Release downloads</a> ·
+					<a href="/PortFinder/install/">Full install guide →</a>
+				</p>
+			</InstallTabs>
+		</div>
+	</section>
+
+	<section class="pt-section">
+		<div class="pt-wrap">
+			<div class="pt-head"><div><div class="pt-eyebrow">Docs</div><h2>Start here</h2></div><a class="pt-link" href="/PortFinder/install/">All docs →</a></div>
+			<div class="pt-cards">
+				<a class="pt-lcard" href="/PortFinder/install/"><div class="pt-eyebrow">Get started</div><h3>Install</h3><p>Homebrew, Scoop, winget and Linux packages, plus capture privileges per platform.</p></a>
+				<a class="pt-lcard" href="/PortFinder/usage/gui/"><div class="pt-eyebrow">Guide</div><h3>GUI</h3><p>The capture workflow, the result card, history, shortcuts and settings.</p></a>
+				<a class="pt-lcard" href="/PortFinder/usage/cli/"><div class="pt-eyebrow">Guide</div><h3>CLI</h3><p><code>capture</code>, <code>list</code> and <code>privileges</code>, global flags and scripting with <code>jq</code>.</p></a>
+				<a class="pt-lcard" href="/PortFinder/dev/setup/"><div class="pt-eyebrow">Develop</div><h3>Setup</h3><p>A working dev environment in three commands.</p></a>
+				<a class="pt-lcard" href="/PortFinder/dev/architecture/"><div class="pt-eyebrow">Develop</div><h3>Architecture</h3><p>How the Rust binary, gpui and libpcap fit together.</p></a>
+				<a class="pt-lcard" href="/PortFinder/changelog/"><div class="pt-eyebrow">Project</div><h3>Changelog</h3><p>What changed in each release.</p></a>
+			</div>
+		</div>
+	</section>
+</Layout>
