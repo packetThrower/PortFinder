@@ -38,12 +38,10 @@ time, so Info.plist isn't part of the bump set.
 Astro Starlight deployed to GitHub Pages on every push to main.
 - `docs-next/` — Starlight site (its own pnpm project, separate from the
   Rust crate)
-- `docs-next/astro.config.mjs` — site config (title, sidebar, custom Hero
-  override)
-- `docs-next/src/content/docs/` — page content (index, install, usage, dev,
-  404)
-- `docs-next/src/components/Hero.astro` — drenched-navy landing hero
-- `docs-next/src/styles/theme.css` — palette + typography (Fraunces / IBM Plex)
+- `docs-next/astro.config.mjs` — site config (title, sidebar); look and
+  header come from the shared `@packetthrower/site-theme` package
+- `docs-next/src/pages/index.astro` — landing page (theme `Layout`)
+- `docs-next/src/content/docs/` — page content (install, usage, dev, 404)
 - `docs-next/scripts/sync-changelog.mjs` — copies repo-root CHANGELOG.md
   into the site on predev/prebuild
 - `.github/workflows/docs.yml` — Pages build + deploy
