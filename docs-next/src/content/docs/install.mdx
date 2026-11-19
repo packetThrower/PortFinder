@@ -13,7 +13,7 @@ The fastest path on each platform, in one row:
 | Windows | `winget install packetThrower.PortFinder` |
 | Linux (Debian/Ubuntu) | `sudo apt install ./PortFinder_<version>_amd64.deb` |
 | Linux (Fedora/RHEL) | `sudo dnf install ./PortFinder-<version>-1.x86_64.rpm` |
-| Linux (any) | `chmod +x PortFinder_<version>_amd64.AppImage && ./PortFinder_<version>_amd64.AppImage` |
+| Linux (any) | `chmod +x PortFinder_<version>_x86_64.AppImage && ./PortFinder_<version>_x86_64.AppImage` |
 
 Pre-built binaries for every release live on the [Releases page](https://github.com/packetThrower/PortFinder/releases).
 
@@ -156,8 +156,8 @@ sudo dnf install ./PortFinder-<version>-1.x86_64.rpm
 <TabItem label=".AppImage (any distro)">
 
 ```bash
-chmod +x PortFinder_<version>_amd64.AppImage
-./PortFinder_<version>_amd64.AppImage
+chmod +x PortFinder_<version>_x86_64.AppImage
+./PortFinder_<version>_x86_64.AppImage
 ```
 
 <Aside type="note" title="Ubuntu 24.04+ / fresh installs">
@@ -170,7 +170,7 @@ sudo apt install libfuse2
 Or skip the FUSE mount entirely (extracts to `/tmp` on each launch, slower start):
 
 ```bash
-./PortFinder_<version>_amd64.AppImage --appimage-extract-and-run
+./PortFinder_<version>_x86_64.AppImage --appimage-extract-and-run
 ```
 </Aside>
 
