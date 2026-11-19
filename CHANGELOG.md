@@ -14,6 +14,11 @@ Each major version line is a different implementation:
 
 ## [Unreleased]
 
+### Changed
+
+- **Moved to GPUI Kit 0.10.0** (gpui-pre 0.3.12), in step with the other
+  packetThrower apps.
+
 ## [4.2.0] - 2026-10-26
 
 The move to [GPUI Kit](https://gpui-kit.com): PortFinder now builds
