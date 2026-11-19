@@ -22,8 +22,9 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use flume::{Receiver, Sender};
 use gpui::{
     actions, div, prelude::*, px, rgb, AnyView, App, AppContext, Bounds, ClipboardItem, Context,
-    Entity, FocusHandle, Focusable, Hsla, IntoElement, KeyBinding, Menu, MenuItem, ParentElement,
-    QuitMode, Render, SharedString, Styled, Window, WindowBounds, WindowDecorations, WindowOptions,
+    Entity, FocusHandle, Focusable, Hsla, IntoElement, KeyBinding, KeyBindingContextPredicate,
+    Menu, MenuItem, ParentElement, QuitMode, Render, SharedString, Styled, Window, WindowBounds,
+    WindowDecorations, WindowOptions,
 };
 use gpui_kit::component::{
     button::{Button, ButtonVariants},
@@ -2708,7 +2709,17 @@ pub fn run() {
             // key_context get to keep their own key handling
             // (notably the settings popover's slider, which uses
             // arrow keys).
-            KeyBinding::new("secondary-r", StartOrStop, Some("AppView")),
+            // `KeyBinding::new` panics on `secondary-`: gpui resolves it
+            // against the host OS, which needs `cx`.
+            KeyBinding::load(
+                "secondary-r",
+                Box::new(StartOrStop),
+                Some(KeyBindingContextPredicate::parse("AppView").unwrap().into()),
+                false,
+                None,
+                cx,
+            )
+            .unwrap(),
         ]);
         cx.set_menus(vec![Menu {
             name: "PortFinder".into(),
